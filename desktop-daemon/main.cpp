@@ -4,10 +4,11 @@
  *
  * Win32 System Tray & Lifecycle Enforcer:
  * - Shell_NotifyIconW: System Tray Icon with status tooltips & balloon alerts
+ * - Win32 Login Dialog: Authentication against SleepOrDie API
  * - GetLastInputInfo: Detects keyboard/mouse evasion
  * - LockWorkStation: Enforces Lockdown at T-15m
  * - SetSuspendState: Puts PC to sleep upon 0% HP shutdown
- * - WinHTTP: Telemetry reporting to SleepOrDie API
+ * - WinHTTP: Telemetry reporting and config sync with SleepOrDie API
  */
 
 #define NOMINMAX
@@ -28,6 +29,7 @@
 #include <atomic>
 
 #pragma comment(lib, "user32.lib")
+#pragma comment(lib, "gdi32.lib")
 #pragma comment(lib, "shell32.lib")
 #pragma comment(lib, "winmm.lib")
 #pragma comment(lib, "winhttp.lib")
@@ -36,13 +38,20 @@
 #define WM_TRAYICON (WM_USER + 101)
 #define ID_TRAY_STATUS 2001
 #define ID_TRAY_SIMULATE 2002
-#define ID_TRAY_EXIT 2003
+#define ID_TRAY_LOGIN 2003
+#define ID_TRAY_EXIT 2004
+
+#define IDC_DLG_EMAIL 3001
+#define IDC_DLG_PASSWORD 3002
+#define IDC_DLG_BTN_LOGIN 3003
+#define IDC_DLG_BTN_CANCEL 3004
+#define IDC_DLG_STATUS 3005
 
 enum class SleepStage {
     Normal,
     Alert,      // T-30m
     Lockdown,   // T-15m (Windows Screen Lock)
-    Sleep,      // Deadline Exceeded (30s emergency window)
+    Sleep,      // Deadline Exceeded (Configurable emergency countdown window)
     Shutdown    // HP 0% (Disciplinary PC Sleep / Suspend)
 };
 
@@ -51,11 +60,14 @@ struct DaemonConfig {
     int bedtimeMinute = 15;
     int wakeUpHour = 7;
     int wakeUpMinute = 0;
+    int emergencyCountdownSeconds = 60;
     std::wstring apiHost = L"127.0.0.1";
     int apiPort = 8000;
     std::wstring apiPath = L"/api/presence/update";
     std::string discordUserId = "";
-    int userId = 1;
+    int userId = 0;
+    std::string authToken = "";
+    std::string userEmail = "";
     bool enableAudio = true;
     bool lockWorkstationOnLockdown = true;
     std::string enforceAction = "sleep"; // "sleep", "shutdown", "test_msgbox"
@@ -71,6 +83,30 @@ SleepStage currentStage = SleepStage::Normal;
 NOTIFYICONDATAW g_nid = {};
 HWND g_hWnd = NULL;
 std::atomic<bool> g_simulationRunning(false);
+
+void SaveConfigJson() {
+    std::ofstream file("config.json");
+    if (!file.is_open()) return;
+    file << "{\n";
+    file << "  \"bedtime_hour\": " << config.bedtimeHour << ",\n";
+    file << "  \"bedtime_minute\": " << config.bedtimeMinute << ",\n";
+    file << "  \"wake_up_hour\": " << config.wakeUpHour << ",\n";
+    file << "  \"wake_up_minute\": " << config.wakeUpMinute << ",\n";
+    file << "  \"emergency_countdown_seconds\": " << config.emergencyCountdownSeconds << ",\n";
+    file << "  \"api_url\": \"http://127.0.0.1:8000/api/presence/update\",\n";
+    file << "  \"discord_user_id\": \"" << config.discordUserId << "\",\n";
+    file << "  \"user_id\": " << config.userId << ",\n";
+    file << "  \"auth_token\": \"" << config.authToken << "\",\n";
+    file << "  \"email\": \"" << config.userEmail << "\",\n";
+    file << "  \"enable_audio\": " << (config.enableAudio ? "true" : "false") << ",\n";
+    file << "  \"lock_workstation_on_lockdown\": " << (config.lockWorkstationOnLockdown ? "true" : "false") << ",\n";
+    file << "  \"enforce_action\": \"" << config.enforceAction << "\",\n";
+    file << "  \"anti_evasion\": " << (config.antiEvasion ? "true" : "false") << ",\n";
+    file << "  \"idle_threshold_seconds\": " << config.idleThresholdSeconds << ",\n";
+    file << "  \"check_interval_seconds\": " << config.checkIntervalSeconds << "\n";
+    file << "}\n";
+    file.close();
+}
 
 void LoadConfigJson() {
     std::ifstream file("config.json");
@@ -108,7 +144,10 @@ void LoadConfigJson() {
     config.bedtimeMinute = findInt("bedtime_minute", config.bedtimeMinute);
     config.wakeUpHour = findInt("wake_up_hour", config.wakeUpHour);
     config.wakeUpMinute = findInt("wake_up_minute", config.wakeUpMinute);
+    config.emergencyCountdownSeconds = findInt("emergency_countdown_seconds", config.emergencyCountdownSeconds);
     config.userId = findInt("user_id", config.userId);
+    config.authToken = findString("auth_token", config.authToken);
+    config.userEmail = findString("email", config.userEmail);
     config.discordUserId = findString("discord_user_id", config.discordUserId);
     config.enforceAction = findString("enforce_action", config.enforceAction);
     config.idleThresholdSeconds = findInt("idle_threshold_seconds", config.idleThresholdSeconds);
@@ -208,7 +247,9 @@ void PlaySoundForStage(SleepStage stage) {
     }
 }
 
-bool SendPresenceHttp(const std::wstring& host, int port, const std::wstring& path, const std::string& jsonPayload) {
+bool SendHttpJson(const std::wstring& host, int port, const std::wstring& path, const std::string& jsonPayload, std::string& responseOut, DWORD& statusCodeOut) {
+    statusCodeOut = 0;
+    responseOut.clear();
     HINTERNET hSession = WinHttpOpen(L"SleepOrDieGuard/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
     if (!hSession) return false;
 
@@ -237,6 +278,25 @@ bool SendPresenceHttp(const std::wstring& host, int port, const std::wstring& pa
         bResults = WinHttpReceiveResponse(hRequest, NULL);
     }
 
+    if (bResults) {
+        DWORD statusCode = 0;
+        DWORD statusSize = sizeof(statusCode);
+        WinHttpQueryHeaders(hRequest, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER, WINHTTP_HEADER_NAME_BY_INDEX, &statusCode, &statusSize, WINHTTP_NO_HEADER_INDEX);
+        statusCodeOut = statusCode;
+
+        DWORD dwSize = 0;
+        do {
+            dwSize = 0;
+            if (!WinHttpQueryDataAvailable(hRequest, &dwSize)) break;
+            if (dwSize == 0) break;
+            std::string buffer(dwSize, 0);
+            DWORD dwDownloaded = 0;
+            if (WinHttpReadData(hRequest, &buffer[0], dwSize, &dwDownloaded)) {
+                responseOut.append(buffer.c_str(), dwDownloaded);
+            }
+        } while (dwSize > 0);
+    }
+
     WinHttpCloseHandle(hRequest);
     WinHttpCloseHandle(hConnect);
     WinHttpCloseHandle(hSession);
@@ -254,7 +314,26 @@ void ReportPresence(const std::string& status, int idleSeconds, bool screenLocke
     json += "}";
 
     std::thread([json]() {
-        SendPresenceHttp(config.apiHost, config.apiPort, config.apiPath, json);
+        std::string resp;
+        DWORD code = 0;
+        if (SendHttpJson(config.apiHost, config.apiPort, config.apiPath, json, resp, code)) {
+            // Check if response contains updated countdown
+            size_t pos = resp.find("\"emergency_countdown_seconds\"");
+            if (pos != std::string::npos) {
+                size_t colon = resp.find(":", pos);
+                if (colon != std::string::npos) {
+                    size_t start = resp.find_first_of("0123456789", colon);
+                    if (start != std::string::npos) {
+                        try {
+                            int sec = std::stoi(resp.substr(start));
+                            if (sec >= 10 && sec <= 300) {
+                                config.emergencyCountdownSeconds = sec;
+                            }
+                        } catch (...) {}
+                    }
+                }
+            }
+        }
     }).detach();
 }
 
@@ -280,18 +359,16 @@ void ExecuteFinalEnforcement() {
 
     if (config.enforceAction == "sleep") {
         Sleep(2000);
-        // SetSuspendState(bHibernate, bForce, bWakeupEventsDisabled)
         SetSuspendState(FALSE, FALSE, FALSE);
     } else if (config.enforceAction == "shutdown") {
         Sleep(2000);
         ExitWindowsEx(EWX_SHUTDOWN | EWX_FORCE, SHTDN_REASON_MAJOR_SYSTEM);
     } else {
-        // Test Dialog mode
         MessageBoxW(
             NULL,
             L"🚨 [SleepOrDie: HARDCORE DISCIPLINARY SHUTDOWN]\n\n"
             L"พลังชีวิต (HP) ของคุณลดลงเหลือ 0% แล้ว!\n"
-            L"หมดเวลาช่วงฉุกเฉิน 30 วินาที และเลยเส้นตายเข้านอน\n\n"
+            L"หมดเวลาช่วงฉุกเฉิน และเลยเส้นตายเข้านอน\n\n"
             L"[โหมดทดสอบ: จำลองคำสั่ง Shutdown สำเร็จ]\n"
             L"(ในโหมดปกติเครื่องจะถูกสั่ง SetSuspendState เข้าสู่โหมดสลีปทันที)",
             L"SleepOrDie — SYSTEM SHUTDOWN (0% HP)",
@@ -312,11 +389,13 @@ void RunSimulation321() {
             Sleep(1000);
         }
 
-        ShowTrayBalloon(L"🚨 เลยเส้นตายเข้านอน!", L"เข้าสู่ช่วงฉุกเฉิน 30 วินาทีก่อน HP ลดเหลือ 0%!", NIIF_ERROR);
+        int countdown = config.emergencyCountdownSeconds > 0 ? config.emergencyCountdownSeconds : 60;
+        std::wstring alertMsg = L"เข้าสู่ช่วงฉุกเฉิน " + std::to_wstring(countdown) + L" วินาทีก่อน HP ลดเหลือ 0%!";
+        ShowTrayBalloon(L"🚨 เลยเส้นตายเข้านอน!", alertMsg.c_str(), NIIF_ERROR);
         PlaySoundForStage(SleepStage::Sleep);
 
-        for (int sec = 30; sec >= 1; --sec) {
-            int hp = (sec * 100) / 30;
+        for (int sec = countdown; sec >= 1; --sec) {
+            int hp = (sec * 100) / countdown;
             std::wstring tip = L"SleepOrDie - ฉุกเฉินเหลือ " + std::to_wstring(sec) + L"s (HP: " + std::to_wstring(hp) + L"%)";
             UpdateTrayTooltip(tip);
             Beep(1175, 120);
@@ -326,6 +405,219 @@ void RunSimulation321() {
         ExecuteFinalEnforcement();
         g_simulationRunning = false;
     }).detach();
+}
+
+struct LoginDialogState {
+    bool success = false;
+    HWND hEditEmail = NULL;
+    HWND hEditPassword = NULL;
+    HWND hBtnLogin = NULL;
+    HWND hBtnCancel = NULL;
+    HWND hStatus = NULL;
+    HFONT hFont = NULL;
+};
+
+LRESULT CALLBACK LoginDialogWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    LoginDialogState* pState = (LoginDialogState*)GetWindowLongPtrW(hWnd, GWLP_USERDATA);
+
+    switch (msg) {
+        case WM_CREATE: {
+            CREATESTRUCTW* pCS = (CREATESTRUCTW*)lParam;
+            pState = (LoginDialogState*)pCS->lpCreateParams;
+            SetWindowLongPtrW(hWnd, GWLP_USERDATA, (LONG_PTR)pState);
+
+            HFONT hFont = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
+            pState->hFont = hFont;
+
+            HWND hLblHeader = CreateWindowExW(0, L"STATIC", L"🔒 เข้าสู่ระบบ SleepOrDie Guard", WS_CHILD | WS_VISIBLE | SS_LEFT, 20, 15, 360, 24, hWnd, NULL, pCS->hInstance, NULL);
+            SendMessageW(hLblHeader, WM_SETFONT, (WPARAM)hFont, TRUE);
+
+            HWND hLblSub = CreateWindowExW(0, L"STATIC", L"กรุณากรอก Email และ Password เดียวกับบัญชีบนเว็บ", WS_CHILD | WS_VISIBLE | SS_LEFT, 20, 42, 360, 20, hWnd, NULL, pCS->hInstance, NULL);
+            SendMessageW(hLblSub, WM_SETFONT, (WPARAM)hFont, TRUE);
+
+            HWND hLblEmail = CreateWindowExW(0, L"STATIC", L"อีเมล (Email):", WS_CHILD | WS_VISIBLE | SS_LEFT, 20, 75, 360, 18, hWnd, NULL, pCS->hInstance, NULL);
+            SendMessageW(hLblEmail, WM_SETFONT, (WPARAM)hFont, TRUE);
+
+            pState->hEditEmail = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL, 20, 95, 350, 26, hWnd, (HMENU)IDC_DLG_EMAIL, pCS->hInstance, NULL);
+            SendMessageW(pState->hEditEmail, WM_SETFONT, (WPARAM)hFont, TRUE);
+            if (!config.userEmail.empty()) {
+                int wlen = MultiByteToWideChar(CP_UTF8, 0, config.userEmail.c_str(), -1, NULL, 0);
+                std::wstring wEmail(wlen, 0);
+                MultiByteToWideChar(CP_UTF8, 0, config.userEmail.c_str(), -1, &wEmail[0], wlen);
+                SetWindowTextW(pState->hEditEmail, wEmail.c_str());
+            }
+
+            HWND hLblPass = CreateWindowExW(0, L"STATIC", L"รหัสผ่าน (Password):", WS_CHILD | WS_VISIBLE | SS_LEFT, 20, 130, 360, 18, hWnd, NULL, pCS->hInstance, NULL);
+            SendMessageW(hLblPass, WM_SETFONT, (WPARAM)hFont, TRUE);
+
+            pState->hEditPassword = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_PASSWORD | ES_AUTOHSCROLL, 20, 150, 350, 26, hWnd, (HMENU)IDC_DLG_PASSWORD, pCS->hInstance, NULL);
+            SendMessageW(pState->hEditPassword, WM_SETFONT, (WPARAM)hFont, TRUE);
+
+            pState->hStatus = CreateWindowExW(0, L"STATIC", L"", WS_CHILD | WS_VISIBLE | SS_LEFT, 20, 185, 350, 35, hWnd, (HMENU)IDC_DLG_STATUS, pCS->hInstance, NULL);
+            SendMessageW(pState->hStatus, WM_SETFONT, (WPARAM)hFont, TRUE);
+
+            pState->hBtnLogin = CreateWindowExW(0, L"BUTTON", L"เข้าสู่ระบบ (Login)", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON, 150, 230, 120, 30, hWnd, (HMENU)IDC_DLG_BTN_LOGIN, pCS->hInstance, NULL);
+            SendMessageW(pState->hBtnLogin, WM_SETFONT, (WPARAM)hFont, TRUE);
+
+            pState->hBtnCancel = CreateWindowExW(0, L"BUTTON", L"ยกเลิก", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 280, 230, 90, 30, hWnd, (HMENU)IDC_DLG_BTN_CANCEL, pCS->hInstance, NULL);
+            SendMessageW(pState->hBtnCancel, WM_SETFONT, (WPARAM)hFont, TRUE);
+
+            SetFocus(config.userEmail.empty() ? pState->hEditEmail : pState->hEditPassword);
+            return 0;
+        }
+        case WM_COMMAND: {
+            int wmId = LOWORD(wParam);
+            if (wmId == IDC_DLG_BTN_CANCEL) {
+                pState->success = false;
+                DestroyWindow(hWnd);
+                return 0;
+            }
+            if (wmId == IDC_DLG_BTN_LOGIN) {
+                wchar_t szEmail[256] = {};
+                wchar_t szPass[256] = {};
+                GetWindowTextW(pState->hEditEmail, szEmail, 255);
+                GetWindowTextW(pState->hEditPassword, szPass, 255);
+
+                if (wcslen(szEmail) == 0 || wcslen(szPass) == 0) {
+                    SetWindowTextW(pState->hStatus, L"⚠️ กรุณากรอกอีเมลและรหัสผ่านให้ครบถ้วน");
+                    return 0;
+                }
+
+                SetWindowTextW(pState->hStatus, L"⏳ กำลังตรวจสอบข้อมูลเข้าสู่ระบบ...");
+                EnableWindow(pState->hBtnLogin, FALSE);
+                UpdateWindow(hWnd);
+
+                int emailLen = WideCharToMultiByte(CP_UTF8, 0, szEmail, -1, NULL, 0, NULL, NULL);
+                std::string sEmail(emailLen - 1, 0);
+                WideCharToMultiByte(CP_UTF8, 0, szEmail, -1, &sEmail[0], emailLen, NULL, NULL);
+
+                int passLen = WideCharToMultiByte(CP_UTF8, 0, szPass, -1, NULL, 0, NULL, NULL);
+                std::string sPass(passLen - 1, 0);
+                WideCharToMultiByte(CP_UTF8, 0, szPass, -1, &sPass[0], passLen, NULL, NULL);
+
+                std::string jsonReq = "{\"email\":\"" + sEmail + "\",\"password\":\"" + sPass + "\"}";
+                std::string resp;
+                DWORD statusCode = 0;
+
+                bool sent = SendHttpJson(config.apiHost, config.apiPort, L"/api/daemon/login", jsonReq, resp, statusCode);
+                if (sent && statusCode == 200) {
+                    auto findInt = [&](const std::string& key, int defaultVal) -> int {
+                        size_t pos = resp.find("\"" + key + "\"");
+                        if (pos == std::string::npos) return defaultVal;
+                        size_t colon = resp.find(":", pos);
+                        if (colon == std::string::npos) return defaultVal;
+                        size_t start = resp.find_first_of("0123456789", colon);
+                        if (start == std::string::npos) return defaultVal;
+                        try { return std::stoi(resp.substr(start)); } catch (...) { return defaultVal; }
+                    };
+                    auto findString = [&](const std::string& key, const std::string& defaultVal) -> std::string {
+                        size_t pos = resp.find("\"" + key + "\"");
+                        if (pos == std::string::npos) return defaultVal;
+                        size_t colon = resp.find(":", pos);
+                        if (colon == std::string::npos) return defaultVal;
+                        size_t firstQuote = resp.find("\"", colon);
+                        if (firstQuote == std::string::npos) return defaultVal;
+                        size_t secondQuote = resp.find("\"", firstQuote + 1);
+                        if (secondQuote == std::string::npos) return defaultVal;
+                        return resp.substr(firstQuote + 1, secondQuote - firstQuote - 1);
+                    };
+
+                    config.userId = findInt("user_id", config.userId);
+                    config.emergencyCountdownSeconds = findInt("emergency_countdown_seconds", config.emergencyCountdownSeconds);
+                    config.bedtimeHour = findInt("bedtime_hour", config.bedtimeHour);
+                    config.bedtimeMinute = findInt("bedtime_minute", config.bedtimeMinute);
+                    config.wakeUpHour = findInt("wake_up_hour", config.wakeUpHour);
+                    config.wakeUpMinute = findInt("wake_up_minute", config.wakeUpMinute);
+                    config.authToken = findString("token", config.authToken);
+                    config.userEmail = sEmail;
+
+                    SaveConfigJson();
+                    pState->success = true;
+                    DestroyWindow(hWnd);
+                    return 0;
+                } else {
+                    EnableWindow(pState->hBtnLogin, TRUE);
+                    if (statusCode == 401) {
+                        SetWindowTextW(pState->hStatus, L"❌ อีเมลหรือรหัสผ่านไม่ถูกต้อง กรุณาลองใหม่");
+                    } else {
+                        std::wstring err = L"❌ ไม่สามารถเชื่อมต่อ API ได้ (HTTP " + std::to_wstring(statusCode) + L")";
+                        SetWindowTextW(pState->hStatus, err.c_str());
+                    }
+                    return 0;
+                }
+            }
+            break;
+        }
+        case WM_CLOSE: {
+            pState->success = false;
+            DestroyWindow(hWnd);
+            return 0;
+        }
+        case WM_DESTROY: {
+            PostQuitMessage(0);
+            return 0;
+        }
+        default:
+            return DefWindowProcW(hWnd, msg, wParam, lParam);
+    }
+    return 0;
+}
+
+bool PromptLoginDialog(HWND hParent) {
+    HINSTANCE hInstance = GetModuleHandle(NULL);
+    WNDCLASSEXW wc = {};
+    wc.cbSize = sizeof(WNDCLASSEXW);
+    wc.lpfnWndProc = LoginDialogWndProc;
+    wc.hInstance = hInstance;
+    wc.lpszClassName = L"SleepOrDieLoginDialogClass";
+    wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+
+    RegisterClassExW(&wc);
+
+    LoginDialogState state;
+
+    int screenW = GetSystemMetrics(SM_CXSCREEN);
+    int screenH = GetSystemMetrics(SM_CYSCREEN);
+    int dlgW = 410;
+    int dlgH = 320;
+    int posX = (screenW - dlgW) / 2;
+    int posY = (screenH - dlgH) / 2;
+
+    HWND hDlg = CreateWindowExW(
+        WS_EX_DLGMODALFRAME | WS_EX_TOPMOST,
+        L"SleepOrDieLoginDialogClass",
+        L"เข้าสู่ระบบ SleepOrDie Desktop Guard",
+        WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
+        posX, posY, dlgW, dlgH,
+        hParent, NULL, hInstance, &state
+    );
+
+    if (!hDlg) return false;
+
+    if (hParent) EnableWindow(hParent, FALSE);
+
+    MSG msg;
+    while (IsWindow(hDlg) && GetMessageW(&msg, NULL, 0, 0)) {
+        if (msg.message == WM_KEYDOWN && msg.wParam == VK_RETURN) {
+            SendMessageW(hDlg, WM_COMMAND, MAKEWPARAM(IDC_DLG_BTN_LOGIN, BN_CLICKED), 0);
+            continue;
+        }
+        if (msg.message == WM_KEYDOWN && msg.wParam == VK_ESCAPE) {
+            SendMessageW(hDlg, WM_COMMAND, MAKEWPARAM(IDC_DLG_BTN_CANCEL, BN_CLICKED), 0);
+            continue;
+        }
+        TranslateMessage(&msg);
+        DispatchMessageW(&msg);
+    }
+
+    if (hParent) {
+        EnableWindow(hParent, TRUE);
+        SetForegroundWindow(hParent);
+    }
+
+    UnregisterClassW(L"SleepOrDieLoginDialogClass", hInstance);
+    return state.success;
 }
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
@@ -348,6 +640,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
                 AppendMenuW(hMenu, MF_SEPARATOR, 0, NULL);
                 AppendMenuW(hMenu, MF_STRING, ID_TRAY_STATUS, L"📊 ดูข้อมูลสถานะการนอน");
                 AppendMenuW(hMenu, MF_STRING, ID_TRAY_SIMULATE, L"🧪 ทดสอบจำลองเส้นตาย 3-2-1");
+                AppendMenuW(hMenu, MF_STRING, ID_TRAY_LOGIN, L"🔑 เข้าสู่ระบบใหม่ (Switch User)");
                 AppendMenuW(hMenu, MF_SEPARATOR, 0, NULL);
                 AppendMenuW(hMenu, MF_STRING, ID_TRAY_EXIT, L"🚪 ออกจากโปรแกรม (Exit)");
 
@@ -357,14 +650,19 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
 
                 if (cmd == ID_TRAY_STATUS) {
                     std::wstring info = L"SleepOrDie Desktop Guard\n\n"
+                                        L"• บัญชีผู้ใช้: " + (config.userEmail.empty() ? L"(ยังไม่ล็อกอิน)" : std::wstring(config.userEmail.begin(), config.userEmail.end())) + L"\n"
                                         L"• เวลานอนเป้าหมาย: " + std::to_wstring(config.bedtimeHour) + L":" + (config.bedtimeMinute < 10 ? L"0" : L"") + std::to_wstring(config.bedtimeMinute) + L" น.\n"
                                         L"• เวลาตื่นนอน: " + std::to_wstring(config.wakeUpHour) + L":" + (config.wakeUpMinute < 10 ? L"0" : L"") + std::to_wstring(config.wakeUpMinute) + L" น.\n"
-                                        L"• ลำดับการทำงาน: Alert (T-30m) > Lockdown LockWorkStation (T-15m) > Sleep Deadline (T-0m) > Suspend\n"
+                                        L"• เวลานับถอยหลังฉุกเฉิน: " + std::to_wstring(config.emergencyCountdownSeconds) + L" วินาที\n"
                                         L"• พลังชีวิต (HP): " + std::to_wstring(config.currentHp) + L"%\n"
                                         L"• สถานะเคอร์ฟิว: " + (IsWithinCurfewHours() ? L"กำลังอยู่ในช่วงเคอร์ฟิวเข้านอน" : L"ช่วงเวลาปกติ");
                     MessageBoxW(hWnd, info.c_str(), L"สถานะระบบ SleepOrDie", MB_OK | MB_ICONINFORMATION);
                 } else if (cmd == ID_TRAY_SIMULATE) {
                     RunSimulation321();
+                } else if (cmd == ID_TRAY_LOGIN) {
+                    if (PromptLoginDialog(hWnd)) {
+                        ShowTrayBalloon(L"SleepOrDie", L"เข้าสู่ระบบใหม่สำเร็จ บันทึกการตั้งค่าเรียบร้อยแล้ว", NIIF_INFO);
+                    }
                 } else if (cmd == ID_TRAY_EXIT) {
                     if (config.antiEvasion && IsWithinCurfewHours()) {
                         MessageBoxW(hWnd, L"⚠️ ไม่อนุญาตให้ออกจากโปรแกรมในช่วงเคอร์ฟิวเวลานอน!\n\nระบบวินัย SleepOrDie เปิดใช้งานการป้องกัน Anti-Evasion กรุณาปฏิบัติตามวินัยการพักผ่อน", L"Anti-Evasion Enforced", MB_OK | MB_ICONWARNING | MB_SYSTEMMODAL);
@@ -431,7 +729,9 @@ void DaemonLoop() {
                 }
                 ReportPresence("offline", 900, true);
             } else if (currentStage == SleepStage::Sleep) {
-                ShowTrayBalloon(L"🚨 SleepOrDie ถึงเส้นตายเข้านอน!", L"เลยเส้นตายแล้ว! มีเวลา 30 วินาทีฉุกเฉินก่อนเครื่องจะเข้าสู่โหมดพักระบบ", NIIF_ERROR);
+                int countdown = config.emergencyCountdownSeconds > 0 ? config.emergencyCountdownSeconds : 60;
+                std::wstring msg = L"เลยเส้นตายแล้ว! มีเวลา " + std::to_wstring(countdown) + L" วินาทีฉุกเฉินก่อนเครื่องจะเข้าสู่โหมดพักระบบ";
+                ShowTrayBalloon(L"🚨 SleepOrDie ถึงเส้นตายเข้านอน!", msg.c_str(), NIIF_ERROR);
                 ReportPresence("online", (int)idleSeconds, false);
             }
         }
@@ -439,8 +739,9 @@ void DaemonLoop() {
         // Emergency countdown if past deadline
         if (currentStage == SleepStage::Sleep) {
             long secondsPast = -secondsRemaining;
-            long emergencySecondsLeft = std::max(0L, 30L - secondsPast);
-            config.currentHp = std::max(0, (int)((emergencySecondsLeft * 100) / 30));
+            long countdown = config.emergencyCountdownSeconds > 0 ? config.emergencyCountdownSeconds : 60;
+            long emergencySecondsLeft = std::max(0L, countdown - secondsPast);
+            config.currentHp = std::max(0, (int)((emergencySecondsLeft * 100) / countdown));
 
             PlaySoundForStage(SleepStage::Sleep);
 
@@ -473,8 +774,18 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     if (cmd.find("--test") != std::string::npos) {
         // Run standalone test simulation
         RunSimulation321();
-        Sleep(35000);
+        int waitSec = (config.emergencyCountdownSeconds > 0 ? config.emergencyCountdownSeconds : 60) + 5;
+        Sleep(waitSec * 1000);
         return 0;
+    }
+
+    // Require login if no valid user_id or auth token
+    if (config.userId <= 0 || config.authToken.empty()) {
+        bool ok = PromptLoginDialog(NULL);
+        if (!ok || config.userId <= 0) {
+            MessageBoxW(NULL, L"จำเป็นต้องเข้าสู่ระบบก่อนเริ่มใช้งาน SleepOrDie Guard\nโปรแกรมจะปิดการทำงาน", L"SleepOrDie Guard", MB_OK | MB_ICONWARNING);
+            return 0;
+        }
     }
 
     // Register hidden window class for System Tray message loop
@@ -503,7 +814,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     Shell_NotifyIconW(NIM_ADD, &g_nid);
 
     // Initial greeting balloon
-    ShowTrayBalloon(L"SleepOrDie Desktop Guard", L"ระบบเริ่มทำงานเงียบ ๆ บน System Tray เฝ้าระวังวินัยเวลานอน", NIIF_INFO);
+    std::wstring greetMsg = L"ระบบเริ่มทำงานเงียบ ๆ บน System Tray (นับถอยหลังฉุกเฉิน " + std::to_wstring(config.emergencyCountdownSeconds) + L"s)";
+    ShowTrayBalloon(L"SleepOrDie Desktop Guard", greetMsg.c_str(), NIIF_INFO);
 
     // Launch daemon evaluation loop on worker thread
     std::thread daemonThread(DaemonLoop);
