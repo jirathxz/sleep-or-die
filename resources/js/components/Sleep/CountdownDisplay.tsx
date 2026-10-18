@@ -33,7 +33,7 @@ export const CountdownDisplay: React.FC<CountdownDisplayProps> = ({
 }) => {
     const pad = (n: number) => n.toString().padStart(2, '0');
 
-    let stageText = 'ระบบนับถอยหลังสู่การนอนหลับ';
+    let stageText = 'นับถอยหลังสู่เส้นตายเข้านอนคืนนี้ (Bedtime Deadline)';
     let dotColor = 'bg-white/40';
     let stageTextColor = 'text-zinc-400';
     let digitsColor = 'text-white';
@@ -107,14 +107,14 @@ export const CountdownDisplay: React.FC<CountdownDisplayProps> = ({
                 </div>
             </div>
 
-            {/* Target Schedule Details (Subdued, Clean Layout) */}
-            <div className="flex items-center justify-center gap-4 text-xs text-zinc-400 font-light">
+            {/* Target Schedule Details: Emphasize Bedtime Deadline */}
+            <div className="flex items-center justify-center gap-3 text-xs text-zinc-400 font-light">
                 <span>
-                    เป้าหมายเข้านอน: <span className="text-zinc-200 font-normal">{sleepTargetTime || '--:--'} น.</span>
+                    เส้นตายเข้านอนคืนนี้: <span className="text-white font-medium">{sleepTargetTime || '--:--'} น.</span>
                 </span>
                 <span className="text-zinc-700">•</span>
-                <span>
-                    เป้าหมายตื่น: <span className="text-zinc-200 font-normal">{wakeUpTime || '--:--'} น.</span>
+                <span className="text-zinc-500 font-light">
+                    เวลาตื่นอ้างอิง: {wakeUpTime || '--:--'} น. (5 รอบการนอน)
                 </span>
             </div>
 

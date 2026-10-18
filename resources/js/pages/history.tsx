@@ -53,10 +53,10 @@ export default function History() {
                 {/* Header */}
                 <div>
                     <h1 className="text-xl font-medium tracking-tight text-white">
-                        ประวัติการนอน (Sleep Logs)
+                        ประวัติการเข้านอนตรงเวลา (Bedtime Discipline Logs)
                     </h1>
                     <p className="text-xs text-zinc-500 font-light mt-0.5">
-                        บันทึกเวลาเข้านอนจริงและประวัติการตื่นย้อนหลัง
+                        บันทึกสถิติความตรงต่อเวลา อัตราการรอดชีวิต และประวัติการกดยืนยันเวลานอน
                     </p>
                 </div>
 

@@ -3,6 +3,7 @@ import { Link, usePage } from '@inertiajs/react';
 import {
     LayoutGrid,
     AlarmClock,
+    BellRing,
     Calendar,
     History,
     Activity,
@@ -41,10 +42,10 @@ const mainItems: MenuItem[] = [
         matches: ['/', '/dashboard'],
     },
     {
-        title: 'นาฬิกาปลุก',
+        title: 'แจ้งเตือนเวลานอน',
         href: '/alarms',
-        icon: AlarmClock,
-        matches: ['/alarms'],
+        icon: BellRing,
+        matches: ['/alarms', '/bedtime-alerts'],
     },
     {
         title: 'ตารางการนอน',

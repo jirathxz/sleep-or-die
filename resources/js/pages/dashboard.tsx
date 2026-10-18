@@ -104,7 +104,7 @@ export default function Dashboard() {
                             Sleep Or Die
                         </h1>
                         <p className="text-xs text-zinc-500 font-light">
-                            ระบบควบคุมและตรวจจับวินัยการนอนหลับ
+                            ระบบแจ้งเตือนและบังคับวินัยการเข้านอนตรงเวลา
                         </p>
                     </div>
 

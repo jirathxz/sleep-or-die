@@ -24,10 +24,10 @@ export default function Schedule() {
                 {/* Header */}
                 <div>
                     <h1 className="text-xl font-medium tracking-tight text-white">
-                        ตารางการนอน (Circadian Schedule)
+                        ตารางเส้นตายการนอน (Bedtime Schedule)
                     </h1>
                     <p className="text-xs text-zinc-500 font-light mt-0.5">
-                        กำหนดจังหวะการนอนและตื่นรายวันเพื่อรักษานาฬิกาชีวภาพ
+                        คำนวณและกำหนดเส้นตายเข้านอนรายวัน เพื่อรักษาวินัยและป้องกันการสูญเสียพลังชีวิต
                     </p>
                 </div>
 

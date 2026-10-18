@@ -7,6 +7,7 @@ Route::inertia('/', 'dashboard')->name('home');
 
 // Sleep & Lifestyle Management Modules (MAIN)
 Route::inertia('alarms', 'alarms')->name('alarms');
+Route::inertia('bedtime-alerts', 'alarms')->name('bedtime-alerts');
 Route::inertia('schedule', 'schedule')->name('schedule');
 Route::inertia('history', 'history')->name('history');
 

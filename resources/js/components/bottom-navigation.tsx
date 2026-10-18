@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, usePage } from '@inertiajs/react';
-import { LayoutGrid, AlarmClock, Calendar, History, Menu } from 'lucide-react';
+import { LayoutGrid, BellRing, Calendar, History, Menu } from 'lucide-react';
 import { useSidebar } from '@/components/ui/sidebar';
 
 export function BottomNavigation() {
@@ -15,10 +15,10 @@ export function BottomNavigation() {
             icon: LayoutGrid,
         },
         {
-            title: 'นาฬิกาปลุก',
+            title: 'แจ้งเตือนนอน',
             href: '/alarms',
-            match: ['/alarms'],
-            icon: AlarmClock,
+            match: ['/alarms', '/bedtime-alerts'],
+            icon: BellRing,
         },
         {
             title: 'ตารางการนอน',
