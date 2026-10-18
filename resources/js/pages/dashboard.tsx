@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Head, usePage } from '@inertiajs/react';
+import { Head, Link, usePage } from '@inertiajs/react';
 import { CountdownDisplay } from '@/components/Sleep/CountdownDisplay';
 import { HpBar } from '@/components/Sleep/HpBar';
 import { SettingsModal } from '@/components/Sleep/SettingsModal';
@@ -119,6 +119,21 @@ export default function Dashboard() {
                     </div>
 
                     <div className="flex items-center gap-2">
+                        {auth?.user ? (
+                            <span className="text-xs font-mono text-muted-foreground hidden sm:inline mr-2">
+                                Operator: <span className="font-bold text-foreground">{auth.user.name}</span>
+                            </span>
+                        ) : (
+                            <div className="flex items-center gap-1.5 mr-1">
+                                <Button variant="ghost" size="sm" asChild className="font-mono text-xs">
+                                    <Link href="/login">Log in</Link>
+                                </Button>
+                                <Button size="sm" asChild className="font-mono text-xs font-bold">
+                                    <Link href="/register">Register</Link>
+                                </Button>
+                            </div>
+                        )}
+
                         <Button
                             variant="outline"
                             size="icon"

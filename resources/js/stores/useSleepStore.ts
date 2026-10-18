@@ -33,6 +33,17 @@ export interface SleepState {
     fetchStatus: () => Promise<void>;
 }
 
+function calculateSleepTargetLocal(wakeUpTime: string, cycles: number = 5): string {
+    const [hours, minutes] = wakeUpTime.split(':').map(Number);
+    const date = new Date();
+    date.setHours(hours || 7, minutes || 0, 0, 0);
+    const totalMinutesToSubtract = (cycles * 90) + 15;
+    date.setMinutes(date.getMinutes() - totalMinutesToSubtract);
+    const h = date.getHours().toString().padStart(2, '0');
+    const m = date.getMinutes().toString().padStart(2, '0');
+    return `${h}:${m}`;
+}
+
 function calculateTimeRemaining(targetTimeString: string | null): {
     totalSeconds: number;
     hours: number;
@@ -50,7 +61,6 @@ function calculateTimeRemaining(targetTimeString: string | null): {
     const target = new Date(now);
     target.setHours(hours, minutes, 0, 0);
 
-    // If target was early morning and now is late evening, or vice versa, adjust day
     let diffSeconds = Math.floor((target.getTime() - now.getTime()) / 1000);
 
     // If deadline was more than 12 hours ago, assume it's for today/tomorrow
@@ -100,13 +110,16 @@ function determineStage(
     return 'normal';
 }
 
+const defaultWakeUp = '07:00';
+const defaultSleepTarget = calculateSleepTargetLocal(defaultWakeUp);
+
 export const useSleepStore = create<SleepState>((set, get) => ({
     current_hp: 100,
-    wake_up_time: null,
-    sleep_target_time: null,
+    wake_up_time: defaultWakeUp,
+    sleep_target_time: defaultSleepTarget,
     shutdown_stacks: 0,
-    days_survived: 0,
-    tickets_count: 0,
+    days_survived: 3, // Initial demo streak for guests
+    tickets_count: 1, // 1 emergency ticket
     is_disabled: false,
     discord_user_id: null,
     last_sleep_confirmed_at: null,
@@ -181,23 +194,37 @@ export const useSleepStore = create<SleepState>((set, get) => ({
 
     saveSettings: async (wakeUpTime: string, discordUserId?: string) => {
         try {
+            const calculatedTarget = calculateSleepTargetLocal(wakeUpTime);
             const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-            const res = await fetch('/sleep/settings', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken || '',
-                },
-                body: JSON.stringify({
-                    wake_up_time: wakeUpTime,
-                    discord_user_id: discordUserId,
-                }),
-            });
 
-            if (!res.ok) return false;
-            const data = await res.json();
-            get().syncUser(data);
+            // Attempt server save if authenticated
+            if (csrfToken) {
+                const res = await fetch('/sleep/settings', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                    },
+                    body: JSON.stringify({
+                        wake_up_time: wakeUpTime,
+                        discord_user_id: discordUserId,
+                    }),
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    get().syncUser(data);
+                    return true;
+                }
+            }
+
+            // Local fallback for guest
+            get().syncUser({
+                wake_up_time: wakeUpTime,
+                sleep_target_time: calculatedTarget,
+                discord_user_id: discordUserId || null,
+            });
             return true;
         } catch {
             return false;
@@ -207,19 +234,29 @@ export const useSleepStore = create<SleepState>((set, get) => ({
     confirmSleep: async () => {
         try {
             const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-            const res = await fetch('/sleep/confirm', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken || '',
-                },
-            });
-
-            if (!res.ok) return false;
-            const data = await res.json();
             audioManager.stopAllAudio();
-            get().syncUser(data);
+
+            if (csrfToken) {
+                const res = await fetch('/sleep/confirm', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                    },
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    get().syncUser(data);
+                    return true;
+                }
+            }
+
+            // Local fallback for guest
+            get().syncUser({
+                last_sleep_confirmed_at: new Date().toISOString(),
+            });
             return true;
         } catch {
             return false;
@@ -229,25 +266,45 @@ export const useSleepStore = create<SleepState>((set, get) => ({
     useTicket: async () => {
         try {
             const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-            const res = await fetch('/sleep/ticket', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken || '',
-                },
-            });
 
-            if (!res.ok) return false;
-            const data = await res.json();
-            if (data.success) {
-                set((state) => ({
-                    sleep_target_time: data.new_sleep_target_time,
-                    tickets_count: data.remaining_tickets,
-                }));
+            if (csrfToken) {
+                const res = await fetch('/sleep/ticket', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                    },
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.success) {
+                        set({
+                            sleep_target_time: data.new_sleep_target_time,
+                            tickets_count: data.remaining_tickets,
+                        });
+                        get().tick();
+                        return true;
+                    }
+                }
+            }
+
+            // Local fallback for guest
+            const { tickets_count, sleep_target_time } = get();
+            if (tickets_count > 0 && sleep_target_time) {
+                const [h, m] = sleep_target_time.split(':').map(Number);
+                const d = new Date();
+                d.setHours(h, m + 30, 0, 0);
+                const newTarget = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+                set({
+                    sleep_target_time: newTarget,
+                    tickets_count: tickets_count - 1,
+                });
                 get().tick();
                 return true;
             }
+
             return false;
         } catch {
             return false;
@@ -264,7 +321,7 @@ export const useSleepStore = create<SleepState>((set, get) => ({
                 get().syncUser(data);
             }
         } catch {
-            // Offline or unauthenticated
+            // Guest mode
         }
     },
 }));
