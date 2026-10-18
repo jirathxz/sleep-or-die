@@ -28,6 +28,8 @@ Route::middleware(['auth'])->group(function () {
         Route::post('confirm', [SleepController::class, 'confirmSleep'])->name('confirm');
         Route::post('ticket', [SleepController::class, 'useTicket'])->name('ticket');
         Route::get('status', [SleepController::class, 'status'])->name('status');
+        Route::post('test-discord', [SleepController::class, 'testDiscord'])->name('test-discord');
+        Route::post('test-alert', [SleepController::class, 'testAlert'])->name('test-alert');
     });
 });
 

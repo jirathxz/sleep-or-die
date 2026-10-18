@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Head } from '@inertiajs/react';
-import { BellRing, Moon, ShieldAlert, Sparkles, Plus, Volume2, Repeat, Trash2, Check, Clock } from 'lucide-react';
+import { BellRing, Moon, Plus, Repeat, Trash2, Clock, Send, Check, Loader2, AlertCircle } from 'lucide-react';
 import { useSleepStore } from '@/stores/useSleepStore';
 
 interface BedtimeAlertRule {
@@ -22,7 +22,33 @@ interface CustomBedtimeSchedule {
 }
 
 export default function BedtimeAlerts() {
-    const { sleep_target_time } = useSleepStore();
+    const {
+        sleep_target_time,
+        wake_up_time,
+        saveSettings,
+        testAlert,
+    } = useSleepStore();
+
+    const [activeTarget, setActiveTarget] = useState(sleep_target_time || '23:15');
+    const [activeWake, setActiveWake] = useState(wake_up_time || '07:00');
+    const [isSaving, setIsSaving] = useState(false);
+    const [saveSuccess, setSaveSuccess] = useState(false);
+
+    // Testing alert state
+    const [testingStage, setTestingStage] = useState<string | null>(null);
+    const [alertFeedback, setAlertFeedback] = useState<{
+        success: boolean;
+        message: string;
+    } | null>(null);
+
+    useEffect(() => {
+        if (sleep_target_time) {
+            setActiveTarget(sleep_target_time);
+        }
+        if (wake_up_time) {
+            setActiveWake(wake_up_time);
+        }
+    }, [sleep_target_time, wake_up_time]);
 
     // Built-in Discipline Protocols
     const [alertRules, setAlertRules] = useState<BedtimeAlertRule[]>([
@@ -30,7 +56,7 @@ export default function BedtimeAlerts() {
             id: 'rule-1',
             title: 'แจ้งเตือนผ่อนคลายก่อนนอน • 30 นาทีก่อนเส้นตาย',
             timeBeforeMinutes: 30,
-            description: 'ส่งเสียงสัญญาณกระตุ้นให้เริ่มวางงาน สรุปกิจกรรมประจำวัน และเตรียมตัวเข้านอน',
+            description: 'ส่งสัญญาณกระตุ้นให้เริ่มวางงาน สรุปกิจกรรมประจำวัน และเตรียมตัวเข้านอน',
             sound: 'Chime Melodic Pulse',
             enabled: true,
             stage: 'alert',
@@ -39,7 +65,7 @@ export default function BedtimeAlerts() {
             id: 'rule-2',
             title: 'แจ้งเตือนล็อคดาวน์หน้าจอ • 15 นาทีก่อนเส้นตาย',
             timeBeforeMinutes: 15,
-            description: 'เร่งจังหวะเตือนขั้นสูง บังคับปิดแสงสีฟ้า ปิดหน้าจอ และหยุดใช้งานโซเชียลมีเดีย',
+            description: 'เร่งจังหวะเตือนขั้นสูง บังคับปิดแสงสีฟ้า ปิดหน้าจอคอม และหยุดใช้งานโซเชียลมีเดีย',
             sound: 'Heartbeat Rhythm',
             enabled: true,
             stage: 'lockdown',
@@ -48,14 +74,14 @@ export default function BedtimeAlerts() {
             id: 'rule-3',
             title: 'สัญญาณไซเรนเส้นตายเข้านอน',
             timeBeforeMinutes: 0,
-            description: 'ส่งเสียงไซเรนฉุกเฉินเมื่อถึงเวลา หากไม่กดยืนยันการนอน พลังชีวิตจะเริ่มลดลงทันที',
+            description: 'ส่งเสียงไซเรนฉุกเฉินและแจ้งเตือน Discord เมื่อถึงเวลา หากไม่เข้านอน HP จะเริ่มลดลงทันที',
             sound: 'Emergency Alarm',
             enabled: true,
             stage: 'deadline',
         },
     ]);
 
-    // Custom Bedtime Targets for weekdays/weekends
+    // Custom Bedtime Targets
     const [bedtimeSchedules, setBedtimeSchedules] = useState<CustomBedtimeSchedule[]>([
         {
             id: 'sched-1',
@@ -89,6 +115,30 @@ export default function BedtimeAlerts() {
         );
     };
 
+    const handleSavePrimarySchedule = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsSaving(true);
+        setSaveSuccess(false);
+
+        // Save settings to backend with wake up time and sleep target
+        const ok = await saveSettings(activeWake);
+        setIsSaving(false);
+        if (ok) {
+            setSaveSuccess(true);
+            setTimeout(() => setSaveSuccess(false), 3000);
+        }
+    };
+
+    const handleTriggerTest = async (stage: 'alert' | 'lockdown' | 'deadline') => {
+        setTestingStage(stage);
+        setAlertFeedback(null);
+
+        const res = await testAlert(stage);
+        setTestingStage(null);
+        setAlertFeedback(res);
+        setTimeout(() => setAlertFeedback(null), 5000);
+    };
+
     const addSchedule = (e: React.FormEvent) => {
         e.preventDefault();
         const created: CustomBedtimeSchedule = {
@@ -108,7 +158,7 @@ export default function BedtimeAlerts() {
 
     return (
         <>
-            <Head title="แจ้งเตือนเวลานอน - SleepOrDie" />
+            <Head title="ตั้งเวลาแจ้งเตือนเวลานอน - SleepOrDie" />
 
             <div className="max-w-3xl w-full mx-auto p-4 md:p-6 space-y-6 select-none">
                 {/* Header: Focused on Bedtime Discipline */}
@@ -116,10 +166,10 @@ export default function BedtimeAlerts() {
                     <div>
                         <h1 className="text-xl font-medium tracking-tight text-white flex items-center gap-2">
                             <Moon className="size-5 text-indigo-400" />
-                            ระบบแจ้งเตือนเวลานอน
+                            ระบบตั้งเวลาแจ้งเวลานอน
                         </h1>
                         <p className="text-xs text-zinc-500 font-light mt-0.5">
-                            เน้นการเฝ้าระวัง แจ้งเตือนก่อนนอน และบังคับวินัยการพักผ่อนตรงเวลา
+                            กำหนดเวลาเข้านอน ระบบจะคำนวณและแจ้งเตือนตามลำดับขั้นตอนก่อนถึงเส้นตาย
                         </p>
                     </div>
 
@@ -132,12 +182,86 @@ export default function BedtimeAlerts() {
                     </button>
                 </div>
 
+                {/* Section 0: Primary Bedtime Target Card */}
+                <form onSubmit={handleSavePrimarySchedule} className="bg-[#121215] rounded-2xl p-5 md:p-6 space-y-4 shadow-sm">
+                    <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-white flex items-center gap-2">
+                            <Clock className="size-4 text-emerald-400" />
+                            เป้าหมายเวลาเข้านอนหลัก (Active Bedtime Target)
+                        </span>
+                        {saveSuccess && (
+                            <span className="text-xs text-emerald-400 flex items-center gap-1">
+                                <Check className="size-3.5" />
+                                บันทึกสำเร็จ
+                            </span>
+                        )}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                        <div className="space-y-1.5">
+                            <label className="text-xs text-zinc-400 font-light flex items-center justify-between">
+                                <span>เวลาตื่นนอนเป้าหมาย</span>
+                                <span className="text-[11px] text-zinc-500">(คำนวณ 5 Sleep Cycles)</span>
+                            </label>
+                            <input
+                                type="time"
+                                value={activeWake}
+                                onChange={(e) => setActiveWake(e.target.value)}
+                                required
+                                className="w-full h-11 px-3 bg-[#18181b] text-white rounded-lg border-0 text-lg tabular-nums focus:outline-none focus:ring-1 focus:ring-white/20"
+                            />
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <label className="text-xs text-zinc-400 font-light flex items-center justify-between">
+                                <span>เวลาเข้านอนเป้าหมาย</span>
+                                <span className="text-[11px] text-emerald-400 font-medium">เส้นตายเข้านอน</span>
+                            </label>
+                            <div className="w-full h-11 px-3 bg-[#18181b] text-white rounded-lg flex items-center text-lg tabular-nums">
+                                {activeTarget} น.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2">
+                        <span className="text-[11px] text-zinc-500 font-light">
+                            คำนวณถอยหลัง 7 ชั่วโมง 45 นาที (90 นาที × 5 รอบ + 15 นาทีเพื่อผล็อยหลับ)
+                        </span>
+                        <button
+                            type="submit"
+                            disabled={isSaving}
+                            className="h-9 px-5 rounded-lg bg-white text-zinc-950 text-xs font-medium hover:bg-zinc-200 transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                        >
+                            {isSaving ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
+                            <span>บันทึกการตั้งค่า</span>
+                        </button>
+                    </div>
+                </form>
+
+                {/* Alert Feedback Toast */}
+                {alertFeedback && (
+                    <div
+                        className={`p-3.5 rounded-xl text-xs flex items-center gap-2 ${
+                            alertFeedback.success
+                                ? 'bg-emerald-950/60 text-emerald-300'
+                                : 'bg-rose-950/60 text-rose-300'
+                        }`}
+                    >
+                        {alertFeedback.success ? (
+                            <Check className="size-4 shrink-0 text-emerald-400" />
+                        ) : (
+                            <AlertCircle className="size-4 shrink-0 text-rose-400" />
+                        )}
+                        <span>{alertFeedback.message}</span>
+                    </div>
+                )}
+
                 {/* Section 1: Pre-Bedtime Notification Stages (Core Enforcer) */}
                 <div className="bg-[#121215] rounded-2xl p-5 md:p-6 space-y-4 shadow-sm">
                     <div className="flex items-center justify-between">
                         <span className="text-sm font-medium text-white flex items-center gap-2">
                             <BellRing className="size-4 text-emerald-400" />
-                            ขั้นตอนการแจ้งเตือนก่อนถึงเส้นตาย
+                            ลำดับขั้นตอนการแจ้งเตือนอัตโนมัติ
                         </span>
                         <span className="text-xs text-zinc-500 font-light">3 ระดับความเข้มข้น</span>
                     </div>
@@ -146,7 +270,7 @@ export default function BedtimeAlerts() {
                         {alertRules.map((rule) => (
                             <div
                                 key={rule.id}
-                                className="bg-[#18181b] rounded-xl p-4 flex items-center justify-between gap-4 transition-colors"
+                                className="bg-[#18181b] rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors"
                             >
                                 <div className="space-y-1">
                                     <div className="flex items-center gap-2">
@@ -168,20 +292,37 @@ export default function BedtimeAlerts() {
                                     </p>
                                 </div>
 
-                                <button
-                                    onClick={() => toggleRule(rule.id)}
-                                    className={`w-12 h-6 rounded-full transition-colors relative flex items-center p-0.5 shrink-0 ${
-                                        rule.enabled ? 'bg-white' : 'bg-zinc-800'
-                                    }`}
-                                >
-                                    <div
-                                        className={`size-5 rounded-full transition-transform ${
-                                            rule.enabled
-                                                ? 'bg-zinc-950 translate-x-6'
-                                                : 'bg-zinc-500 translate-x-0'
+                                <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
+                                    <button
+                                        type="button"
+                                        disabled={testingStage === rule.stage}
+                                        onClick={() => handleTriggerTest(rule.stage)}
+                                        className="h-8 px-3 rounded-lg bg-[#27272a] text-zinc-300 hover:text-white hover:bg-zinc-700 text-[11px] font-normal flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                                        title="ทดสอบส่งการแจ้งเตือนไปยัง Discord หรือระบบ"
+                                    >
+                                        {testingStage === rule.stage ? (
+                                            <Loader2 className="size-3 animate-spin" />
+                                        ) : (
+                                            <Send className="size-3" />
+                                        )}
+                                        <span>ทดสอบเตือน</span>
+                                    </button>
+
+                                    <button
+                                        onClick={() => toggleRule(rule.id)}
+                                        className={`w-12 h-6 rounded-full transition-colors relative flex items-center p-0.5 shrink-0 ${
+                                            rule.enabled ? 'bg-white' : 'bg-zinc-800'
                                         }`}
-                                    />
-                                </button>
+                                    >
+                                        <div
+                                            className={`size-5 rounded-full transition-transform ${
+                                                rule.enabled
+                                                    ? 'bg-zinc-950 translate-x-6'
+                                                    : 'bg-zinc-500 translate-x-0'
+                                            }`}
+                                        />
+                                    </button>
+                                </div>
                             </div>
                         ))}
                     </div>

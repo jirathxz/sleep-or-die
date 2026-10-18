@@ -1,12 +1,15 @@
 {
   "bedtime_hour": 23,
   "bedtime_minute": 15,
+  "wake_up_hour": 7,
+  "wake_up_minute": 0,
   "api_url": "http://127.0.0.1:8000/api/presence/update",
   "discord_user_id": "",
   "user_id": 1,
   "enable_audio": true,
   "lock_workstation_on_lockdown": true,
-  "enforce_system_shutdown": false,
+  "enforce_action": "sleep",
+  "anti_evasion": true,
   "idle_threshold_seconds": 60,
   "check_interval_seconds": 2
 }

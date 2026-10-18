@@ -1,0 +1,80 @@
+services:
+  # Primary Web Application Service
+  - type: web
+    name: sleepordie-web
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: singapore
+    healthCheckPath: /up
+    envVars:
+      - key: APP_NAME
+        value: SleepOrDie
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: APP_KEY
+        generateValue: true
+      - key: LOG_CHANNEL
+        value: stderr
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DB_HOST
+        value: db.ruzurqqvsoyuumaftvoa.supabase.co
+      - key: DB_PORT
+        value: "5432"
+      - key: DB_DATABASE
+        value: postgres
+      - key: DB_USERNAME
+        value: postgres
+      - key: DB_PASSWORD
+        sync: false
+      - key: SESSION_DRIVER
+        value: database
+      - key: CACHE_STORE
+        value: database
+      - key: QUEUE_CONNECTION
+        value: database
+      - key: VITE_SUPABASE_URL
+        value: https://ruzurqqvsoyuumaftvoa.supabase.co
+      - key: VITE_SUPABASE_ANON_KEY
+        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ1enVycXF2c295dXVtYWZ0dm9hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIzMTczMjMsImV4cCI6MjEwNzg5MzMyM30.-ExmSOoR-DSpGBYqEkpUNBLos3l_ox5GWLc8opGzCkA
+
+  # Background Scheduler Worker for Bedtime Alerts (every minute)
+  - type: worker
+    name: sleepordie-scheduler
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerCommand: php artisan schedule:work
+    plan: free
+    region: singapore
+    envVars:
+      - key: APP_NAME
+        value: SleepOrDie
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: APP_KEY
+        fromService:
+          type: web
+          name: sleepordie-web
+          envVarKey: APP_KEY
+      - key: LOG_CHANNEL
+        value: stderr
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DB_HOST
+        value: db.ruzurqqvsoyuumaftvoa.supabase.co
+      - key: DB_PORT
+        value: "5432"
+      - key: DB_DATABASE
+        value: postgres
+      - key: DB_USERNAME
+        value: postgres
+      - key: DB_PASSWORD
+        fromService:
+          type: web
+          name: sleepordie-web
+          envVarKey: DB_PASSWORD

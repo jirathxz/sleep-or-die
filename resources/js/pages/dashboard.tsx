@@ -26,6 +26,7 @@ interface PageProps {
             tickets_count?: number;
             is_disabled?: boolean;
             discord_user_id?: string | null;
+            discord_bot_token?: string | null;
             last_sleep_confirmed_at?: string | null;
         };
     };
@@ -76,6 +77,7 @@ export default function Dashboard() {
                 tickets_count: auth.user.tickets_count ?? 0,
                 is_disabled: auth.user.is_disabled ?? false,
                 discord_user_id: auth.user.discord_user_id ?? null,
+                discord_bot_token: auth.user.discord_bot_token ?? null,
                 last_sleep_confirmed_at: auth.user.last_sleep_confirmed_at ?? null,
             });
         }

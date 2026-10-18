@@ -1,6 +1,9 @@
 /.phpunit.cache
 /bootstrap/ssr
 /node_modules
+node_modules/
+**/node_modules/
+discord-bot/.env
 /public/build
 /public/fonts-manifest.dev.json
 /public/hot

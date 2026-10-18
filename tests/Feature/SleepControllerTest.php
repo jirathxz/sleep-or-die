@@ -210,3 +210,112 @@ test('morning wake up time automatically awards survival reward if slept through
     Carbon\Carbon::setTestNow();
 });
 
+test('user can test discord connection successfully and persists token', function () {
+    Illuminate\Support\Facades\Http::fake([
+        'https://discord.com/api/v10/users/@me' => Illuminate\Support\Facades\Http::response([
+            'id' => '999888777',
+            'username' => 'SleepOrDieBot',
+        ], 200),
+        'https://discord.com/api/v10/users/123456' => Illuminate\Support\Facades\Http::response([
+            'id' => '123456',
+            'username' => 'TestDiscordUser',
+            'global_name' => 'Tester',
+        ], 200),
+    ]);
+
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)->postJson('/sleep/test-discord', [
+        'discord_bot_token' => 'mock_valid_token_xyz',
+        'discord_user_id' => '123456',
+    ]);
+
+    $response->assertOk()
+        ->assertJson([
+            'success' => true,
+            'bot' => [
+                'id' => '999888777',
+                'username' => 'SleepOrDieBot',
+            ],
+            'target_user' => [
+                'found' => true,
+                'username' => 'TestDiscordUser',
+            ],
+        ]);
+
+    expect($user->fresh()->discord_bot_token)->toBe('mock_valid_token_xyz')
+        ->and($user->fresh()->discord_user_id)->toBe('123456');
+});
+
+test('test discord connection returns error if token is invalid', function () {
+    Illuminate\Support\Facades\Http::fake([
+        'https://discord.com/api/v10/users/@me' => Illuminate\Support\Facades\Http::response([
+            'message' => '401: Unauthorized',
+            'code' => 0,
+        ], 401),
+    ]);
+
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)->postJson('/sleep/test-discord', [
+        'discord_bot_token' => 'invalid_token_123',
+    ]);
+
+    $response->assertStatus(400)
+        ->assertJson([
+            'success' => false,
+        ]);
+});
+
+test('user can update sleep schedule by providing direct sleep target time', function () {
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)->postJson('/sleep/settings', [
+        'sleep_target_time' => '23:30',
+    ]);
+
+    $response->assertOk()
+        ->assertJson([
+            'sleep_target_time' => '23:30',
+        ]);
+
+    expect($user->fresh()->sleep_target_time)->toBe('23:30');
+});
+
+test('user can trigger test alert endpoint', function () {
+    $user = User::factory()->create([
+        'sleep_target_time' => '23:00',
+    ]);
+
+    $response = $this->actingAs($user)->postJson('/sleep/test-alert', [
+        'stage' => 'deadline',
+    ]);
+
+    $response->assertOk()
+        ->assertJson([
+            'success' => true,
+            'stage' => 'deadline',
+        ]);
+});
+
+test('bedtime alert command dispatches notification at scheduled target time', function () {
+    Illuminate\Support\Facades\Http::fake([
+        'https://discord.com/api/v10/users/@me/channels' => Illuminate\Support\Facades\Http::response(['id' => 'dm_ch_999'], 200),
+        'https://discord.com/api/v10/channels/dm_ch_999/messages' => Illuminate\Support\Facades\Http::response(['id' => 'msg_111'], 200),
+    ]);
+
+    // Create user whose target time matches current time exactly
+    $currentTime = now()->format('H:i');
+    $user = User::factory()->create([
+        'sleep_target_time' => $currentTime,
+        'discord_user_id' => 'discord_user_123',
+        'discord_bot_token' => 'discord_bot_token_abc',
+        'last_sleep_confirmed_at' => null,
+    ]);
+
+    $this->artisan('sleep:check-alerts')
+        ->expectsOutput('Checking bedtime alert schedules...')
+        ->expectsOutput('Completed. Alerts dispatched: 1')
+        ->assertSuccessful();
+});
+

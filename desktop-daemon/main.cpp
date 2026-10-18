@@ -2,18 +2,22 @@
  * SleepOrDie Native Windows Desktop Guard Daemon
  * Hardcore Biological Discipline & Night Curfew Enforcer
  *
- * Win32 API Integration:
- * - GetLastInputInfo: Detects keyboard/mouse activity & evasion
- * - Beep / PlaySound: Hardware audio alerts for Alert, Lockdown, Emergency Alarm, Shutdown
- * - LockWorkStation: Instantly locks Windows workstation (Sign Out) upon Lockdown
- * - WinHTTP: Native HTTP presence reporting to SleepOrDie Web API
+ * Win32 System Tray & Lifecycle Enforcer:
+ * - Shell_NotifyIconW: System Tray Icon with status tooltips & balloon alerts
+ * - GetLastInputInfo: Detects keyboard/mouse evasion
+ * - LockWorkStation: Enforces Lockdown at T-15m
+ * - SetSuspendState: Puts PC to sleep upon 0% HP shutdown
+ * - WinHTTP: Telemetry reporting to SleepOrDie API
  */
 
+#define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <shellapi.h>
 #include <mmsystem.h>
 #include <winhttp.h>
+#include <powrprof.h>
+#include <algorithm>
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -21,23 +25,32 @@
 #include <ctime>
 #include <chrono>
 #include <thread>
+#include <atomic>
 
 #pragma comment(lib, "user32.lib")
 #pragma comment(lib, "shell32.lib")
 #pragma comment(lib, "winmm.lib")
 #pragma comment(lib, "winhttp.lib")
+#pragma comment(lib, "powrprof.lib")
+
+#define WM_TRAYICON (WM_USER + 101)
+#define ID_TRAY_STATUS 2001
+#define ID_TRAY_SIMULATE 2002
+#define ID_TRAY_EXIT 2003
 
 enum class SleepStage {
     Normal,
     Alert,      // T-30m
-    Lockdown,   // T-15m (Windows Sign Out / Screen Lock)
-    Sleep,      // Deadline Exceeded (HP Draining - 30s emergency)
-    Shutdown    // HP 0% (Disciplinary Shutdown)
+    Lockdown,   // T-15m (Windows Screen Lock)
+    Sleep,      // Deadline Exceeded (30s emergency window)
+    Shutdown    // HP 0% (Disciplinary PC Sleep / Suspend)
 };
 
 struct DaemonConfig {
     int bedtimeHour = 23;
     int bedtimeMinute = 15;
+    int wakeUpHour = 7;
+    int wakeUpMinute = 0;
     std::wstring apiHost = L"127.0.0.1";
     int apiPort = 8000;
     std::wstring apiPath = L"/api/presence/update";
@@ -45,7 +58,8 @@ struct DaemonConfig {
     int userId = 1;
     bool enableAudio = true;
     bool lockWorkstationOnLockdown = true;
-    bool enforcePcPoweroff = false;
+    std::string enforceAction = "sleep"; // "sleep", "shutdown", "test_msgbox"
+    bool antiEvasion = true;
     int idleThresholdSeconds = 60;
     int checkIntervalSeconds = 2;
     int currentHp = 100;
@@ -54,6 +68,9 @@ struct DaemonConfig {
 // Global daemon state
 DaemonConfig config;
 SleepStage currentStage = SleepStage::Normal;
+NOTIFYICONDATAW g_nid = {};
+HWND g_hWnd = NULL;
+std::atomic<bool> g_simulationRunning(false);
 
 void LoadConfigJson() {
     std::ifstream file("config.json");
@@ -89,19 +106,22 @@ void LoadConfigJson() {
 
     config.bedtimeHour = findInt("bedtime_hour", config.bedtimeHour);
     config.bedtimeMinute = findInt("bedtime_minute", config.bedtimeMinute);
+    config.wakeUpHour = findInt("wake_up_hour", config.wakeUpHour);
+    config.wakeUpMinute = findInt("wake_up_minute", config.wakeUpMinute);
     config.userId = findInt("user_id", config.userId);
     config.discordUserId = findString("discord_user_id", config.discordUserId);
+    config.enforceAction = findString("enforce_action", config.enforceAction);
     config.idleThresholdSeconds = findInt("idle_threshold_seconds", config.idleThresholdSeconds);
     config.checkIntervalSeconds = findInt("check_interval_seconds", config.checkIntervalSeconds);
 
     if (content.find("\"lock_workstation_on_lockdown\": false") != std::string::npos) {
         config.lockWorkstationOnLockdown = false;
     }
+    if (content.find("\"anti_evasion\": false") != std::string::npos) {
+        config.antiEvasion = false;
+    }
 }
 
-/**
- * Returns seconds since last user input (keyboard or mouse)
- */
 DWORD GetUserIdleSeconds() {
     LASTINPUTINFO lii;
     lii.cbSize = sizeof(LASTINPUTINFO);
@@ -112,9 +132,6 @@ DWORD GetUserIdleSeconds() {
     return 0;
 }
 
-/**
- * Calculates remaining seconds until bedtime target
- */
 long GetSecondsUntilBedtime(int targetHour, int targetMin) {
     auto now = std::chrono::system_clock::now();
     std::time_t nowTime = std::chrono::system_clock::to_time_t(now);
@@ -126,7 +143,6 @@ long GetSecondsUntilBedtime(int targetHour, int targetMin) {
 
     long diff = targetSeconds - nowSeconds;
 
-    // Adjust for overnight wrap-around (within 12h span)
     if (diff < -43200) {
         diff += 86400;
     } else if (diff > 43200) {
@@ -136,29 +152,42 @@ long GetSecondsUntilBedtime(int targetHour, int targetMin) {
     return diff;
 }
 
-/**
- * Hardware Sound Synthesis for Each Stage
- */
+bool IsWithinCurfewHours() {
+    auto now = std::chrono::system_clock::now();
+    std::time_t nowTime = std::chrono::system_clock::to_time_t(now);
+    std::tm localTm;
+    localtime_s(&localTm, &nowTime);
+
+    int nowMinutes = localTm.tm_hour * 60 + localTm.tm_min;
+    int bedMinutes = config.bedtimeHour * 60 + config.bedtimeMinute;
+    int alertMinutes = bedMinutes - 30;
+    if (alertMinutes < 0) alertMinutes += 1440;
+    int wakeMinutes = config.wakeUpHour * 60 + config.wakeUpMinute;
+
+    if (alertMinutes > wakeMinutes) {
+        return nowMinutes >= alertMinutes || nowMinutes <= wakeMinutes;
+    } else {
+        return nowMinutes >= alertMinutes && nowMinutes <= wakeMinutes;
+    }
+}
+
 void PlaySoundForStage(SleepStage stage) {
     if (!config.enableAudio) return;
 
     switch (stage) {
         case SleepStage::Alert:
-            // Gentle double chime (D5 -> A5)
             Beep(587, 250);
             Sleep(80);
             Beep(880, 350);
             break;
 
         case SleepStage::Lockdown:
-            // Urgent heartbeat rhythm
             Beep(440, 150);
             Sleep(100);
             Beep(440, 200);
             break;
 
         case SleepStage::Sleep:
-            // High-frequency emergency alarm pulse
             for (int i = 0; i < 3; ++i) {
                 Beep(988, 120);
                 Sleep(50);
@@ -168,7 +197,6 @@ void PlaySoundForStage(SleepStage stage) {
             break;
 
         case SleepStage::Shutdown:
-            // Power-down descending tone
             Beep(659, 250);
             Beep(494, 250);
             Beep(330, 400);
@@ -180,17 +208,6 @@ void PlaySoundForStage(SleepStage stage) {
     }
 }
 
-void PrintConsoleUnicode(const std::wstring& text) {
-    HANDLE hStdOut = GetStdHandle(STD_OUTPUT_HANDLE);
-    if (hStdOut != INVALID_HANDLE_VALUE) {
-        DWORD written = 0;
-        WriteConsoleW(hStdOut, text.c_str(), (DWORD)text.length(), &written, NULL);
-    }
-}
-
-/**
- * Native HTTP presence reporting to SleepOrDie API via WinHTTP
- */
 bool SendPresenceHttp(const std::wstring& host, int port, const std::wstring& path, const std::string& jsonPayload) {
     HINTERNET hSession = WinHttpOpen(L"SleepOrDieGuard/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
     if (!hSession) return false;
@@ -241,116 +258,144 @@ void ReportPresence(const std::string& status, int idleSeconds, bool screenLocke
     }).detach();
 }
 
-/**
- * Native Windows Toast / Message Alert (Async non-blocking popup)
- */
-void ShowWindowsAlert(const std::wstring& title, const std::wstring& message, UINT iconType) {
-    PrintConsoleUnicode(L"[" + title + L"] " + message + L"\n");
-    MessageBeep(iconType);
-
-    struct PopupArgs {
-        std::wstring title;
-        std::wstring message;
-        UINT iconType;
-    };
-    PopupArgs* args = new PopupArgs{ title, message, iconType };
-
-    HANDLE hThread = CreateThread(
-        NULL, 0,
-        [](LPVOID param) -> DWORD {
-            PopupArgs* p = (PopupArgs*)param;
-            MessageBoxW(NULL, p->message.c_str(), p->title.c_str(), p->iconType | MB_TOPMOST);
-            delete p;
-            return 0;
-        },
-        args, 0, NULL
-    );
-    if (hThread) {
-        CloseHandle(hThread);
-    }
+void UpdateTrayTooltip(const std::wstring& tooltip) {
+    wcsncpy_s(g_nid.szTip, tooltip.c_str(), _TRUNCATE);
+    g_nid.uFlags = NIF_TIP;
+    Shell_NotifyIconW(NIM_MODIFY, &g_nid);
 }
 
-/**
- * Disciplinary Enforcement (Shutdown - Test Mode uses MessageBox as requested)
- */
-void ExecuteEnforcement() {
-    PrintConsoleUnicode(L"\n=======================================================\n");
-    PrintConsoleUnicode(L">>> [0% HP: SYSTEM SHUTDOWN ENFORCED (TEST MODE: MSGBOX)] <<<\n");
-    PrintConsoleUnicode(L"=======================================================\n");
+void ShowTrayBalloon(const std::wstring& title, const std::wstring& message, DWORD infoFlags = NIIF_INFO) {
+    g_nid.uFlags = NIF_INFO;
+    wcsncpy_s(g_nid.szInfoTitle, title.c_str(), _TRUNCATE);
+    wcsncpy_s(g_nid.szInfo, message.c_str(), _TRUNCATE);
+    g_nid.dwInfoFlags = infoFlags;
+    Shell_NotifyIconW(NIM_MODIFY, &g_nid);
+}
+
+void ExecuteFinalEnforcement() {
+    ReportPresence("shutdown", 0, true);
     PlaySoundForStage(SleepStage::Shutdown);
 
-    ReportPresence("shutdown", 0, true);
+    ShowTrayBalloon(L"SleepOrDie — 0% HP SHUTDOWN", L"หมดเวลาฉุกเฉินแล้ว! เริ่มดำเนินการสั่งพักระบบคอมพิวเตอร์", NIIF_ERROR);
 
-    // Using Windows MessageBox for test mode as requested (instead of locking or turning off PC)
-    MessageBoxW(
-        NULL,
-        L"🚨 [SleepOrDie: HARDCORE DISCIPLINARY SHUTDOWN]\n\n"
-        L"พลังชีวิต (HP) ของคุณลดลงเหลือ 0% แล้ว!\n"
-        L"หมดเวลาช่วงฉุกเฉิน 30 วินาที และเลยเส้นตายเข้านอน\n\n"
-        L"⚠️ บันทึกสไตรค์ความผิด 1 ครั้ง (Strike Recorded)\n\n"
-        L"----------------------------------------------------\n"
-        L"[โหมดทดสอบ: แสดง MessageBox จำลองคำสั่ง Shutdown สำเร็จ]\n"
-        L"(ในระบบจริงเครื่องจะถูกสั่ง LockWorkStation หรือปิดระบบทันที)",
-        L"SleepOrDie — SYSTEM SHUTDOWN (0% HP)",
-        MB_OK | MB_ICONERROR | MB_SYSTEMMODAL
-    );
+    if (config.enforceAction == "sleep") {
+        Sleep(2000);
+        // SetSuspendState(bHibernate, bForce, bWakeupEventsDisabled)
+        SetSuspendState(FALSE, FALSE, FALSE);
+    } else if (config.enforceAction == "shutdown") {
+        Sleep(2000);
+        ExitWindowsEx(EWX_SHUTDOWN | EWX_FORCE, SHTDN_REASON_MAJOR_SYSTEM);
+    } else {
+        // Test Dialog mode
+        MessageBoxW(
+            NULL,
+            L"🚨 [SleepOrDie: HARDCORE DISCIPLINARY SHUTDOWN]\n\n"
+            L"พลังชีวิต (HP) ของคุณลดลงเหลือ 0% แล้ว!\n"
+            L"หมดเวลาช่วงฉุกเฉิน 30 วินาที และเลยเส้นตายเข้านอน\n\n"
+            L"[โหมดทดสอบ: จำลองคำสั่ง Shutdown สำเร็จ]\n"
+            L"(ในโหมดปกติเครื่องจะถูกสั่ง SetSuspendState เข้าสู่โหมดสลีปทันที)",
+            L"SleepOrDie — SYSTEM SHUTDOWN (0% HP)",
+            MB_OK | MB_ICONERROR | MB_SYSTEMMODAL
+        );
+    }
 }
 
-/**
- * Simulates the 3-2-1 Bedtime Countdown locally with 30s emergency window before HP hits 0%
- */
 void RunSimulation321() {
-    std::cout << "\n=======================================================\n";
-    std::cout << "  [SIMULATION] Starting Bedtime Countdown 3 - 2 - 1    \n";
-    std::cout << "=======================================================\n";
+    if (g_simulationRunning) return;
+    g_simulationRunning = true;
 
-    for (int sec = 3; sec >= 1; --sec) {
-        std::cout << ">>> Countdown: " << sec << " seconds remaining...\n";
-        Beep(587, 200);
-        Sleep(1000);
-    }
+    std::thread([]() {
+        ShowTrayBalloon(L"SleepOrDie จำลองการทดสอบ", L"เริ่มนับถอยหลัง 3 - 2 - 1 จำลองเส้นตายเข้านอน", NIIF_INFO);
 
-    std::cout << "\n>>> [DEADLINE REACHED: 00:00:00] BEDTIME PROTOCOL BREACHED! <<<\n";
-    std::cout << ">>> EMERGENCY! 30 seconds remaining before HP reaches 0%!\n";
-    PlaySoundForStage(SleepStage::Sleep);
+        for (int sec = 3; sec >= 1; --sec) {
+            Beep(587, 200);
+            Sleep(1000);
+        }
 
-    for (int sec = 30; sec >= 1; --sec) {
-        int hp = (sec * 100) / 30;
-        std::cout << ">>> [EMERGENCY 30s COUNTDOWN] " << sec << "s remaining before HP 0%! Current HP: " << hp << "%\n";
-        Beep(1175, 120);
-        Sleep(1000);
-    }
+        ShowTrayBalloon(L"🚨 เลยเส้นตายเข้านอน!", L"เข้าสู่ช่วงฉุกเฉิน 30 วินาทีก่อน HP ลดเหลือ 0%!", NIIF_ERROR);
+        PlaySoundForStage(SleepStage::Sleep);
 
-    std::cout << "\n>>> [0% HP: SYSTEM SHUTDOWN] STRIKE RECORDED! <<<\n";
-    ExecuteEnforcement();
+        for (int sec = 30; sec >= 1; --sec) {
+            int hp = (sec * 100) / 30;
+            std::wstring tip = L"SleepOrDie - ฉุกเฉินเหลือ " + std::to_wstring(sec) + L"s (HP: " + std::to_wstring(hp) + L"%)";
+            UpdateTrayTooltip(tip);
+            Beep(1175, 120);
+            Sleep(1000);
+        }
+
+        ExecuteFinalEnforcement();
+        g_simulationRunning = false;
+    }).detach();
 }
 
-int main(int argc, char* argv[]) {
-    // Set console code page to UTF-8
-    SetConsoleOutputCP(CP_UTF8);
-    SetConsoleCP(CP_UTF8);
+LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
+    switch (message) {
+        case WM_TRAYICON: {
+            if (LOWORD(lParam) == WM_RBUTTONUP || LOWORD(lParam) == WM_LBUTTONDBLCLK) {
+                POINT pt;
+                GetCursorPos(&pt);
+                HMENU hMenu = CreatePopupMenu();
 
-    LoadConfigJson();
+                long secLeft = GetSecondsUntilBedtime(config.bedtimeHour, config.bedtimeMinute);
+                long hours = std::max(0L, secLeft / 3600);
+                long mins = std::max(0L, (secLeft % 3600) / 60);
 
-    std::cout << "============================================================\n";
-    std::cout << "       SLEEP OR DIE - NATIVE WINDOWS DESKTOP GUARD          \n";
-    std::cout << "    Hardcore Biological Discipline & Night Curfew Enforcer  \n";
-    std::cout << "============================================================\n";
-    std::cout << " Target Bedtime: " << config.bedtimeHour << ":" << (config.bedtimeMinute < 10 ? "0" : "") << config.bedtimeMinute << "\n";
-    std::cout << " Emergency Window: 30 seconds before HP runs out (100% -> 0%)\n";
-    std::cout << " Lockdown Action: Windows Sign Out / LockWorkStation at T-15m\n";
-    std::cout << " Monitoring active user presence via Win32 API...\n";
-    std::cout << " Type 'SleepOrDieGuard.exe --test' to simulate 3-2-1 bedtime deadline.\n";
-    std::cout << "------------------------------------------------------------\n\n";
+                std::wstring statusText = L"🛡️ SleepOrDie Guard (HP: " + std::to_wstring(config.currentHp) + L"%)";
+                std::wstring timeText = L"⏱️ เวลานอนเป้าหมาย: " + std::to_wstring(config.bedtimeHour) + L":" + (config.bedtimeMinute < 10 ? L"0" : L"") + std::to_wstring(config.bedtimeMinute) + L" (เหลือ " + std::to_wstring(hours) + L"h " + std::to_wstring(mins) + L"m)";
 
-    if (argc > 1 && std::string(argv[1]) == "--test") {
-        RunSimulation321();
-        return 0;
+                AppendMenuW(hMenu, MF_STRING | MF_GRAYED, 0, statusText.c_str());
+                AppendMenuW(hMenu, MF_STRING | MF_GRAYED, 0, timeText.c_str());
+                AppendMenuW(hMenu, MF_SEPARATOR, 0, NULL);
+                AppendMenuW(hMenu, MF_STRING, ID_TRAY_STATUS, L"📊 ดูข้อมูลสถานะการนอน");
+                AppendMenuW(hMenu, MF_STRING, ID_TRAY_SIMULATE, L"🧪 ทดสอบจำลองเส้นตาย 3-2-1");
+                AppendMenuW(hMenu, MF_SEPARATOR, 0, NULL);
+                AppendMenuW(hMenu, MF_STRING, ID_TRAY_EXIT, L"🚪 ออกจากโปรแกรม (Exit)");
+
+                SetForegroundWindow(hWnd);
+                int cmd = TrackPopupMenu(hMenu, TPM_RETURNCMD | TPM_NONOTIFY, pt.x, pt.y, 0, hWnd, NULL);
+                DestroyMenu(hMenu);
+
+                if (cmd == ID_TRAY_STATUS) {
+                    std::wstring info = L"SleepOrDie Desktop Guard\n\n"
+                                        L"• เวลานอนเป้าหมาย: " + std::to_wstring(config.bedtimeHour) + L":" + (config.bedtimeMinute < 10 ? L"0" : L"") + std::to_wstring(config.bedtimeMinute) + L" น.\n"
+                                        L"• เวลาตื่นนอน: " + std::to_wstring(config.wakeUpHour) + L":" + (config.wakeUpMinute < 10 ? L"0" : L"") + std::to_wstring(config.wakeUpMinute) + L" น.\n"
+                                        L"• ลำดับการทำงาน: Alert (T-30m) > Lockdown LockWorkStation (T-15m) > Sleep Deadline (T-0m) > Suspend\n"
+                                        L"• พลังชีวิต (HP): " + std::to_wstring(config.currentHp) + L"%\n"
+                                        L"• สถานะเคอร์ฟิว: " + (IsWithinCurfewHours() ? L"กำลังอยู่ในช่วงเคอร์ฟิวเข้านอน" : L"ช่วงเวลาปกติ");
+                    MessageBoxW(hWnd, info.c_str(), L"สถานะระบบ SleepOrDie", MB_OK | MB_ICONINFORMATION);
+                } else if (cmd == ID_TRAY_SIMULATE) {
+                    RunSimulation321();
+                } else if (cmd == ID_TRAY_EXIT) {
+                    if (config.antiEvasion && IsWithinCurfewHours()) {
+                        MessageBoxW(hWnd, L"⚠️ ไม่อนุญาตให้ออกจากโปรแกรมในช่วงเคอร์ฟิวเวลานอน!\n\nระบบวินัย SleepOrDie เปิดใช้งานการป้องกัน Anti-Evasion กรุณาปฏิบัติตามวินัยการพักผ่อน", L"Anti-Evasion Enforced", MB_OK | MB_ICONWARNING | MB_SYSTEMMODAL);
+                        ReportPresence("online", (int)GetUserIdleSeconds(), false);
+                    } else {
+                        Shell_NotifyIconW(NIM_DELETE, &g_nid);
+                        PostQuitMessage(0);
+                    }
+                }
+            }
+            break;
+        }
+        case WM_DESTROY:
+            Shell_NotifyIconW(NIM_DELETE, &g_nid);
+            PostQuitMessage(0);
+            break;
+        default:
+            return DefWindowProcW(hWnd, message, wParam, lParam);
     }
+    return 0;
+}
 
+void DaemonLoop() {
     int tickCount = 0;
-    bool running = true;
-    while (running) {
+
+    while (true) {
+        if (g_simulationRunning) {
+            Sleep(1000);
+            continue;
+        }
+
         long secondsRemaining = GetSecondsUntilBedtime(config.bedtimeHour, config.bedtimeMinute);
         DWORD idleSeconds = GetUserIdleSeconds();
         SleepStage newStage = SleepStage::Normal;
@@ -365,59 +410,124 @@ int main(int argc, char* argv[]) {
             newStage = SleepStage::Normal;
         }
 
-        // Stage transition alerts & physical enforcement
+        // Update Tray Tooltip
+        long hoursLeft = std::max(0L, secondsRemaining / 3600);
+        long minsLeft = std::max(0L, (secondsRemaining % 3600) / 60);
+        std::wstring tip = L"SleepOrDie: " + std::to_wstring(hoursLeft) + L"h " + std::to_wstring(minsLeft) + L"m to Bedtime | HP: " + std::to_wstring(config.currentHp) + L"%";
+        UpdateTrayTooltip(tip);
+
+        // Stage transition events
         if (newStage != currentStage) {
             currentStage = newStage;
             PlaySoundForStage(currentStage);
 
             if (currentStage == SleepStage::Alert) {
-                ShowWindowsAlert(L"SleepOrDie เตือนเวลานอน", L"เหลือเวลา 30 นาทีก่อนถึงเส้นตาย เริ่มวางงานและพักสายตา", MB_ICONINFORMATION);
+                ShowTrayBalloon(L"SleepOrDie เตือนเวลานอน (T-30m)", L"เหลือเวลา 30 นาทีก่อนถึงเส้นตาย กรุณาเริ่มวางงานและเตรียมตัวเข้านอน", NIIF_INFO);
                 ReportPresence("idle", (int)idleSeconds, false);
             } else if (currentStage == SleepStage::Lockdown) {
-                ShowWindowsAlert(L"SleepOrDie ล็อคดาวน์ (Windows Sign Out)", L"เหลือเวลา 15 นาทีสุดท้าย! กำลังล็อคหน้าจอเพื่อให้ออกจากระบบทันที", MB_ICONWARNING);
+                ShowTrayBalloon(L"SleepOrDie ล็อคดาวน์ (T-15m)", L"เหลือเวลา 15 นาทีสุดท้าย! บังคับล็อกหน้าจอ Windows ออกจากระบบทันที", NIIF_WARNING);
                 if (config.lockWorkstationOnLockdown) {
-                    PrintConsoleUnicode(L"[LOCKDOWN ENFORCED] Windows Sign Out / LockWorkStation initiated!\n");
-                    LockWorkStation(); // Native Windows Sign Out / Lock screen!
+                    LockWorkStation();
                 }
                 ReportPresence("offline", 900, true);
             } else if (currentStage == SleepStage::Sleep) {
-                ShowWindowsAlert(L"SleepOrDie เลยเวลานอน", L"เลยเส้นตายแล้ว! มีเวลา 30 วินาทีก่อน HP หมดและเครื่องจะถูกปิดระบบ", MB_ICONERROR);
+                ShowTrayBalloon(L"🚨 SleepOrDie ถึงเส้นตายเข้านอน!", L"เลยเส้นตายแล้ว! มีเวลา 30 วินาทีฉุกเฉินก่อนเครื่องจะเข้าสู่โหมดพักระบบ", NIIF_ERROR);
                 ReportPresence("online", (int)idleSeconds, false);
             }
         }
 
-        // Periodic presence heartbeat: detect if user complies and leaves PC (auto-confirms sleep)
+        // Emergency countdown if past deadline
+        if (currentStage == SleepStage::Sleep) {
+            long secondsPast = -secondsRemaining;
+            long emergencySecondsLeft = std::max(0L, 30L - secondsPast);
+            config.currentHp = std::max(0, (int)((emergencySecondsLeft * 100) / 30));
+
+            PlaySoundForStage(SleepStage::Sleep);
+
+            if (emergencySecondsLeft <= 0 || config.currentHp <= 0) {
+                currentStage = SleepStage::Shutdown;
+                ExecuteFinalEnforcement();
+                break;
+            }
+        }
+
+        // Periodic presence sync
         if (++tickCount % 5 == 0) {
-            if (currentStage == SleepStage::Alert || currentStage == SleepStage::Lockdown || currentStage == SleepStage::Sleep) {
+            if (currentStage != SleepStage::Normal) {
                 if (idleSeconds >= (DWORD)config.idleThresholdSeconds) {
-                    // User has not touched mouse/keyboard -> considered sleeping!
                     ReportPresence("offline", (int)idleSeconds, currentStage == SleepStage::Lockdown);
                 } else if (idleSeconds < 10) {
-                    // User is actively evading and typing
                     ReportPresence("online", (int)idleSeconds, false);
                 }
             }
         }
 
-        // Bedtime curfew breached: 30 seconds emergency countdown before HP hits 0%
-        if (currentStage == SleepStage::Sleep) {
-            long secondsPastDeadline = -secondsRemaining;
-            long emergencySecondsLeft = max(0L, 30L - secondsPastDeadline);
-            config.currentHp = max(0, (int)((emergencySecondsLeft * 100) / 30));
-
-            std::cout << "[EMERGENCY 30s COUNTDOWN] " << emergencySecondsLeft << "s remaining before HP 0%! Current HP: " << config.currentHp << "%\n";
-            PlaySoundForStage(SleepStage::Sleep);
-
-            if (emergencySecondsLeft <= 0 || config.currentHp <= 0) {
-                currentStage = SleepStage::Shutdown;
-                ExecuteEnforcement();
-                break;
-            }
-        }
-
-        // Sleep for checkIntervalSeconds
         Sleep(config.checkIntervalSeconds * 1000);
     }
+}
 
-    return 0;
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+    LoadConfigJson();
+
+    std::string cmd = lpCmdLine ? lpCmdLine : "";
+    if (cmd.find("--test") != std::string::npos) {
+        // Run standalone test simulation
+        RunSimulation321();
+        Sleep(35000);
+        return 0;
+    }
+
+    // Register hidden window class for System Tray message loop
+    WNDCLASSEXW wcex = {};
+    wcex.cbSize = sizeof(WNDCLASSEXW);
+    wcex.lpfnWndProc = WndProc;
+    wcex.hInstance = hInstance;
+    wcex.lpszClassName = L"SleepOrDieGuardTrayClass";
+
+    RegisterClassExW(&wcex);
+
+    g_hWnd = CreateWindowExW(0, L"SleepOrDieGuardTrayClass", L"SleepOrDie Guard", 0, 0, 0, 0, 0, NULL, NULL, hInstance, NULL);
+    if (!g_hWnd) {
+        return 1;
+    }
+
+    // Initialize System Tray Icon
+    g_nid.cbSize = sizeof(NOTIFYICONDATAW);
+    g_nid.hWnd = g_hWnd;
+    g_nid.uID = 1;
+    g_nid.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP | NIF_INFO;
+    g_nid.uCallbackMessage = WM_TRAYICON;
+    g_nid.hIcon = LoadIcon(NULL, IDI_SHIELD);
+    wcsncpy_s(g_nid.szTip, L"SleepOrDie Desktop Guard — สแตนด์บาย", _TRUNCATE);
+
+    Shell_NotifyIconW(NIM_ADD, &g_nid);
+
+    // Initial greeting balloon
+    ShowTrayBalloon(L"SleepOrDie Desktop Guard", L"ระบบเริ่มทำงานเงียบ ๆ บน System Tray เฝ้าระวังวินัยเวลานอน", NIIF_INFO);
+
+    // Launch daemon evaluation loop on worker thread
+    std::thread daemonThread(DaemonLoop);
+    daemonThread.detach();
+
+    // Standard Win32 Message Loop
+    MSG msg;
+    while (GetMessageW(&msg, NULL, 0, 0)) {
+        TranslateMessage(&msg);
+        DispatchMessageW(&msg);
+    }
+
+    Shell_NotifyIconW(NIM_DELETE, &g_nid);
+    return (int)msg.wParam;
+}
+
+// Fallback main for console compilation
+int main(int argc, char* argv[]) {
+    // Hide console window if run from explorer
+    HWND hConsole = GetConsoleWindow();
+    if (hConsole) {
+        if (argc <= 1 || std::string(argv[1]) != "--console") {
+            ShowWindow(hConsole, SW_HIDE);
+        }
+    }
+    return WinMain(GetModuleHandle(NULL), NULL, GetCommandLineA(), SW_HIDE);
 }

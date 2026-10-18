@@ -40,6 +40,25 @@ export interface SleepState {
     confirmSleep: () => Promise<boolean>;
     useTicket: () => Promise<boolean>;
     fetchStatus: () => Promise<void>;
+    testDiscordConnection: (token?: string, userId?: string) => Promise<{
+        success: boolean;
+        message: string;
+        bot?: { id: string; username: string };
+        target_user?: { found: boolean; username?: string; global_name?: string; message?: string } | null;
+    }>;
+    testAlert: (stage?: string) => Promise<{
+        success: boolean;
+        message: string;
+    }>;
+}
+
+function getCsrfToken(): string | null {
+    if (typeof document === 'undefined') return null;
+    const meta = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    if (meta) return meta;
+    const match = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
+    if (match) return decodeURIComponent(match[1]);
+    return null;
 }
 
 function calculateSleepTargetLocal(wakeUpTime: string, cycles: number = 5): string {
@@ -354,7 +373,7 @@ export const useSleepStore = create<SleepState>((set, get) => ({
     saveSettings: async (wakeUpTime: string, discordUserId?: string, discordBotToken?: string) => {
         try {
             const calculatedTarget = calculateSleepTargetLocal(wakeUpTime);
-            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+            const csrfToken = getCsrfToken();
 
             // Attempt server save if authenticated
             if (csrfToken) {
@@ -394,7 +413,7 @@ export const useSleepStore = create<SleepState>((set, get) => ({
 
     confirmSleep: async () => {
         try {
-            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+            const csrfToken = getCsrfToken();
             audioManager.stopAllAudio();
 
             if (csrfToken) {
@@ -438,7 +457,7 @@ export const useSleepStore = create<SleepState>((set, get) => ({
 
     useTicket: async () => {
         try {
-            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+            const csrfToken = getCsrfToken();
 
             if (csrfToken) {
                 const res = await fetch('/sleep/ticket', {
@@ -495,6 +514,58 @@ export const useSleepStore = create<SleepState>((set, get) => ({
             }
         } catch {
             // Guest mode
+        }
+    },
+
+    testDiscordConnection: async (token?: string, userId?: string) => {
+        try {
+            const csrfToken = getCsrfToken();
+            const res = await fetch('/sleep/test-discord', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    ...(csrfToken ? { 'X-CSRF-TOKEN': csrfToken } : {}),
+                },
+                body: JSON.stringify({
+                    discord_bot_token: token ?? get().discord_bot_token,
+                    discord_user_id: userId ?? get().discord_user_id,
+                }),
+            });
+
+            const data = await res.json();
+            if (data.success) {
+                if (token) set({ discord_bot_token: token });
+                if (userId) set({ discord_user_id: userId });
+            }
+            return data;
+        } catch (e: any) {
+            return {
+                success: false,
+                message: 'ไม่สามารถส่งคำขอตรวจสอบไปยังเซิร์ฟเวอร์ได้ ' + (e?.message || ''),
+            };
+        }
+    },
+
+    testAlert: async (stage = 'deadline') => {
+        try {
+            const csrfToken = getCsrfToken();
+            const res = await fetch('/sleep/test-alert', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    ...(csrfToken ? { 'X-CSRF-TOKEN': csrfToken } : {}),
+                },
+                body: JSON.stringify({ stage }),
+            });
+
+            return await res.json();
+        } catch (e: any) {
+            return {
+                success: false,
+                message: 'ไม่สามารถส่งการแจ้งเตือนได้: ' + (e?.message || ''),
+            };
         }
     },
 }));

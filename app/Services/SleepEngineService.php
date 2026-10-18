@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Models\User;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class SleepEngineService
 {
@@ -216,5 +218,110 @@ class SleepEngineService
         }
 
         return false;
+    }
+
+    /**
+     * Send Discord Direct Message to user using bot token.
+     */
+    public function sendDiscordDm(string $botToken, string $userId, string $message): bool
+    {
+        if (empty($botToken) || empty($userId)) {
+            return false;
+        }
+
+        try {
+            $channelRes = Http::withHeaders([
+                'Authorization' => 'Bot ' . trim($botToken),
+                'Accept' => 'application/json',
+                'Content-Type' => 'application/json',
+            ])->timeout(8)->post('https://discord.com/api/v10/users/@me/channels', [
+                'recipient_id' => trim($userId),
+            ]);
+
+            if (! $channelRes->successful()) {
+                Log::warning('Discord create DM channel failed', [
+                    'status' => $channelRes->status(),
+                    'body' => $channelRes->body(),
+                ]);
+                return false;
+            }
+
+            $channelId = $channelRes->json('id');
+
+            $msgRes = Http::withHeaders([
+                'Authorization' => 'Bot ' . trim($botToken),
+                'Accept' => 'application/json',
+                'Content-Type' => 'application/json',
+            ])->timeout(8)->post("https://discord.com/api/v10/channels/{$channelId}/messages", [
+                'content' => $message,
+            ]);
+
+            return $msgRes->successful();
+        } catch (\Throwable $e) {
+            Log::error('Discord DM send error: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Send bedtime notification to a user via Discord DM or system log.
+     */
+    public function sendBedtimeAlert(User $user, string $stage = 'deadline'): bool
+    {
+        $target = $user->sleep_target_time ?? '23:00';
+        $messages = [
+            'alert' => "🔔 [SleepOrDie] เหลืออีก 30 นาทีจะถึงเวลานอนเป้าหมาย ({$target}) กรุณาเตรียมตัวพักผ่อน",
+            'lockdown' => "⚠️ [SleepOrDie] เหลืออีก 15 นาที! เข้าสู่ช่วง Lockdown กรุณาปิดหน้าจอและเตรียมเข้านอน",
+            'deadline' => "🚨 [SleepOrDie] ถึงเวลาเข้านอนแล้ว ({$target})! กรุณาเข้านอนทันที มิเช่นนั้นระบบจะถือว่าทำผิดวินัย",
+        ];
+
+        $message = $messages[$stage] ?? $messages['deadline'];
+
+        if (!empty($user->discord_bot_token) && !empty($user->discord_user_id)) {
+            return $this->sendDiscordDm($user->discord_bot_token, $user->discord_user_id, $message);
+        }
+
+        Log::info("Bedtime {$stage} alert triggered for User #{$user->id}: {$message}");
+        return true;
+    }
+
+    /**
+     * Check users and trigger bedtime alerts based on target time.
+     * shortcut: exact minute match assumes scheduler runs every minute, add last_alerted_at if missed runs need catchup
+     */
+    public function checkAndSendBedtimeAlerts(?Carbon $now = null): int
+    {
+        $now = $now ? Carbon::parse($now) : now();
+        $currentTime = $now->format('H:i');
+        $sentCount = 0;
+
+        $users = User::whereNotNull('sleep_target_time')
+            ->where('is_disabled', false)
+            ->get();
+
+        foreach ($users as $user) {
+            // Skip if user already confirmed sleep within the last 12 hours
+            if ($user->last_sleep_confirmed_at && $user->last_sleep_confirmed_at->diffInHours($now) < 12) {
+                continue;
+            }
+
+            $targetCarbon = Carbon::createFromTimeString($user->sleep_target_time);
+            $alert30 = $targetCarbon->copy()->subMinutes(30)->format('H:i');
+            $alert15 = $targetCarbon->copy()->subMinutes(15)->format('H:i');
+            $deadline = $targetCarbon->format('H:i');
+
+            if ($currentTime === $alert30) {
+                $this->sendBedtimeAlert($user, 'alert');
+                $sentCount++;
+            } elseif ($currentTime === $alert15) {
+                $this->sendBedtimeAlert($user, 'lockdown');
+                $sentCount++;
+            } elseif ($currentTime === $deadline) {
+                $this->sendBedtimeAlert($user, 'deadline');
+                $sentCount++;
+            }
+        }
+
+        return $sentCount;
     }
 }

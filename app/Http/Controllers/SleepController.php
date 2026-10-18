@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Services\SleepEngineService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
 
 class SleepController extends Controller
 {
@@ -16,16 +17,31 @@ class SleepController extends Controller
     public function saveSettings(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'wake_up_time' => ['required', 'string', 'date_format:H:i'],
+            'wake_up_time' => ['nullable', 'string', 'date_format:H:i'],
+            'sleep_target_time' => ['nullable', 'string', 'date_format:H:i'],
             'discord_user_id' => ['nullable', 'string', 'max:50'],
             'discord_bot_token' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $sleepTarget = $this->sleepEngine->calculateSleepTarget($validated['wake_up_time']);
+        if (empty($validated['wake_up_time']) && empty($validated['sleep_target_time'])) {
+            return response()->json([
+                'message' => 'The wake up time or sleep target time field is required.',
+                'errors' => ['wake_up_time' => ['กรุณาระบุเวลาตื่นนอนหรือเวลาเข้านอน']],
+            ], 422);
+        }
+
+        $wakeUp = $validated['wake_up_time'] ?? null;
+        $sleepTarget = $validated['sleep_target_time'] ?? null;
+
+        if ($wakeUp && empty($sleepTarget)) {
+            $sleepTarget = $this->sleepEngine->calculateSleepTarget($wakeUp);
+        } elseif ($sleepTarget && empty($wakeUp)) {
+            $wakeUp = \Illuminate\Support\Carbon::createFromTimeString($sleepTarget)->addMinutes((5 * 90) + 15)->format('H:i');
+        }
 
         $user = $request->user();
         $user->update([
-            'wake_up_time' => $validated['wake_up_time'],
+            'wake_up_time' => $wakeUp,
             'sleep_target_time' => $sleepTarget,
             'discord_user_id' => array_key_exists('discord_user_id', $validated) ? $validated['discord_user_id'] : $user->discord_user_id,
             'discord_bot_token' => array_key_exists('discord_bot_token', $validated) ? $validated['discord_bot_token'] : $user->discord_bot_token,
@@ -37,6 +53,22 @@ class SleepController extends Controller
             'sleep_target_time' => $user->sleep_target_time,
             'discord_user_id' => $user->discord_user_id,
             'discord_bot_token' => $user->discord_bot_token,
+        ]);
+    }
+
+    public function testAlert(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $stage = $request->input('stage', 'deadline');
+
+        $sent = $this->sleepEngine->sendBedtimeAlert($user, $stage);
+
+        return response()->json([
+            'success' => $sent,
+            'stage' => $stage,
+            'message' => $sent
+                ? "ส่งการแจ้งเตือนระดับ {$stage} เรียบร้อยแล้ว"
+                : "ไม่สามารถส่งการแจ้งเตือนได้ กรุณาตรวจสอบการตั้งค่า Discord",
         ]);
     }
 
@@ -111,11 +143,92 @@ class SleepController extends Controller
             'tickets_count' => $user->tickets_count,
             'is_disabled' => $user->is_disabled,
             'last_sleep_confirmed_at' => $user->last_sleep_confirmed_at,
+            'discord_user_id' => $user->discord_user_id,
             'discord_bot_token' => $user->discord_bot_token,
             'is_sleeping' => !empty($user->last_sleep_confirmed_at),
             'is_within_bedtime_hours' => $inBedtimeHours,
             'morning_rewarded' => $rewarded,
         ]);
+    }
+
+    public function testDiscord(Request $request): JsonResponse
+    {
+        $token = $request->input('discord_bot_token') ?: $request->user()?->discord_bot_token;
+        $targetUserId = $request->input('discord_user_id') ?: $request->user()?->discord_user_id;
+
+        if (empty($token)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'ไม่พบ Discord Bot Token กรุณากรอกข้อมูลในช่อง Token ก่อนทดสอบ',
+            ], 422);
+        }
+
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => 'Bot ' . trim($token),
+                'Accept' => 'application/json',
+            ])->timeout(8)->get('https://discord.com/api/v10/users/@me');
+
+            if (!$response->successful()) {
+                $errorData = $response->json();
+                $detail = $errorData['message'] ?? 'รหัส Token ไม่ถูกต้อง หรือไม่ได้รับสิทธิ์จากระบบ Discord';
+                return response()->json([
+                    'success' => false,
+                    'message' => 'เชื่อมต่อกับ Discord ล้มเหลว ' . $detail,
+                    'status_code' => $response->status(),
+                ], 400);
+            }
+
+            $botData = $response->json();
+            $botName = $botData['username'] ?? 'Discord Bot';
+            $botId = $botData['id'] ?? '';
+
+            $targetUserResult = null;
+            if (!empty($targetUserId)) {
+                $userResponse = Http::withHeaders([
+                    'Authorization' => 'Bot ' . trim($token),
+                    'Accept' => 'application/json',
+                ])->timeout(8)->get("https://discord.com/api/v10/users/{$targetUserId}");
+
+                if ($userResponse->successful()) {
+                    $targetUserData = $userResponse->json();
+                    $targetUserResult = [
+                        'found' => true,
+                        'username' => $targetUserData['username'] ?? '',
+                        'global_name' => $targetUserData['global_name'] ?? $targetUserData['username'] ?? '',
+                        'id' => $targetUserData['id'] ?? $targetUserId,
+                    ];
+                } else {
+                    $targetUserResult = [
+                        'found' => false,
+                        'message' => 'ไม่พบข้อมูลผู้ใช้จาก Discord User ID ที่ระบุ หรือบอทยังไม่ได้แชร์เซิร์ฟเวอร์ร่วมกัน',
+                    ];
+                }
+            }
+
+            if ($request->user() && !empty($token)) {
+                $updateData = ['discord_bot_token' => trim($token)];
+                if (!empty($targetUserId)) {
+                    $updateData['discord_user_id'] = trim($targetUserId);
+                }
+                $request->user()->update($updateData);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'เชื่อมต่อ Discord สำเร็จ บอทออนไลน์และพร้อมทำงาน',
+                'bot' => [
+                    'id' => $botId,
+                    'username' => $botName,
+                ],
+                'target_user' => $targetUserResult,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'เกิดข้อผิดพลาดในการเชื่อมต่อไปยัง Discord API ' . $e->getMessage(),
+            ], 500);
+        }
     }
 
     public function handlePresenceUpdate(Request $request): JsonResponse

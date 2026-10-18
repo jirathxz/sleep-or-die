@@ -34,7 +34,10 @@ Domain terminology for **SleepOrDie**.
 
 ---
 
-### External Detection
+### External Detection & Desktop Guard
 
 - **Target (Discord User)**: บัญชีผู้ใช้ Discord ที่ผูกไว้กับระบบ เพื่อให้ Discord Presence Worker ตรวจสอบสถานะการใช้งาน
 - **Discord Presence Worker**: Microservice (Node.js) ที่ดึงสถานะ Real-time Presence จาก Discord Gateway API แล้วส่ง Webhook อัปเดตกลับมายัง Laravel Backend
+- **System Tray Desktop Guard**: โปรแกรมฝั่ง Client (C++) ที่ทำงานบน Windows System Tray คอยเฝ้าระวังการเคลื่อนไหวของเมาส์/คีย์บอร์ด และส่งการแจ้งเตือนตามรอบเวลา
+- **Lockdown Curfew (`LockWorkStation`)**: คำสั่งล็อกหน้าจอคอมพิวเตอร์แบบทันทีเมื่อเข้าสู่จังหวะ T-15m บังคับให้ผู้ใช้ออกจากหน้าจอโดยไม่ปิดโปรแกรมงาน
+- **System Suspend State**: มาตรการลงโทษเมื่อ HP ลดลงเหลือ 0% โดยการสั่งให้คอมพิวเตอร์เข้าสู่โหมด Standby/Sleep ทันทีเพื่อตัดการใช้งานอย่างเด็ดขาด แต่ไม่ทำให้ไฟล์งานที่ยังไม่เซฟเสียหาย
