@@ -139,12 +139,20 @@ class SleepEngineService
     public function handlePresence(User $user, string $status, string $source = 'discord', array $meta = []): array
     {
         $status = strtolower($status);
+        $isInVoice = !empty($meta['is_in_voice']);
+
         $isOffline = in_array($status, ['offline', 'idle', 'invisible']) ||
             (!empty($meta['screen_locked'])) ||
             (isset($meta['idle_seconds']) && $meta['idle_seconds'] >= 60);
 
         $isOnline = in_array($status, ['online', 'dnd']) ||
             (!empty($meta['is_active']) && empty($meta['screen_locked']) && (!isset($meta['idle_seconds']) || $meta['idle_seconds'] < 60));
+
+        // Rule 2: If user is currently in a voice channel, always considered online
+        if ($isInVoice) {
+            $isOnline = true;
+            $isOffline = false;
+        }
 
         $inBedtimeHours = $this->isWithinBedtimeHours($user);
 

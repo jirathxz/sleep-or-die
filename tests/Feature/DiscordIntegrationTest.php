@@ -179,3 +179,62 @@ test('test-discord endpoint validates bot token and saves credentials', function
     expect($user->fresh()->discord_bot_token)->toBe('bot_token_verified')
         ->and($user->fresh()->discord_user_id)->toBe('555555555555555555');
 });
+
+test('rule 2: user in voice channel is considered online even when discord status is offline', function () {
+    $user = User::factory()->create([
+        'discord_user_id' => '666666666666666666',
+        'last_sleep_confirmed_at' => now()->subMinutes(2),
+        'current_hp' => 100,
+    ]);
+
+    $response = $this->postJson('/api/discord/presence-update', [
+        'discord_user_id' => '666666666666666666',
+        'status' => 'offline',
+        'raw_status' => 'offline',
+        'is_in_voice' => true,
+        'voice_channel' => 'General Voice 1',
+        'guild_name' => 'Community Guild',
+    ]);
+
+    $response->assertOk()
+        ->assertJson([
+            'penalized' => true,
+        ]);
+
+    expect($user->fresh()->last_sleep_confirmed_at)->toBeNull()
+        ->and($user->fresh()->current_hp)->toBe(75);
+
+    $cached = \Illuminate\Support\Facades\Cache::get("discord_presence_{$user->id}");
+    expect($cached['is_in_voice'])->toBeTrue()
+        ->and($cached['effective_status'])->toBe('online')
+        ->and($cached['raw_status'])->toBe('offline')
+        ->and($cached['voice_channel'])->toBe('General Voice 1');
+});
+
+test('rule 1: user not in voice channel is considered offline when discord status is offline', function () {
+    $user = User::factory()->create([
+        'discord_user_id' => '777777777777777777',
+        'last_sleep_confirmed_at' => now()->subMinutes(2),
+        'current_hp' => 100,
+    ]);
+
+    $response = $this->postJson('/api/discord/presence-update', [
+        'discord_user_id' => '777777777777777777',
+        'status' => 'offline',
+        'raw_status' => 'offline',
+        'is_in_voice' => false,
+    ]);
+
+    $response->assertOk()
+        ->assertJson([
+            'penalized' => false,
+        ]);
+
+    expect($user->fresh()->last_sleep_confirmed_at)->not->toBeNull()
+        ->and($user->fresh()->current_hp)->toBe(100);
+
+    $cached = \Illuminate\Support\Facades\Cache::get("discord_presence_{$user->id}");
+    expect($cached['is_in_voice'])->toBeFalse()
+        ->and($cached['effective_status'])->toBe('offline');
+});
+

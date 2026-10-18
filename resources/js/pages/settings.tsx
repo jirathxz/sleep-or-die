@@ -289,15 +289,42 @@ export default function SettingsPage() {
                                     </div>
 
                                     {testResult.success && testResult.bot && (
-                                        <div className="pl-6 text-[11px] text-zinc-300 space-y-0.5 font-light">
-                                            <p>ชื่อบอท: <span className="font-medium text-white">{testResult.bot.username}</span></p>
+                                        <div className="pl-6 text-[11px] text-zinc-300 space-y-1 font-light">
+                                            <p>ชื่อบอท: <span className="font-medium text-white">{testResult.bot.username}</span> <span className="text-[10px] text-emerald-400 ml-1">● บอทเชื่อมต่อสำเร็จ</span></p>
                                             <p className="font-mono text-zinc-400 text-[10px]">ID บอท: {testResult.bot.id}</p>
                                             {testResult.target_user && (
-                                                <p className={testResult.target_user.found ? 'text-emerald-400' : 'text-amber-400'}>
-                                                    {testResult.target_user.found
-                                                        ? `ตรวจพบผู้ใช้เป้าหมาย: ${testResult.target_user.global_name || testResult.target_user.username}`
-                                                        : testResult.target_user.message}
-                                                </p>
+                                                testResult.target_user.found ? (
+                                                    <div className="mt-2 pt-2 border-t border-white/10 space-y-1">
+                                                        <p className="text-white font-medium">
+                                                            ผู้ใช้เป้าหมาย: {testResult.target_user.global_name || testResult.target_user.username}
+                                                        </p>
+                                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-[11px]">
+                                                            <p className="text-zinc-300">
+                                                                1. สถานะที่ตั้งไว้: <span className="font-mono text-white uppercase">{testResult.target_user.raw_status || 'OFFLINE'}</span>
+                                                            </p>
+                                                            <p className="text-zinc-300">
+                                                                2. ห้องคุยเสียง: <span className={testResult.target_user.is_in_voice ? 'text-emerald-400 font-medium' : 'text-zinc-400'}>
+                                                                    {testResult.target_user.is_in_voice
+                                                                        ? `อยู่ในห้อง "${testResult.target_user.voice_channel}"`
+                                                                        : 'ไม่ได้อยู่ในห้องคุย'}
+                                                                </span>
+                                                            </p>
+                                                        </div>
+                                                        <p className="text-xs pt-1 flex items-center gap-1.5 font-medium">
+                                                            <span className="text-zinc-300">ผลการประเมิน:</span>
+                                                            <span className={testResult.target_user.is_considered_online ? 'text-emerald-400' : 'text-zinc-400'}>
+                                                                {testResult.target_user.is_considered_online ? '🟢 ถือว่าออนไลน์ (ONLINE)' : '⚪ ถือว่าออฟไลน์ (OFFLINE)'}
+                                                            </span>
+                                                        </p>
+                                                        {testResult.target_user.reason && (
+                                                            <p className="text-[10px] text-zinc-400 font-light italic">
+                                                                {testResult.target_user.reason}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-amber-400">{testResult.target_user.message}</p>
+                                                )
                                             )}
                                         </div>
                                     )}

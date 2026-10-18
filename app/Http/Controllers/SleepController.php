@@ -224,6 +224,7 @@ class SleepController extends Controller
             'last_sleep_confirmed_at' => $user->last_sleep_confirmed_at,
             'discord_user_id' => $user->discord_user_id,
             'discord_bot_token' => $user->discord_bot_token,
+            'discord_presence' => \Illuminate\Support\Facades\Cache::get("discord_presence_{$user->id}"),
             'emergency_countdown_seconds' => $user->emergency_countdown_seconds ?? 60,
             'is_sleeping' => !empty($user->last_sleep_confirmed_at),
             'is_within_bedtime_hours' => $inBedtimeHours,
@@ -272,12 +273,78 @@ class SleepController extends Controller
 
                 if ($userResponse->successful()) {
                     $targetUserData = $userResponse->json();
+
+                    // Check bot guilds and voice status
+                    $isInVoice = false;
+                    $voiceChannelName = null;
+                    $guildName = null;
+
+                    $guildsResponse = Http::withHeaders([
+                        'Authorization' => 'Bot ' . trim($token),
+                        'Accept' => 'application/json',
+                    ])->timeout(8)->get("https://discord.com/api/v10/users/@me/guilds");
+
+                    if ($guildsResponse->successful()) {
+                        $guilds = $guildsResponse->json();
+                        foreach ($guilds as $guild) {
+                            $guildId = $guild['id'];
+                            $voiceRes = Http::withHeaders([
+                                'Authorization' => 'Bot ' . trim($token),
+                                'Accept' => 'application/json',
+                            ])->timeout(5)->get("https://discord.com/api/v10/guilds/{$guildId}/voice-states/{$targetUserId}");
+
+                            if ($voiceRes->successful()) {
+                                $voiceData = $voiceRes->json();
+                                if (!empty($voiceData['channel_id'])) {
+                                    $isInVoice = true;
+                                    $guildName = $guild['name'] ?? 'Discord Server';
+                                    $channelRes = Http::withHeaders([
+                                        'Authorization' => 'Bot ' . trim($token),
+                                        'Accept' => 'application/json',
+                                    ])->timeout(5)->get("https://discord.com/api/v10/channels/{$voiceData['channel_id']}");
+                                    if ($channelRes->successful()) {
+                                        $voiceChannelName = $channelRes->json('name') ?? 'Voice Room';
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    $cachedPresence = \Illuminate\Support\Facades\Cache::get("discord_presence_{$request->user()?->id}");
+                    $rawStatus = $cachedPresence['raw_status'] ?? ($isInVoice ? 'online' : 'offline');
+
+                    // Rule 2: If in voice room, effective status is online
+                    $effectiveStatus = $isInVoice ? 'online' : $rawStatus;
+                    $isConsideredOnline = $isInVoice || in_array($rawStatus, ['online', 'dnd']);
+
                     $targetUserResult = [
                         'found' => true,
                         'username' => $targetUserData['username'] ?? '',
                         'global_name' => $targetUserData['global_name'] ?? $targetUserData['username'] ?? '',
                         'id' => $targetUserData['id'] ?? $targetUserId,
+                        'raw_status' => $rawStatus,
+                        'is_in_voice' => $isInVoice,
+                        'voice_channel' => $voiceChannelName,
+                        'guild_name' => $guildName,
+                        'effective_status' => $effectiveStatus,
+                        'is_considered_online' => $isConsideredOnline,
+                        'reason' => $isInVoice
+                            ? "กำลังอยู่ในห้องคุยเสียง \"{$voiceChannelName}\" (ถือว่าออนไลน์ตามกฎข้อ 2)"
+                            : "สถานะที่ตั้งไว้: " . strtoupper($rawStatus) . " (ไม่ได้อยู่ในห้องคุย)",
                     ];
+
+                    if ($request->user()) {
+                        \Illuminate\Support\Facades\Cache::put("discord_presence_{$request->user()->id}", [
+                            'discord_user_id' => $targetUserId,
+                            'effective_status' => $effectiveStatus,
+                            'raw_status' => $rawStatus,
+                            'is_in_voice' => $isInVoice,
+                            'voice_channel' => $voiceChannelName,
+                            'guild_name' => $guildName,
+                            'updated_at' => now()->toIso8601String(),
+                        ], now()->addDay());
+                    }
                 } else {
                     $targetUserResult = [
                         'found' => false,
@@ -321,6 +388,10 @@ class SleepController extends Controller
             'user_id' => ['nullable', 'integer'],
             'email' => ['nullable', 'string'],
             'status' => ['required', 'string'],
+            'raw_status' => ['nullable', 'string'],
+            'is_in_voice' => ['nullable', 'boolean'],
+            'voice_channel' => ['nullable', 'string'],
+            'guild_name' => ['nullable', 'string'],
             'source' => ['nullable', 'string'],
             'idle_seconds' => ['nullable', 'numeric'],
             'screen_locked' => ['nullable', 'boolean'],
@@ -349,7 +420,22 @@ class SleepController extends Controller
             'idle_seconds' => $validated['idle_seconds'] ?? null,
             'screen_locked' => $validated['screen_locked'] ?? false,
             'is_active' => $validated['is_active'] ?? null,
+            'is_in_voice' => (bool)($validated['is_in_voice'] ?? false),
+            'voice_channel' => $validated['voice_channel'] ?? null,
+            'guild_name' => $validated['guild_name'] ?? null,
         ];
+
+        // Cache live presence for quick dashboard feedback
+        $effectiveStatus = !empty($validated['is_in_voice']) ? 'online' : strtolower($validated['status']);
+        \Illuminate\Support\Facades\Cache::put("discord_presence_{$user->id}", [
+            'discord_user_id' => $user->discord_user_id,
+            'effective_status' => $effectiveStatus,
+            'raw_status' => strtolower($validated['raw_status'] ?? $validated['status']),
+            'is_in_voice' => (bool)($validated['is_in_voice'] ?? false),
+            'voice_channel' => $validated['voice_channel'] ?? null,
+            'guild_name' => $validated['guild_name'] ?? null,
+            'updated_at' => now()->toIso8601String(),
+        ], now()->addDay());
 
         $result = $this->sleepEngine->handlePresence($user, $validated['status'], $source, $meta);
 
