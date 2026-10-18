@@ -25,6 +25,8 @@ export interface SleepState {
     isPastDeadline: boolean;
     audioEnabled: boolean;
     simulationActive: boolean;
+    simulationPhase: 'idle' | 'countdown_321' | 'grace_30s' | 'shutdown';
+    simulationRemaining: number;
     simulationElapsedPast: number;
 
     // Actions
@@ -57,15 +59,14 @@ function calculateTimeRemaining(targetTimeString: string | null): {
     seconds: number;
     isPast: boolean;
 } {
-    if (!targetTimeString) {
-        return { totalSeconds: 86400, hours: 24, minutes: 0, seconds: 0, isPast: false };
-    }
-
+    const targetStr = targetTimeString || defaultSleepTarget;
     const now = new Date();
-    const [hours, minutes] = targetTimeString.split(':').map(Number);
+    const parts = targetStr.split(':').map(Number);
+    const targetHours = !isNaN(parts[0]) ? parts[0] : 23;
+    const targetMinutes = !isNaN(parts[1]) ? parts[1] : 15;
 
     const target = new Date(now);
-    target.setHours(hours, minutes, 0, 0);
+    target.setHours(targetHours, targetMinutes, 0, 0);
 
     let diffSeconds = Math.floor((target.getTime() - now.getTime()) / 1000);
 
@@ -140,19 +141,35 @@ export const useSleepStore = create<SleepState>((set, get) => ({
     isPastDeadline: false,
     audioEnabled: true,
     simulationActive: false,
+    simulationPhase: 'idle',
+    simulationRemaining: 0,
     simulationElapsedPast: 0,
 
     syncUser: (data) => {
         set((state) => {
             const currentHp = data.current_hp ?? state.current_hp;
             const isDisabled = data.is_disabled ?? state.is_disabled;
-            const target = data.sleep_target_time !== undefined ? data.sleep_target_time : state.sleep_target_time;
+            const wakeUp = data.wake_up_time || state.wake_up_time || defaultWakeUp;
+            const target = data.sleep_target_time || state.sleep_target_time || calculateSleepTargetLocal(wakeUp);
+
+            // If simulation is running, do NOT clobber running simulation countdown!
+            if (state.simulationActive) {
+                return {
+                    ...data,
+                    wake_up_time: wakeUp,
+                    sleep_target_time: target,
+                    current_hp: state.current_hp,
+                    is_disabled: isDisabled,
+                };
+            }
 
             const timer = calculateTimeRemaining(target);
             const newStage = determineStage(currentHp, isDisabled, timer.totalSeconds);
 
             return {
                 ...data,
+                wake_up_time: wakeUp,
+                sleep_target_time: target,
                 stage: newStage,
                 totalSecondsRemaining: timer.totalSeconds,
                 hoursRemaining: timer.hours,
@@ -170,24 +187,27 @@ export const useSleepStore = create<SleepState>((set, get) => ({
         }
         set({
             simulationActive: true,
-            simulationElapsedPast: 0,
+            simulationPhase: 'countdown_321',
+            simulationRemaining: 3,
             totalSecondsRemaining: 3,
             hoursRemaining: 0,
             minutesRemaining: 0,
             secondsRemaining: 3,
             isPastDeadline: false,
             stage: 'lockdown',
+            current_hp: 100,
         });
     },
 
     resetSimulation: () => {
         audioManager.stopAllAudio();
-        const { sleep_target_time } = get();
-        const timer = calculateTimeRemaining(sleep_target_time);
+        const target = get().sleep_target_time || defaultSleepTarget;
+        const timer = calculateTimeRemaining(target);
         const newStage = determineStage(100, false, timer.totalSeconds);
         set({
             simulationActive: false,
-            simulationElapsedPast: 0,
+            simulationPhase: 'idle',
+            simulationRemaining: 0,
             current_hp: 100,
             stage: newStage,
             totalSecondsRemaining: timer.totalSeconds,
@@ -201,51 +221,56 @@ export const useSleepStore = create<SleepState>((set, get) => ({
     tick: () => {
         const {
             simulationActive,
-            simulationElapsedPast,
+            simulationPhase,
+            simulationRemaining,
             sleep_target_time,
             current_hp,
             is_disabled,
             last_sleep_confirmed_at,
-            totalSecondsRemaining,
             stage: oldStage,
             audioEnabled,
         } = get();
 
         if (simulationActive) {
-            if (totalSecondsRemaining > 1) {
-                const nextSec = totalSecondsRemaining - 1;
-                if (audioEnabled) {
-                    audioManager.playAlertChime();
+            if (simulationPhase === 'countdown_321') {
+                const next = simulationRemaining - 1;
+                if (next > 0) {
+                    if (audioEnabled) {
+                        audioManager.playAlertChime();
+                    }
+                    set({
+                        simulationRemaining: next,
+                        secondsRemaining: next,
+                        totalSecondsRemaining: next,
+                        hoursRemaining: 0,
+                        minutesRemaining: 0,
+                        isPastDeadline: false,
+                        stage: 'lockdown',
+                    });
+                    return;
+                } else {
+                    // Reached deadline (0): transition into 30s emergency window
+                    if (audioEnabled) {
+                        audioManager.startEmergencyAlarm();
+                    }
+                    set({
+                        simulationPhase: 'grace_30s',
+                        simulationRemaining: 30,
+                        secondsRemaining: 30,
+                        totalSecondsRemaining: 0,
+                        hoursRemaining: 0,
+                        minutesRemaining: 0,
+                        isPastDeadline: true,
+                        stage: 'sleep',
+                        current_hp: 100,
+                    });
+                    return;
                 }
-                set({
-                    totalSecondsRemaining: nextSec,
-                    secondsRemaining: nextSec,
-                    hoursRemaining: 0,
-                    minutesRemaining: 0,
-                    isPastDeadline: false,
-                    stage: 'lockdown',
-                });
-                return;
-            } else if (totalSecondsRemaining === 1) {
-                if (audioEnabled) {
-                    audioManager.startEmergencyAlarm();
-                }
-                set({
-                    totalSecondsRemaining: 0,
-                    secondsRemaining: 30,
-                    hoursRemaining: 0,
-                    minutesRemaining: 0,
-                    isPastDeadline: true,
-                    stage: 'sleep',
-                    simulationElapsedPast: 0,
-                });
-                return;
-            } else {
-                // Past deadline: Exactly 30 seconds before HP runs out (100% -> 0%)
-                const newElapsed = (simulationElapsedPast || 0) + 1;
-                const emergencySecondsLeft = Math.max(0, 30 - newElapsed);
-                const newHp = Math.max(0, Math.round((emergencySecondsLeft / 30) * 100));
-                const newStage = determineStage(newHp, is_disabled, 0);
+            } else if (simulationPhase === 'grace_30s') {
+                const next = simulationRemaining - 1;
+                const safeSeconds = Math.max(0, next);
+                const newHp = Math.max(0, Math.round((safeSeconds / 30) * 100));
+                const newStage = safeSeconds <= 0 || newHp <= 0 ? 'shutdown' : 'sleep';
 
                 if (newStage === 'shutdown' && oldStage !== 'shutdown') {
                     if (audioEnabled) {
@@ -254,20 +279,24 @@ export const useSleepStore = create<SleepState>((set, get) => ({
                 }
 
                 set({
+                    simulationPhase: newStage === 'shutdown' ? 'shutdown' : 'grace_30s',
+                    simulationRemaining: safeSeconds,
+                    secondsRemaining: safeSeconds,
+                    totalSecondsRemaining: -(30 - safeSeconds),
+                    hoursRemaining: 0,
+                    minutesRemaining: 0,
                     current_hp: newHp,
                     stage: newStage,
                     isPastDeadline: true,
-                    simulationElapsedPast: newElapsed,
-                    totalSecondsRemaining: -newElapsed,
-                    secondsRemaining: emergencySecondsLeft,
-                    minutesRemaining: 0,
-                    hoursRemaining: 0,
                 });
+                return;
+            } else {
                 return;
             }
         }
 
-        const timer = calculateTimeRemaining(sleep_target_time);
+        const target = sleep_target_time || defaultSleepTarget;
+        const timer = calculateTimeRemaining(target);
         let activeHp = current_hp;
         let displaySeconds = timer.seconds;
         let displayMinutes = timer.minutes;

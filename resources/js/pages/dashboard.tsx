@@ -67,10 +67,12 @@ export default function Dashboard() {
         if (auth?.user) {
             syncUser({
                 current_hp: auth.user.current_hp ?? 100,
-                wake_up_time: auth.user.wake_up_time ?? '07:00',
-                sleep_target_time: auth.user.sleep_target_time ?? '23:15',
+                wake_up_time: auth.user.wake_up_time || '07:00',
+                sleep_target_time: auth.user.sleep_target_time || '23:15',
                 shutdown_stacks: auth.user.shutdown_stacks ?? 0,
                 days_survived: auth.user.days_survived ?? 0,
+                level: auth.user.level ?? 1,
+                exp: auth.user.exp ?? 0,
                 tickets_count: auth.user.tickets_count ?? 0,
                 is_disabled: auth.user.is_disabled ?? false,
                 discord_user_id: auth.user.discord_user_id ?? null,
@@ -79,13 +81,15 @@ export default function Dashboard() {
         }
 
         fetchStatus();
+    }, [auth?.user?.id]);
 
+    useEffect(() => {
         const timer = setInterval(() => {
             tick();
         }, 1000);
 
         return () => clearInterval(timer);
-    }, [auth, syncUser, tick, fetchStatus]);
+    }, [tick]);
 
     if (is_disabled) {
         return <TombstoneScreen daysSurvived={days_survived} userName={auth?.user?.name || 'ผู้ใช้งาน'} />;

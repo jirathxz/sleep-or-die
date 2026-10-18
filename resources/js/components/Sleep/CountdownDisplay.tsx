@@ -110,11 +110,11 @@ export const CountdownDisplay: React.FC<CountdownDisplayProps> = ({
             {/* Target Schedule Details: Emphasize Bedtime Deadline */}
             <div className="flex items-center justify-center gap-3 text-xs text-zinc-400 font-light">
                 <span>
-                    เส้นตายเข้านอนคืนนี้: <span className="text-white font-medium">{sleepTargetTime || '--:--'} น.</span>
+                    เส้นตายเข้านอนคืนนี้: <span className="text-white font-medium">{sleepTargetTime || '23:15'} น.</span>
                 </span>
                 <span className="text-zinc-700">•</span>
                 <span className="text-zinc-500 font-light">
-                    เวลาตื่นอ้างอิง: {wakeUpTime || '--:--'} น. (5 รอบการนอน)
+                    เวลาตื่นอ้างอิง: {wakeUpTime || '07:00'} น. (5 รอบการนอน)
                 </span>
             </div>
 
