@@ -49,10 +49,11 @@
 
 enum class SleepStage {
     Normal,
-    Alert,      // T-30m
-    Lockdown,   // T-15m (Windows Screen Lock)
-    Sleep,      // Deadline Exceeded (Configurable emergency countdown window)
-    Shutdown    // HP 0% (Disciplinary PC Sleep / Suspend)
+    Alert,          // T-10m: แจ้งเตือนธรรมดา
+    Lockdown,       // T-5m: Lockdown (MSGBOX จำลอง)
+    SleepWarning,   // T-2m: Windows Sleep Mode (MSGBOX จำลอง)
+    Sleep,          // T-0m: ถึงเวลานอน เริ่มนับถอยหลังฉุกเฉิน
+    Shutdown        // HP 0%: Shutdown (MSGBOX จำลอง)
 };
 
 struct DaemonConfig {
@@ -226,6 +227,12 @@ void PlaySoundForStage(SleepStage stage) {
             Beep(440, 200);
             break;
 
+        case SleepStage::SleepWarning:
+            Beep(659, 150);
+            Sleep(80);
+            Beep(587, 200);
+            break;
+
         case SleepStage::Sleep:
             for (int i = 0; i < 3; ++i) {
                 Beep(988, 120);
@@ -355,26 +362,17 @@ void ExecuteFinalEnforcement() {
     ReportPresence("shutdown", 0, true);
     PlaySoundForStage(SleepStage::Shutdown);
 
-    ShowTrayBalloon(L"SleepOrDie — 0% HP SHUTDOWN", L"หมดเวลาฉุกเฉินแล้ว! เริ่มดำเนินการสั่งพักระบบคอมพิวเตอร์", NIIF_ERROR);
+    ShowTrayBalloon(L"SleepOrDie — 0% HP SHUTDOWN", L"ถึงเวลานอนที่ตั้งไว้และหมดเวลาฉุกเฉินแล้ว! เริ่มดำเนินการ Shutdown (จำลอง)", NIIF_ERROR);
 
-    if (config.enforceAction == "sleep") {
-        Sleep(2000);
-        SetSuspendState(FALSE, FALSE, FALSE);
-    } else if (config.enforceAction == "shutdown") {
-        Sleep(2000);
-        ExitWindowsEx(EWX_SHUTDOWN | EWX_FORCE, SHTDN_REASON_MAJOR_SYSTEM);
-    } else {
-        MessageBoxW(
-            NULL,
-            L"🚨 [SleepOrDie: HARDCORE DISCIPLINARY SHUTDOWN]\n\n"
-            L"พลังชีวิต (HP) ของคุณลดลงเหลือ 0% แล้ว!\n"
-            L"หมดเวลาช่วงฉุกเฉิน และเลยเส้นตายเข้านอน\n\n"
-            L"[โหมดทดสอบ: จำลองคำสั่ง Shutdown สำเร็จ]\n"
-            L"(ในโหมดปกติเครื่องจะถูกสั่ง SetSuspendState เข้าสู่โหมดสลีปทันที)",
-            L"SleepOrDie — SYSTEM SHUTDOWN (0% HP)",
-            MB_OK | MB_ICONERROR | MB_SYSTEMMODAL
-        );
-    }
+    MessageBoxW(
+        NULL,
+        L"💀 [SleepOrDie: HARDCORE SHUTDOWN WARNING]\n\n"
+        L"ถึงเวลานอนที่ตั้งไว้แล้ว และหมดเวลาผ่อนผันฉุกเฉิน!\n"
+        L"พลังชีวิต (HP) ของคุณลดลงเหลือ 0% แล้ว\n\n"
+        L"[ระบบจำลอง: แสดงแจ้งเตือน Shutdown สำเร็จโดยไม่ปิดเครื่องจริง]",
+        L"SleepOrDie — SHUTDOWN (Mock 0% HP)",
+        MB_OK | MB_ICONERROR | MB_SYSTEMMODAL
+    );
 }
 
 void RunSimulation321() {
@@ -382,16 +380,40 @@ void RunSimulation321() {
     g_simulationRunning = true;
 
     std::thread([]() {
-        ShowTrayBalloon(L"SleepOrDie จำลองการทดสอบ", L"เริ่มนับถอยหลัง 3 - 2 - 1 จำลองเส้นตายเข้านอน", NIIF_INFO);
+        ShowTrayBalloon(L"SleepOrDie จำลองการทดสอบ", L"เริ่มจำลองลำดับ 1.Alert(T-10m) > 2.Lockdown(T-5m) > 3.Sleep(T-2m) > 4.Shutdown", NIIF_INFO);
 
-        for (int sec = 3; sec >= 1; --sec) {
-            Beep(587, 200);
-            Sleep(1000);
-        }
+        // 1. Alert (T-10m)
+        ShowTrayBalloon(L"1/4. SleepOrDie Alert (T-10m)", L"แจ้งเตือนให้นอนตามปกติ (Alert ธรรมดา)", NIIF_INFO);
+        PlaySoundForStage(SleepStage::Alert);
+        Sleep(2000);
 
-        int countdown = config.emergencyCountdownSeconds > 0 ? config.emergencyCountdownSeconds : 60;
-        std::wstring alertMsg = L"เข้าสู่ช่วงฉุกเฉิน " + std::to_wstring(countdown) + L" วินาทีก่อน HP ลดเหลือ 0%!";
-        ShowTrayBalloon(L"🚨 เลยเส้นตายเข้านอน!", alertMsg.c_str(), NIIF_ERROR);
+        // 2. Lockdown (T-5m) Mock MSGBOX
+        PlaySoundForStage(SleepStage::Lockdown);
+        MessageBoxW(
+            NULL,
+            L"🚨 [ขั้นตอน 2/4: จำลอง LOCKDOWN (T-5m)]\n\n"
+            L"หากผู้ใช้ยังไม่ยอมนอน ระบบเข้าสู่โหมด Lockdown\n\n"
+            L"[โหมดจำลอง: แสดงแจ้งเตือนโดยไม่ล็อกหน้าจอจริง]\n"
+            L"กด OK เพื่อดูขั้นตอนถัดไป",
+            L"SleepOrDie Lockdown (Mock)",
+            MB_OK | MB_ICONWARNING | MB_SYSTEMMODAL
+        );
+
+        // 3. Windows Sleep Mode (T-2m) Mock MSGBOX
+        PlaySoundForStage(SleepStage::SleepWarning);
+        MessageBoxW(
+            NULL,
+            L"⚠️ [ขั้นตอน 3/4: จำลอง WINDOWS SLEEP MODE (T-2m)]\n\n"
+            L"หากฝ่าฝืนอีก ระบบจะเข้าสู่ Windows Sleep Mode\n\n"
+            L"[โหมดจำลอง: แสดงแจ้งเตือนโดยไม่สลีปเครื่องจริง]\n"
+            L"กด OK เพื่อดูขั้นตอนนับถอยหลังฉุกเฉินและ Shutdown",
+            L"SleepOrDie Sleep Mode (Mock)",
+            MB_OK | MB_ICONWARNING | MB_SYSTEMMODAL
+        );
+
+        // 4. Emergency Countdown before Shutdown
+        int countdown = 5; // Fast demo countdown 5s
+        ShowTrayBalloon(L"🚨 ถึงเวลานอนที่ตั้งไว้!", L"เริ่มช่วงนับถอยหลังฉุกเฉินก่อน Shutdown", NIIF_ERROR);
         PlaySoundForStage(SleepStage::Sleep);
 
         for (int sec = countdown; sec >= 1; --sec) {
@@ -402,6 +424,7 @@ void RunSimulation321() {
             Sleep(1000);
         }
 
+        // 5. Final Shutdown Mock MSGBOX
         ExecuteFinalEnforcement();
         g_simulationRunning = false;
     }).detach();
@@ -649,8 +672,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
                 DestroyMenu(hMenu);
 
                 if (cmd == ID_TRAY_STATUS) {
+                    int wlen = MultiByteToWideChar(CP_UTF8, 0, config.userEmail.c_str(), -1, NULL, 0);
+                    std::wstring wEmail = (wlen > 1) ? std::wstring(wlen - 1, 0) : L"(ยังไม่ล็อกอิน)";
+                    if (wlen > 1) {
+                        MultiByteToWideChar(CP_UTF8, 0, config.userEmail.c_str(), -1, &wEmail[0], wlen);
+                    }
+
                     std::wstring info = L"SleepOrDie Desktop Guard\n\n"
-                                        L"• บัญชีผู้ใช้: " + (config.userEmail.empty() ? L"(ยังไม่ล็อกอิน)" : std::wstring(config.userEmail.begin(), config.userEmail.end())) + L"\n"
+                                        L"• บัญชีผู้ใช้: " + wEmail + L"\n"
                                         L"• เวลานอนเป้าหมาย: " + std::to_wstring(config.bedtimeHour) + L":" + (config.bedtimeMinute < 10 ? L"0" : L"") + std::to_wstring(config.bedtimeMinute) + L" น.\n"
                                         L"• เวลาตื่นนอน: " + std::to_wstring(config.wakeUpHour) + L":" + (config.wakeUpMinute < 10 ? L"0" : L"") + std::to_wstring(config.wakeUpMinute) + L" น.\n"
                                         L"• เวลานับถอยหลังฉุกเฉิน: " + std::to_wstring(config.emergencyCountdownSeconds) + L" วินาที\n"
@@ -700,9 +729,11 @@ void DaemonLoop() {
 
         if (secondsRemaining <= 0) {
             newStage = SleepStage::Sleep;
-        } else if (secondsRemaining <= 900) {
+        } else if (secondsRemaining <= 120) {
+            newStage = SleepStage::SleepWarning;
+        } else if (secondsRemaining <= 300) {
             newStage = SleepStage::Lockdown;
-        } else if (secondsRemaining <= 1800) {
+        } else if (secondsRemaining <= 600) {
             newStage = SleepStage::Alert;
         } else {
             newStage = SleepStage::Normal;
@@ -720,17 +751,41 @@ void DaemonLoop() {
             PlaySoundForStage(currentStage);
 
             if (currentStage == SleepStage::Alert) {
-                ShowTrayBalloon(L"SleepOrDie เตือนเวลานอน (T-30m)", L"เหลือเวลา 30 นาทีก่อนถึงเส้นตาย กรุณาเริ่มวางงานและเตรียมตัวเข้านอน", NIIF_INFO);
+                ShowTrayBalloon(L"SleepOrDie เตือนเวลานอน (T-10m)", L"เหลือเวลา 10 นาทีก่อนถึงเวลานอน กรุณาเริ่มวางงานและเตรียมตัวเข้านอน", NIIF_INFO);
                 ReportPresence("idle", (int)idleSeconds, false);
             } else if (currentStage == SleepStage::Lockdown) {
-                ShowTrayBalloon(L"SleepOrDie ล็อคดาวน์ (T-15m)", L"เหลือเวลา 15 นาทีสุดท้าย! บังคับล็อกหน้าจอ Windows ออกจากระบบทันที", NIIF_WARNING);
-                if (config.lockWorkstationOnLockdown) {
-                    LockWorkStation();
-                }
-                ReportPresence("offline", 900, true);
+                ShowTrayBalloon(L"SleepOrDie ล็อคดาวน์ (T-5m)", L"เหลือเวลา 5 นาทีสุดท้าย! หากยังไม่ยอมนอน ระบบเข้าสู่โหมด Lockdown", NIIF_WARNING);
+                ReportPresence("offline", 300, true);
+
+                std::thread([]() {
+                    MessageBoxW(
+                        NULL,
+                        L"🚨 [SleepOrDie: LOCKDOWN WARNING (T-5m)]\n\n"
+                        L"เหลือเวลา 5 นาทีก่อนถึงเวลานอน!\n"
+                        L"หากผู้ใช้ยังไม่ยอมนอน ระบบเข้าสู่โหมด Lockdown\n\n"
+                        L"[โหมดจำลอง: แสดงแจ้งเตือนโดยไม่ล็อกหน้าจอจริง]",
+                        L"SleepOrDie Lockdown (Mock)",
+                        MB_OK | MB_ICONWARNING | MB_SYSTEMMODAL
+                    );
+                }).detach();
+            } else if (currentStage == SleepStage::SleepWarning) {
+                ShowTrayBalloon(L"SleepOrDie สลีปโหมด (T-2m)", L"เหลือเวลา 2 นาที! หากฝ่าฝืนอีกระบบจะสั่ง Windows Sleep Mode", NIIF_WARNING);
+                ReportPresence("offline", 120, true);
+
+                std::thread([]() {
+                    MessageBoxW(
+                        NULL,
+                        L"⚠️ [SleepOrDie: WINDOWS SLEEP WARNING (T-2m)]\n\n"
+                        L"เหลือเวลา 2 นาทีสุดท้ายก่อนเวลานอน!\n"
+                        L"คุณยังคงฝ่าฝืนการใช้งาน ระบบเตรียมเข้าสู่ Windows Sleep Mode\n\n"
+                        L"[โหมดจำลอง: แสดงแจ้งเตือนโดยไม่สลีปเครื่องจริง]",
+                        L"SleepOrDie Sleep Mode (Mock)",
+                        MB_OK | MB_ICONWARNING | MB_SYSTEMMODAL
+                    );
+                }).detach();
             } else if (currentStage == SleepStage::Sleep) {
                 int countdown = config.emergencyCountdownSeconds > 0 ? config.emergencyCountdownSeconds : 60;
-                std::wstring msg = L"เลยเส้นตายแล้ว! มีเวลา " + std::to_wstring(countdown) + L" วินาทีฉุกเฉินก่อนเครื่องจะเข้าสู่โหมดพักระบบ";
+                std::wstring msg = L"ถึงเวลานอนที่ตั้งไว้แล้ว! มีเวลา " + std::to_wstring(countdown) + L" วินาทีฉุกเฉินก่อน HP ลดเหลือ 0%";
                 ShowTrayBalloon(L"🚨 SleepOrDie ถึงเส้นตายเข้านอน!", msg.c_str(), NIIF_ERROR);
                 ReportPresence("online", (int)idleSeconds, false);
             }
