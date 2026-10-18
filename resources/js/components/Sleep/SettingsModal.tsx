@@ -1,4 +1,17 @@
 import React, { useState } from 'react';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
+import { Settings, Volume2, VolumeX, Clock, Bot, Loader2 } from 'lucide-react';
 
 interface SettingsModalProps {
     isOpen: boolean;
@@ -23,8 +36,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     const [discordId, setDiscordId] = useState(currentDiscordId || '');
     const [saving, setSaving] = useState(false);
 
-    if (!isOpen) return null;
-
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setSaving(true);
@@ -36,87 +47,102 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     };
 
     return (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="max-w-md w-full bg-neutral-950 border border-neutral-800 rounded-3xl p-6 shadow-2xl">
-                <div className="flex items-center justify-between pb-4 border-b border-neutral-800">
-                    <h2 className="text-lg font-mono font-bold text-white uppercase tracking-wider">
-                        ⚙️ Sleep Parameters
-                    </h2>
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="text-neutral-500 hover:text-white font-mono text-sm"
-                    >
-                        ✕
-                    </button>
-                </div>
+        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+            <DialogContent className="sm:max-w-md bg-card/95 backdrop-blur-2xl border-border/70 shadow-2xl">
+                <DialogHeader>
+                    <div className="flex items-center gap-2">
+                        <Settings className="size-5 text-primary" />
+                        <DialogTitle className="font-mono uppercase tracking-wider text-base">
+                            Sleep Engine Parameters
+                        </DialogTitle>
+                    </div>
+                    <DialogDescription className="text-xs font-mono text-muted-foreground">
+                        Configure target wake-up time and Discord presence verification guard.
+                    </DialogDescription>
+                </DialogHeader>
 
-                <form onSubmit={handleSubmit} className="mt-6 space-y-5">
-                    <div>
-                        <label className="block text-xs font-mono uppercase text-neutral-400 mb-2">
-                            Wake-up Time (เวลาตื่นเป้าหมาย)
-                        </label>
-                        <input
+                <form onSubmit={handleSubmit} className="space-y-4 py-2">
+                    <div className="space-y-2">
+                        <Label htmlFor="wake_time" className="font-mono text-xs uppercase flex items-center gap-1.5">
+                            <Clock className="size-3.5" />
+                            Target Wake-up Time (เวลาตื่นเป้าหมาย)
+                        </Label>
+                        <Input
+                            id="wake_time"
                             type="time"
                             value={wakeUpTime}
                             onChange={(e) => setWakeUpTime(e.target.value)}
                             required
-                            className="w-full bg-neutral-900 border border-neutral-800 rounded-xl px-4 py-3 font-mono text-white text-lg focus:outline-none focus:border-emerald-500"
+                            className="font-mono text-lg py-5 bg-background/50 border-input"
                         />
-                        <p className="text-[11px] text-neutral-500 font-mono mt-1.5">
-                            ระบบจะคำนวณเวลานอน 5 Sleep Cycles (7h 30m) + 15m buffer ให้อัตโนมัติ
+                        <p className="text-[11px] text-muted-foreground font-mono">
+                            Auto-calculates bedtime: 5 Sleep Cycles (7h 30m) + 15m latency.
                         </p>
                     </div>
 
-                    <div>
-                        <label className="block text-xs font-mono uppercase text-neutral-400 mb-2">
+                    <div className="space-y-2">
+                        <Label htmlFor="discord_id" className="font-mono text-xs uppercase flex items-center gap-1.5">
+                            <Bot className="size-3.5" />
                             Target Discord User ID (สำหรับตรวจจับ)
-                        </label>
-                        <input
+                        </Label>
+                        <Input
+                            id="discord_id"
                             type="text"
                             placeholder="e.g. 123456789012345678"
                             value={discordId}
                             onChange={(e) => setDiscordId(e.target.value)}
-                            className="w-full bg-neutral-900 border border-neutral-800 rounded-xl px-4 py-2.5 font-mono text-white text-sm focus:outline-none focus:border-emerald-500"
+                            className="font-mono text-sm bg-background/50 border-input"
                         />
-                        <p className="text-[11px] text-neutral-500 font-mono mt-1.5">
-                            บอทจะเช็คสถานะ Discord ของ ID นี้หลังกดยืนยันนอน
+                        <p className="text-[11px] text-muted-foreground font-mono">
+                            Discord Presence Guard will track if this account is online during the 10-minute sleep verification window.
                         </p>
                     </div>
 
-                    <div className="pt-2 flex items-center justify-between border-t border-neutral-900">
-                        <span className="text-xs font-mono text-neutral-300">Audio Alarm & Sirens:</span>
-                        <button
+                    <Separator className="my-2" />
+
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-mono text-muted-foreground">Audio Sirens & Warning Bells:</span>
+                        <Button
                             type="button"
+                            variant={audioEnabled ? 'outline' : 'secondary'}
+                            size="sm"
                             onClick={onToggleAudio}
-                            className={`px-3 py-1.5 rounded-lg font-mono text-xs font-bold border ${
-                                audioEnabled
-                                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                                    : 'bg-neutral-900 border-neutral-800 text-neutral-500'
-                            }`}
+                            className="font-mono text-xs gap-1.5"
                         >
-                            {audioEnabled ? '🔊 Sound ON' : '🔇 Muted'}
-                        </button>
+                            {audioEnabled ? (
+                                <>
+                                    <Volume2 className="size-3.5 text-emerald-400" />
+                                    Sound ON
+                                </>
+                            ) : (
+                                <>
+                                    <VolumeX className="size-3.5 text-muted-foreground" />
+                                    Muted
+                                </>
+                            )}
+                        </Button>
                     </div>
 
-                    <div className="pt-4 flex gap-3">
-                        <button
+                    <DialogFooter className="pt-4 flex gap-2">
+                        <Button
                             type="button"
+                            variant="secondary"
                             onClick={onClose}
-                            className="flex-1 py-3 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-neutral-400 font-mono text-xs uppercase"
+                            className="font-mono text-xs uppercase"
                         >
                             Cancel
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                             type="submit"
                             disabled={saving}
-                            className="flex-1 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-mono text-xs font-black uppercase transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50"
+                            className="font-mono text-xs font-bold uppercase gap-2"
                         >
-                            {saving ? 'Saving...' : 'Save Settings'}
-                        </button>
-                    </div>
+                            {saving && <Loader2 className="size-4 animate-spin" />}
+                            Save Parameters
+                        </Button>
+                    </DialogFooter>
                 </form>
-            </div>
-        </div>
+            </DialogContent>
+        </Dialog>
     );
 };

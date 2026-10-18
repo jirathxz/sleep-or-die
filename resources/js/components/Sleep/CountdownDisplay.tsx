@@ -1,5 +1,10 @@
 import React from 'react';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
 import { SleepStage } from '@/stores/useSleepStore';
+import { Clock, Moon, ShieldAlert, Sparkles, Loader2 } from 'lucide-react';
 
 interface CountdownDisplayProps {
     hours: number;
@@ -26,98 +31,117 @@ export const CountdownDisplay: React.FC<CountdownDisplayProps> = ({
 }) => {
     const pad = (n: number) => n.toString().padStart(2, '0');
 
-    let borderColor = 'border-neutral-800';
-    let digitsColor = 'text-white';
-    let banner = 'COUNTDOWN TO BEDTIME';
+    let badgeText = 'BEDTIME PROTOCOL ACTIVE';
+    let badgeVariant: 'default' | 'secondary' | 'destructive' | 'outline' = 'secondary';
+    let badgeClass = 'text-muted-foreground border-border bg-secondary/50';
+    let digitsColor = 'text-foreground';
 
-    if (stage === 'lockdown') {
-        borderColor = 'border-amber-500/50 shadow-amber-500/10';
+    if (stage === 'alert') {
+        badgeText = 'STAGE 1: APPROACHING BEDTIME (30M)';
+        badgeVariant = 'secondary';
+        badgeClass = 'text-amber-400 border-amber-500/40 bg-amber-500/10';
         digitsColor = 'text-amber-400';
-        banner = '⚠️ LOCKDOWN ACTIVE - PREPARE FOR SLEEP';
+    } else if (stage === 'lockdown') {
+        badgeText = 'STAGE 2: SYSTEM LOCKDOWN (15M)';
+        badgeVariant = 'destructive';
+        badgeClass = 'text-orange-400 border-orange-500/50 bg-orange-500/10 shadow-md shadow-orange-500/20';
+        digitsColor = 'text-orange-400';
     } else if (stage === 'sleep') {
-        borderColor = 'border-red-600/70 shadow-red-600/20 animate-pulse';
-        digitsColor = 'text-red-500';
-        banner = '🚨 DEADLINE EXCEEDED - SLEEP IMMEDIATELY';
+        badgeText = 'STAGE 3: DEADLINE EXCEEDED // DRAINING HP';
+        badgeVariant = 'destructive';
+        badgeClass = 'text-red-400 border-red-500/60 bg-red-500/20 animate-pulse';
+        digitsColor = 'text-red-500 animate-pulse';
     } else if (stage === 'shutdown') {
-        borderColor = 'border-neutral-800';
+        badgeText = 'STAGE 4: NIGHT SHUTDOWN (HP 0)';
+        badgeVariant = 'outline';
+        badgeClass = 'text-neutral-500 border-neutral-700 bg-neutral-900';
         digitsColor = 'text-neutral-600';
-        banner = '💀 SYSTEM SHUTDOWN';
     }
 
     const isVerifying = Boolean(lastConfirmedAt);
 
     return (
-        <div className={`w-full bg-neutral-950/90 rounded-3xl p-8 border ${borderColor} shadow-2xl backdrop-blur-xl text-center relative overflow-hidden transition-all duration-500`}>
-            {/* Header Stage Notice */}
-            <div className="inline-block px-4 py-1.5 rounded-full bg-neutral-900 border border-neutral-800 text-xs font-mono tracking-widest text-neutral-300 uppercase mb-6">
-                {banner}
-            </div>
+        <Card className="border-border/60 bg-card/60 backdrop-blur-xl shadow-2xl relative overflow-hidden text-center transition-all duration-500">
+            <CardHeader className="flex flex-col items-center pb-2 pt-6">
+                <Badge variant={badgeVariant} className={`font-mono text-xs px-3.5 py-1 tracking-widest gap-2 uppercase ${badgeClass}`}>
+                    <Clock className="size-3.5" />
+                    {badgeText}
+                </Badge>
+            </CardHeader>
 
-            {/* Giant Clock Digits */}
-            <div className="flex items-center justify-center gap-2 md:gap-4 my-2">
-                <div className="flex flex-col items-center">
-                    <span className={`text-6xl md:text-8xl font-black font-mono tracking-tight ${digitsColor}`}>
-                        {pad(hours)}
-                    </span>
-                    <span className="text-[11px] font-mono uppercase text-neutral-500 tracking-wider mt-1">Hours</span>
-                </div>
-
-                <span className={`text-5xl md:text-7xl font-bold font-mono pb-6 ${digitsColor}`}>:</span>
-
-                <div className="flex flex-col items-center">
-                    <span className={`text-6xl md:text-8xl font-black font-mono tracking-tight ${digitsColor}`}>
-                        {pad(minutes)}
-                    </span>
-                    <span className="text-[11px] font-mono uppercase text-neutral-500 tracking-wider mt-1">Minutes</span>
-                </div>
-
-                <span className={`text-5xl md:text-7xl font-bold font-mono pb-6 ${digitsColor}`}>:</span>
-
-                <div className="flex flex-col items-center">
-                    <span className={`text-6xl md:text-8xl font-black font-mono tracking-tight ${digitsColor}`}>
-                        {pad(seconds)}
-                    </span>
-                    <span className="text-[11px] font-mono uppercase text-neutral-500 tracking-wider mt-1">Seconds</span>
-                </div>
-            </div>
-
-            {/* Schedule Info */}
-            <div className="flex justify-center items-center gap-6 text-xs text-neutral-400 font-mono mt-6 pt-6 border-t border-neutral-900">
-                <div>
-                    Target Sleep:{' '}
-                    <span className="text-white font-bold">{sleepTargetTime || '--:--'}</span>
-                </div>
-                <div className="w-1 h-1 rounded-full bg-neutral-700" />
-                <div>
-                    Target Wake:{' '}
-                    <span className="text-white font-bold">{wakeUpTime || '--:--'}</span>
-                </div>
-            </div>
-
-            {/* Primary Action Button */}
-            <div className="mt-8">
-                {isVerifying ? (
-                    <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-sm font-mono flex items-center justify-center gap-3">
-                        <span className="w-3 h-3 rounded-full bg-amber-400 animate-ping" />
-                        VERIFYING SLEEP WITH DISCORD... (DO NOT GO ONLINE)
+            <CardContent className="space-y-6 pt-2 pb-8">
+                {/* Digits Display */}
+                <div className="flex items-center justify-center gap-2 md:gap-5 my-2">
+                    <div className="flex flex-col items-center">
+                        <span className={`text-6xl md:text-8xl font-black font-mono tracking-tight ${digitsColor}`}>
+                            {pad(hours)}
+                        </span>
+                        <span className="text-[10px] font-mono uppercase text-muted-foreground tracking-widest mt-1">
+                            Hours
+                        </span>
                     </div>
-                ) : (
-                    <button
-                        type="button"
-                        onClick={onConfirmSleep}
-                        disabled={stage === 'shutdown'}
-                        className={`w-full py-4 px-6 rounded-2xl font-bold tracking-wider text-base uppercase transition-all duration-300 shadow-xl ${
-                            stage === 'sleep'
-                                ? 'bg-red-600 hover:bg-red-500 text-white shadow-red-600/40 animate-bounce'
-                                : stage === 'lockdown'
-                                  ? 'bg-amber-500 hover:bg-amber-400 text-neutral-950 font-black shadow-amber-500/30'
-                                  : 'bg-white hover:bg-neutral-200 text-neutral-950 shadow-white/10'
-                        } disabled:opacity-30 disabled:cursor-not-allowed`}
-                    >
-                        🌙 I am going to sleep now (เข้าสู่นิทรา)
-                    </button>
-                )}
-            </div>
-        </div>
+
+                    <span className={`text-5xl md:text-7xl font-bold font-mono pb-6 ${digitsColor}`}>:</span>
+
+                    <div className="flex flex-col items-center">
+                        <span className={`text-6xl md:text-8xl font-black font-mono tracking-tight ${digitsColor}`}>
+                            {pad(minutes)}
+                        </span>
+                        <span className="text-[10px] font-mono uppercase text-muted-foreground tracking-widest mt-1">
+                            Minutes
+                        </span>
+                    </div>
+
+                    <span className={`text-5xl md:text-7xl font-bold font-mono pb-6 ${digitsColor}`}>:</span>
+
+                    <div className="flex flex-col items-center">
+                        <span className={`text-6xl md:text-8xl font-black font-mono tracking-tight ${digitsColor}`}>
+                            {pad(seconds)}
+                        </span>
+                        <span className="text-[10px] font-mono uppercase text-muted-foreground tracking-widest mt-1">
+                            Seconds
+                        </span>
+                    </div>
+                </div>
+
+                {/* Sub schedule details with shadcn Separator */}
+                <div className="flex justify-center items-center gap-6 text-xs text-muted-foreground font-mono pt-4">
+                    <div>
+                        Target Sleep: <span className="font-bold text-foreground">{sleepTargetTime || '--:--'}</span>
+                    </div>
+                    <Separator orientation="vertical" className="h-4" />
+                    <div>
+                        Target Wake: <span className="font-bold text-foreground">{wakeUpTime || '--:--'}</span>
+                    </div>
+                </div>
+
+                {/* Action button using shadcn Button */}
+                <div className="max-w-md mx-auto pt-2">
+                    {isVerifying ? (
+                        <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-mono flex items-center justify-center gap-3">
+                            <Loader2 className="size-4 animate-spin text-amber-400" />
+                            <span>DISCORD PRESENCE VERIFICATION IN PROGRESS (10M)</span>
+                        </div>
+                    ) : (
+                        <Button
+                            size="lg"
+                            onClick={onConfirmSleep}
+                            disabled={stage === 'shutdown'}
+                            variant={stage === 'sleep' ? 'destructive' : 'default'}
+                            className={`w-full py-6 text-base font-mono font-bold tracking-wide transition-all shadow-xl ${
+                                stage === 'sleep'
+                                    ? 'bg-red-600 hover:bg-red-500 text-white animate-bounce'
+                                    : stage === 'lockdown'
+                                      ? 'bg-amber-500 hover:bg-amber-400 text-black font-black'
+                                      : 'bg-primary text-primary-foreground'
+                            }`}
+                        >
+                            <Moon className="size-5 mr-2" />
+                            Confirm Sleep (เข้าสู่นิทรา)
+                        </Button>
+                    )}
+                </div>
+            </CardContent>
+        </Card>
     );
 };

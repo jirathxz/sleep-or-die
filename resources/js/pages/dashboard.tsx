@@ -6,8 +6,12 @@ import { SettingsModal } from '@/components/Sleep/SettingsModal';
 import { StageOverlay } from '@/components/Sleep/StageOverlay';
 import { StatsBadge } from '@/components/Sleep/StatsBadge';
 import { TombstoneScreen } from '@/components/Sleep/TombstoneScreen';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 import { dashboard } from '@/routes';
 import { useSleepStore } from '@/stores/useSleepStore';
+import { Volume2, VolumeX, Settings, Hourglass, Shield, ShieldAlert } from 'lucide-react';
 
 interface PageProps {
     auth: {
@@ -58,7 +62,6 @@ export default function Dashboard() {
         fetchStatus,
     } = useSleepStore();
 
-    // Initialize store with user props and start 1-second tick loop
     useEffect(() => {
         if (auth?.user) {
             syncUser({
@@ -91,51 +94,63 @@ export default function Dashboard() {
         <>
             <Head title="SleepOrDie - Hardcore Sleep Accountability" />
 
-            {/* Ambient Alert / Lockdown / Shutdown Overlays */}
             <StageOverlay stage={stage} />
 
-            <div className="min-h-screen bg-black text-neutral-200 p-4 md:p-8 flex flex-col justify-between">
-                {/* Header Bar */}
-                <header className="max-w-4xl w-full mx-auto flex items-center justify-between pb-6 border-b border-neutral-900">
+            <div className="min-h-screen bg-background text-foreground p-4 md:p-8 flex flex-col justify-between selection:bg-primary selection:text-primary-foreground">
+                {/* Header with shadcn Button and Badge */}
+                <header className="max-w-4xl w-full mx-auto flex items-center justify-between pb-6 border-b border-border/80">
                     <div className="flex items-center gap-3">
-                        <span className="text-2xl">⏳</span>
+                        <div className="size-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shadow-sm">
+                            <Hourglass className="size-5" />
+                        </div>
                         <div>
-                            <h1 className="text-lg md:text-xl font-black font-mono tracking-tight text-white flex items-center gap-2">
-                                SLEEP OR DIE <span className="text-xs px-2 py-0.5 rounded bg-neutral-900 text-neutral-400 font-normal">v1.0</span>
-                            </h1>
-                            <p className="text-[11px] font-mono text-neutral-500">
+                            <div className="flex items-center gap-2">
+                                <h1 className="text-lg md:text-xl font-black font-mono tracking-tight text-foreground uppercase">
+                                    Sleep Or Die
+                                </h1>
+                                <Badge variant="secondary" className="font-mono text-[10px] px-1.5 py-0 uppercase">
+                                    v1.0-shadcn
+                                </Badge>
+                            </div>
+                            <p className="text-[11px] font-mono text-muted-foreground">
                                 Hardcore Biological Discipline Protocol
                             </p>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                        <button
-                            type="button"
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="outline"
+                            size="icon"
                             onClick={() => toggleAudio()}
-                            className="p-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-sm"
-                            title={audioEnabled ? 'Mute' : 'Unmute'}
+                            className="size-9 rounded-xl border-border/80"
+                            title={audioEnabled ? 'Mute Audio' : 'Unmute Audio'}
                         >
-                            {audioEnabled ? '🔊' : '🔇'}
-                        </button>
+                            {audioEnabled ? (
+                                <Volume2 className="size-4 text-emerald-400" />
+                            ) : (
+                                <VolumeX className="size-4 text-muted-foreground" />
+                            )}
+                        </Button>
 
-                        <button
-                            type="button"
+                        <Button
+                            variant="outline"
+                            size="sm"
                             onClick={() => setSettingsOpen(true)}
-                            className="px-3.5 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-xs font-mono text-neutral-300 flex items-center gap-2 transition-all"
+                            className="font-mono text-xs gap-2 rounded-xl border-border/80"
                         >
-                            <span>⚙️</span>
+                            <Settings className="size-3.5" />
                             <span className="hidden sm:inline">Settings</span>
-                        </button>
+                        </Button>
                     </div>
                 </header>
 
                 {/* Main Dashboard Space */}
                 <main className="max-w-4xl w-full mx-auto my-8 space-y-6">
-                    {/* Vitality HP Bar */}
+                    {/* Vitality Matrix HP Bar */}
                     <HpBar hp={current_hp} stage={stage} />
 
-                    {/* Giant Countdown & Action Center */}
+                    {/* Countdown Display & Action Button */}
                     <CountdownDisplay
                         hours={hoursRemaining}
                         minutes={minutesRemaining}
@@ -148,7 +163,7 @@ export default function Dashboard() {
                         lastConfirmedAt={last_sleep_confirmed_at}
                     />
 
-                    {/* Statistics and Items */}
+                    {/* Gamification Badges & Strike Counter */}
                     <StatsBadge
                         daysSurvived={days_survived}
                         shutdownStacks={shutdown_stacks}
@@ -158,13 +173,26 @@ export default function Dashboard() {
                     />
                 </main>
 
-                {/* Footer notes */}
-                <footer className="max-w-4xl w-full mx-auto pt-6 border-t border-neutral-900 flex flex-col sm:flex-row justify-between text-center sm:text-left text-xs font-mono text-neutral-600 gap-2">
-                    <div>Discord Guard: {discord_user_id ? `Target ID ${discord_user_id} active` : 'No target bound'}</div>
-                    <div>Account Status: {shutdown_stacks} / 5 strikes</div>
+                {/* Footer with shadcn Badges and Separator */}
+                <footer className="max-w-4xl w-full mx-auto pt-6 border-t border-border/80 flex flex-col sm:flex-row items-center justify-between text-xs font-mono text-muted-foreground gap-3">
+                    <div className="flex items-center gap-2">
+                        <Shield className="size-3.5 text-primary" />
+                        <span>Discord Guard:</span>
+                        <Badge variant="outline" className="font-mono text-[10px]">
+                            {discord_user_id ? `Target ID: ${discord_user_id}` : 'Unbound'}
+                        </Badge>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <ShieldAlert className="size-3.5 text-destructive" />
+                        <span>Account Status:</span>
+                        <Badge variant={shutdownStacks >= 4 ? 'destructive' : 'secondary'} className="font-mono text-[10px]">
+                            {shutdownStacks} / 5 strikes
+                        </Badge>
+                    </div>
                 </footer>
 
-                {/* Configuration Modal */}
+                {/* Settings Configuration Modal */}
                 <SettingsModal
                     isOpen={settingsOpen}
                     onClose={() => setSettingsOpen(false)}
