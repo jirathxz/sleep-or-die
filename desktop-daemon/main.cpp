@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SleepOrDie Native Windows Desktop Guard Daemon
  * Hardcore Biological Discipline & Night Curfew Enforcer
  *
@@ -126,11 +126,19 @@ void PlaySoundForStage(SleepStage stage) {
     }
 }
 
+void PrintConsoleUnicode(const std::wstring& text) {
+    HANDLE hStdOut = GetStdHandle(STD_OUTPUT_HANDLE);
+    if (hStdOut != INVALID_HANDLE_VALUE) {
+        DWORD written = 0;
+        WriteConsoleW(hStdOut, text.c_str(), (DWORD)text.length(), &written, NULL);
+    }
+}
+
 /**
  * Native Windows Toast / Message Alert (Async non-blocking popup)
  */
 void ShowWindowsAlert(const std::wstring& title, const std::wstring& message, UINT iconType) {
-    std::wcout << L"[" << title << L"] " << message << std::endl;
+    PrintConsoleUnicode(L"[" + title + L"] " + message + L"\n");
     MessageBeep(iconType);
 
     struct PopupArgs {
@@ -159,9 +167,9 @@ void ShowWindowsAlert(const std::wstring& title, const std::wstring& message, UI
  * Disciplinary Enforcement (Shutdown - Test Mode uses MessageBox as requested)
  */
 void ExecuteEnforcement() {
-    std::wcout << L"\n=======================================================\n";
-    std::wcout << L">>> [0% HP: SYSTEM SHUTDOWN ENFORCED (TEST MODE: MSGBOX)] <<<\n";
-    std::wcout << L"=======================================================\n";
+    PrintConsoleUnicode(L"\n=======================================================\n");
+    PrintConsoleUnicode(L">>> [0% HP: SYSTEM SHUTDOWN ENFORCED (TEST MODE: MSGBOX)] <<<\n");
+    PrintConsoleUnicode(L"=======================================================\n");
     PlaySoundForStage(SleepStage::Shutdown);
 
     // Using Windows MessageBox for test mode as requested (instead of locking or turning off PC)
@@ -211,6 +219,7 @@ void RunSimulation321() {
 int main(int argc, char* argv[]) {
     // Set console code page to UTF-8
     SetConsoleOutputCP(CP_UTF8);
+    SetConsoleCP(CP_UTF8);
 
     std::cout << "============================================================\n";
     std::cout << "       SLEEP OR DIE - NATIVE WINDOWS DESKTOP GUARD          \n";

@@ -1,4 +1,5 @@
 @echo off
+chcp 65001 > nul
 title SleepOrDie Guard - 3-2-1 Test Simulation
 color 0e
 echo ========================================================

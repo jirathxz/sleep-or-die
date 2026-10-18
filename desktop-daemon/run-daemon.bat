@@ -1,4 +1,5 @@
 @echo off
+chcp 65001 > nul
 title SleepOrDie Desktop Guard
 color 0c
 echo ========================================================

@@ -11,7 +11,7 @@ if %ERRORLEVEL% NEQ 0 (
     exit /b %ERRORLEVEL%
 )
 
-cl.exe /O2 /EHsc /std:c++17 main.cpp /Fe:SleepOrDieGuard.exe user32.lib shell32.lib winmm.lib
+cl.exe /utf-8 /O2 /EHsc /std:c++17 main.cpp /Fe:SleepOrDieGuard.exe user32.lib shell32.lib winmm.lib
 
 if %ERRORLEVEL% EQU 0 (
     echo.

@@ -28,6 +28,10 @@ class LASTINPUTINFO(Structure):
 user32 = ctypes.windll.user32
 kernel32 = ctypes.windll.kernel32
 
+from ctypes import wintypes
+user32.MessageBoxW.argtypes = [wintypes.HWND, wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.UINT]
+user32.MessageBoxW.restype = wintypes.INT
+
 def get_idle_seconds() -> float:
     """Returns number of seconds since last mouse or keyboard input."""
     lii = LASTINPUTINFO()
