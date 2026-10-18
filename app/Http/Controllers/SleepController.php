@@ -90,10 +90,13 @@ class SleepController extends Controller
             $expThreshold = $level * 500;
         }
 
+        $newPoints = ($user->points ?? 0) + 50;
+
         $user->update([
             'last_sleep_confirmed_at' => now(),
             'exp' => $newExp,
             'level' => $level,
+            'points' => $newPoints,
         ]);
 
         return response()->json([
@@ -101,7 +104,9 @@ class SleepController extends Controller
             'last_sleep_confirmed_at' => $user->last_sleep_confirmed_at,
             'level' => $user->level,
             'exp' => $user->exp,
+            'points' => $user->points,
             'exp_gained' => 150,
+            'points_gained' => 50,
         ]);
     }
 
@@ -121,6 +126,33 @@ class SleepController extends Controller
             'success' => true,
             'new_sleep_target_time' => $user->fresh()->sleep_target_time,
             'remaining_tickets' => $user->fresh()->tickets_count,
+        ]);
+    }
+
+    public function redeemTicket(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $cost = 100;
+
+        if (($user->points ?? 0) < $cost) {
+            return response()->json([
+                'success' => false,
+                'message' => 'แต้มไม่เพียงพอ ต้องการ 100 แต้มเพื่อแลก 1 ตั๋วขยายเวลา',
+                'points' => $user->points ?? 0,
+                'tickets_count' => $user->tickets_count ?? 0,
+            ], 422);
+        }
+
+        $user->update([
+            'points' => $user->points - $cost,
+            'tickets_count' => ($user->tickets_count ?? 0) + 1,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'แลกตั๋วขยายเวลาเรียบร้อยแล้ว (+30 นาที)',
+            'points' => $user->points,
+            'tickets_count' => $user->tickets_count,
         ]);
     }
 
@@ -144,6 +176,7 @@ class SleepController extends Controller
             'days_survived' => $user->days_survived,
             'level' => $user->level ?? 1,
             'exp' => $user->exp ?? 0,
+            'points' => $user->points ?? 0,
             'tickets_count' => $user->tickets_count,
             'is_disabled' => $user->is_disabled,
             'last_sleep_confirmed_at' => $user->last_sleep_confirmed_at,
