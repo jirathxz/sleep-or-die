@@ -25,63 +25,48 @@ export const LevelExpBar: React.FC<LevelExpBarProps> = ({ level, exp }) => {
     }
 
     return (
-        <section className="bg-[#121215] rounded-2xl p-5 md:p-6 space-y-4 shadow-sm select-none">
-            {/* Header: Title and Status Indicator (Strictly No Badge) */}
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                    <span className="size-2 rounded-full bg-cyan-400" />
-                    <h2 className="text-sm font-medium text-zinc-300">
-                        ระดับและแต้มประสบการณ์ (Level & EXP)
-                    </h2>
+        <section className="bg-[#121215] rounded-xl px-4 py-3 space-y-2 shadow-sm select-none">
+            {/* Row 1: Level, Title, and EXP readout */}
+            <div className="flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2 min-w-0">
+                    <span className="size-2 rounded-full bg-cyan-400 shrink-0" />
+                    <span className="font-semibold text-white text-sm tracking-tight tabular-nums">
+                        Level {currentLevel}
+                    </span>
+                    <span className="text-zinc-600 font-light">•</span>
+                    <span className="text-cyan-400 font-normal truncate">
+                        {disciplineTitle}
+                    </span>
                 </div>
 
-                <div className="flex items-center gap-2 text-xs font-normal">
-                    <span className="text-zinc-500 font-light">ฉายาวินัย:</span>
-                    <span className="text-cyan-400 font-normal">{disciplineTitle}</span>
+                <div className="flex items-baseline gap-1.5 shrink-0 pl-2">
+                    <span className="text-white font-medium tabular-nums text-xs">
+                        {currentExp}
+                    </span>
+                    <span className="text-zinc-500 font-light text-[11px]">
+                        / {expThreshold} XP
+                    </span>
+                    <span className="text-zinc-600 font-light text-[11px] tabular-nums">
+                        ({expPercentage}%)
+                    </span>
                 </div>
             </div>
 
-            {/* Readout Display */}
-            <div className="flex items-baseline justify-between pt-1">
-                <div className="space-y-0.5">
-                    <span className="text-xs text-zinc-500 font-light">
-                        ระดับวินัยปัจจุบัน
-                    </span>
-                    <div className="flex items-baseline gap-2">
-                        <span className="text-3xl md:text-4xl font-medium tracking-tight text-white tabular-nums">
-                            Level {currentLevel}
-                        </span>
-                    </div>
-                </div>
-
-                <div className="text-right space-y-0.5">
-                    <span className="text-xs text-zinc-500 font-light">
-                        ความก้าวหน้าแต้ม EXP
-                    </span>
-                    <div className="flex items-baseline justify-end gap-1.5">
-                        <span className="text-lg md:text-xl font-medium text-zinc-200 tabular-nums">
-                            {currentExp}
-                        </span>
-                        <span className="text-xs text-zinc-500 font-normal">/ {expThreshold} XP</span>
-                    </div>
-                </div>
-            </div>
-
-            {/* EXP Progress Bar Container (Concentric Radius: rounded-lg with inner rounded-md) */}
-            <div className="w-full h-3 bg-[#18181b] rounded-lg p-0.5 overflow-hidden">
+            {/* Row 2: Sleek Slim Progress Bar */}
+            <div className="w-full h-1.5 bg-[#18181b] rounded-full overflow-hidden">
                 <div
-                    className="h-full rounded-md bg-gradient-to-r from-teal-500 via-cyan-400 to-sky-400 transition-all duration-700 ease-out"
+                    className="h-full rounded-full bg-gradient-to-r from-teal-500 to-cyan-400 transition-all duration-700 ease-out"
                     style={{ width: `${expPercentage}%` }}
                 />
             </div>
 
-            {/* Footer Markers */}
-            <div className="flex justify-between items-center text-[11px] text-zinc-500 font-light pt-0.5">
-                <span>+150 XP ทุกการเข้านอนตรงเวลา</span>
+            {/* Row 3: Subtle Micro Hint */}
+            <div className="flex items-center justify-between text-[10px] text-zinc-500 font-light">
+                <span>+150 XP เมื่อเข้านอนตรงเวลา</span>
                 <span className="tabular-nums">
                     {remainingExp === 0
-                        ? 'พร้อมอัปเลเวลถัดไป'
-                        : `อีก ${remainingExp} XP สู่ Level ${currentLevel + 1} (${expPercentage}%)`}
+                        ? 'พร้อมเลื่อนขั้น'
+                        : `ต้องการอีก ${remainingExp} XP สู่ Level ${currentLevel + 1}`}
                 </span>
             </div>
         </section>
