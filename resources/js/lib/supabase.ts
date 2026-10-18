@@ -1,4 +1,4 @@
-import { createClient, SupabaseClient, RealtimeChannel } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
@@ -116,65 +116,6 @@ export async function getSleepProfile(userId: string): Promise<SleepProfile | nu
     return data as SleepProfile;
 }
 
-/**
- * Subscribe to realtime updates for user's sleep profile
- */
-export function subscribeToSleepProfile(
-    userId: string,
-    onUpdate: (profile: SleepProfile) => void
-): RealtimeChannel | null {
-    if (!supabase) return null;
-
-    const channel = supabase
-        .channel(`sleep_profile_${userId}`)
-        .on(
-            'postgres_changes',
-            {
-                event: '*',
-                schema: 'public',
-                table: 'sleep_profiles',
-                filter: `id=eq.${userId}`,
-            },
-            (payload) => {
-                if (payload.new) {
-                    onUpdate(payload.new as SleepProfile);
-                }
-            }
-        )
-        .subscribe();
-
-    return channel;
-}
-
-/**
- * Subscribe to realtime sleep events (alerts, lockdowns, hp drains, shutdowns)
- */
-export function subscribeToSleepEvents(
-    userId: string,
-    onEvent: (event: SleepEvent) => void
-): RealtimeChannel | null {
-    if (!supabase) return null;
-
-    const channel = supabase
-        .channel(`sleep_events_${userId}`)
-        .on(
-            'postgres_changes',
-            {
-                event: 'INSERT',
-                schema: 'public',
-                table: 'sleep_events',
-                filter: `user_id=eq.${userId}`,
-            },
-            (payload) => {
-                if (payload.new) {
-                    onEvent(payload.new as SleepEvent);
-                }
-            }
-        )
-        .subscribe();
-
-    return channel;
-}
 
 /**
  * Update user sleep profile in Supabase

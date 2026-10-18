@@ -81,10 +81,7 @@ def load_config() -> dict:
         "lock_workstation_on_breach": True,
         "enforce_system_shutdown": False,
         "idle_threshold_seconds": 30,
-        "check_interval_seconds": 2,
-        "supabase_url": "",
-        "supabase_anon_key": "",
-        "supabase_user_id": ""
+        "check_interval_seconds": 2
     }
     if os.path.exists(config_path):
         try:
@@ -94,41 +91,6 @@ def load_config() -> dict:
         except Exception as e:
             print(f"[Warning] Failed to load config.json: {e}")
     return default_config
-
-def sync_with_supabase(config: dict, event_type: str, message: str, payload: dict = None):
-    """Pushes alert / lockdown / shutdown events directly to Supabase REST API."""
-    url = config.get("supabase_url", "").strip()
-    key = config.get("supabase_anon_key", "").strip()
-    user_id = config.get("supabase_user_id", "").strip()
-
-    if not url or not key or not user_id:
-        return
-
-    try:
-        import urllib.request
-        endpoint = f"{url.rstrip('/')}/rest/v1/sleep_events"
-        data = {
-            "user_id": user_id,
-            "event_type": event_type,
-            "message": message,
-            "payload": payload or {}
-        }
-        req = urllib.request.Request(
-            endpoint,
-            data=json.dumps(data).encode("utf-8"),
-            headers={
-                "apikey": key,
-                "Authorization": f"Bearer {key}",
-                "Content-Type": "application/json",
-                "Prefer": "return=minimal"
-            },
-            method="POST"
-        )
-        with urllib.request.urlopen(req, timeout=3) as resp:
-            pass
-    except Exception as e:
-        # non-blocking
-        pass
 
 def get_seconds_until_bedtime(target_hour: int, target_minute: int) -> float:
     now = datetime.now()
@@ -226,17 +188,11 @@ def main():
                 play_stage_sound(current_stage)
 
                 if current_stage == "alert":
-                    msg = "เหลือเวลา 30 นาที! เริ่มปิดงานและพักสายตา"
-                    print(f"[ALERT - T-30m] {msg}")
-                    sync_with_supabase(config, "alert_30m", msg, {"remaining_seconds": remaining})
+                    print("[ALERT - T-30m] เหลือเวลา 30 นาที! เริ่มปิดงานและพักสายตา")
                 elif current_stage == "lockdown":
-                    msg = "เหลือเวลา 15 นาที! บันทึกงานและปิดเครื่องทันที"
-                    print(f"[LOCKDOWN - T-15m] {msg}")
-                    sync_with_supabase(config, "lockdown_15m", msg, {"remaining_seconds": remaining})
+                    print("[LOCKDOWN - T-15m] เหลือเวลา 15 นาที! บันทึกงานและปิดเครื่องทันที")
                 elif current_stage == "sleep":
-                    msg = "เลยเวลานอนแล้ว! หากตรวจพบการขยับเมาส์/คีย์บอร์ด เลือดจะลดลงทันที"
-                    print(f"[SLEEP - DEADLINE] {msg}")
-                    sync_with_supabase(config, "curfew_breached", msg, {"remaining_seconds": remaining})
+                    print("[SLEEP - DEADLINE] เลยเวลานอนแล้ว! หากตรวจพบการขยับเมาส์/คีย์บอร์ด เลือดจะลดลงทันที")
 
             # Active curfew check:
             if current_stage == "sleep":
@@ -244,12 +200,10 @@ def main():
                     current_hp = max(0, current_hp - 5)
                     print(f"[{datetime.now().strftime('%H:%M:%S')}] [VIOLATION] Active typing/mouse detected! (Idle: {idle_seconds:.1f}s) -> HP: {current_hp}%")
                     play_stage_sound("sleep")
-                    sync_with_supabase(config, "hp_drain", f"ตรวจพบการใช้งานหน้าจอ HP ลดเหลือ {current_hp}%", {"current_hp": current_hp, "idle_seconds": idle_seconds})
 
                     if current_hp <= 0:
                         print("\n[CRITICAL] HP DROPPED TO 0%! EXECUTING ENFORCEMENT PROTOCOL.")
                         play_stage_sound("shutdown")
-                        sync_with_supabase(config, "disciplinary_lock", "HP เหลือ 0%! ทำการล็อคหน้าจอ Windows ทันที", {"current_hp": 0})
                         if config.get("lock_workstation_on_breach", True):
                             lock_workstation()
                         if config.get("enforce_system_shutdown", False):

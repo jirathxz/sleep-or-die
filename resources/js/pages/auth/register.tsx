@@ -130,20 +130,6 @@ export default function Register({ passwordRules }: Props) {
                                 Log in
                             </TextLink>
                         </div>
-
-                        {/* Supabase Realtime Sync Status Indicator */}
-                        <div className="rounded-xl bg-neutral-900/60 p-3 text-center text-xs text-neutral-400">
-                            {isSupabaseConfigured() ? (
-                                <span className="flex items-center justify-center gap-2 text-emerald-400">
-                                    <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                                    Supabase Realtime Sync พร้อมใช้งาน
-                                </span>
-                            ) : (
-                                <span className="text-neutral-500">
-                                    Supabase Realtime: กำหนดค่า URL และ Anon Key ใน .env เพื่อเปิดใช้งาน
-                                </span>
-                            )}
-                        </div>
                     </>
                 )}
             </Form>

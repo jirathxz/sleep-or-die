@@ -10,8 +10,6 @@ import { Spinner } from '@/components/ui/spinner';
 import { register } from '@/routes';
 import { store } from '@/routes/login';
 import { request } from '@/routes/password';
-import PasskeyVerify from '@/components/passkey-verify';
-
 import { isSupabaseConfigured, signInWithSupabase } from '@/lib/supabase';
 import { useState } from 'react';
 
@@ -41,8 +39,6 @@ export default function Login({ status, canResetPassword }: Props) {
     return (
         <>
             <Head title="Log in" />
-
-            <PasskeyVerify />
 
             <Form
                 {...store.form()}
@@ -118,20 +114,6 @@ export default function Login({ status, canResetPassword }: Props) {
                             <TextLink href={register()} tabIndex={5}>
                                 Sign up
                             </TextLink>
-                        </div>
-
-                        {/* Supabase Realtime Sync Status Indicator */}
-                        <div className="rounded-xl bg-neutral-900/60 p-3 text-center text-xs text-neutral-400">
-                            {isSupabaseConfigured() ? (
-                                <span className="flex items-center justify-center gap-2 text-emerald-400">
-                                    <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                                    Supabase Realtime Sync พร้อมใช้งาน
-                                </span>
-                            ) : (
-                                <span className="text-neutral-500">
-                                    Supabase Realtime: กำหนดค่า URL และ Anon Key ใน .env เพื่อเปิดใช้งาน
-                                </span>
-                            )}
                         </div>
                     </>
                 )}

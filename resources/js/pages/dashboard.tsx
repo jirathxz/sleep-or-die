@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { Head, usePage } from '@inertiajs/react';
 import { CountdownDisplay } from '@/components/Sleep/CountdownDisplay';
 import { HpBar } from '@/components/Sleep/HpBar';
@@ -7,8 +7,7 @@ import { StatsBadge } from '@/components/Sleep/StatsBadge';
 import { TombstoneScreen } from '@/components/Sleep/TombstoneScreen';
 import { dashboard } from '@/routes';
 import { useSleepStore } from '@/stores/useSleepStore';
-import { Volume2, VolumeX, Radio } from 'lucide-react';
-import { isSupabaseConfigured, subscribeToSleepProfile, subscribeToSleepEvents, SleepProfile, SleepEvent } from '@/lib/supabase';
+import { Volume2, VolumeX } from 'lucide-react';
 
 interface PageProps {
     auth: {
@@ -59,8 +58,6 @@ export default function Dashboard() {
         resetSimulation,
     } = useSleepStore();
 
-    const [realtimeActive, setRealtimeActive] = useState<boolean>(false);
-
     useEffect(() => {
         if (auth?.user) {
             syncUser({
@@ -74,35 +71,6 @@ export default function Dashboard() {
                 discord_user_id: auth.user.discord_user_id ?? null,
                 last_sleep_confirmed_at: auth.user.last_sleep_confirmed_at ?? null,
             });
-
-            // Connect to Supabase Realtime for live updates
-            if (isSupabaseConfigured()) {
-                const profileChannel = subscribeToSleepProfile(String(auth.user.id), (updated: SleepProfile) => {
-                    setRealtimeActive(true);
-                    syncUser({
-                        current_hp: updated.current_hp,
-                        wake_up_time: updated.wake_up_time,
-                        sleep_target_time: updated.sleep_target_time,
-                        shutdown_stacks: updated.shutdown_stacks,
-                        days_survived: updated.days_survived,
-                        tickets_count: updated.tickets_count,
-                        is_disabled: updated.is_disabled,
-                        discord_user_id: updated.discord_user_id,
-                        last_sleep_confirmed_at: updated.last_sleep_confirmed_at,
-                    });
-                });
-
-                const eventChannel = subscribeToSleepEvents(String(auth.user.id), (event: SleepEvent) => {
-                    console.log('[Supabase Realtime Event]', event.event_type, event.message);
-                });
-
-                setRealtimeActive(true);
-
-                return () => {
-                    profileChannel?.unsubscribe();
-                    eventChannel?.unsubscribe();
-                };
-            }
         }
 
         fetchStatus();
@@ -129,17 +97,9 @@ export default function Dashboard() {
                 {/* Header: Pure focus on Dashboard role & Quick audio toggle */}
                 <div className="flex items-center justify-between pb-1">
                     <div>
-                        <div className="flex items-center gap-2">
-                            <h1 className="text-xl font-medium tracking-tight text-white">
-                                แผงควบคุม (Dashboard)
-                            </h1>
-                            {realtimeActive && (
-                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-normal bg-emerald-950/40 text-emerald-400">
-                                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                                    Realtime
-                                </span>
-                            )}
-                        </div>
+                        <h1 className="text-xl font-medium tracking-tight text-white">
+                            แผงควบคุม (Dashboard)
+                        </h1>
                         <p className="text-xs text-zinc-500 font-light mt-0.5">
                             ระดับพลังชีวิตและเวลานับถอยหลังสู่เส้นตายเข้านอนคืนนี้
                         </p>
