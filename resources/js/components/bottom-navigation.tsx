@@ -9,7 +9,7 @@ export function BottomNavigation() {
 
     const navItems = [
         {
-            title: 'Dashboard',
+            title: 'แผงควบคุม',
             href: '/dashboard',
             match: ['/', '/dashboard'],
             icon: LayoutGrid,

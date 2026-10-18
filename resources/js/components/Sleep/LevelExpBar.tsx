@@ -13,15 +13,15 @@ export const LevelExpBar: React.FC<LevelExpBarProps> = ({ level, exp }) => {
     const remainingExp = Math.max(0, expThreshold - currentExp);
 
     // Dynamic discipline titles based on level
-    let disciplineTitle = 'มือใหม่หัดนอน (Novice)';
+    let disciplineTitle = 'มือใหม่หัดนอน';
     if (currentLevel >= 5) {
-        disciplineTitle = 'เทพแห่งการพักผ่อน (Immortal Sleeper)';
+        disciplineTitle = 'เทพแห่งการพักผ่อน';
     } else if (currentLevel >= 4) {
-        disciplineTitle = 'ปรมาจารย์วินัยนิทรา (Sleep Master)';
+        disciplineTitle = 'ปรมาจารย์วินัยนิทรา';
     } else if (currentLevel >= 3) {
-        disciplineTitle = 'ผู้เชี่ยวชาญการฟื้นฟู (Vitality Guardian)';
+        disciplineTitle = 'ผู้เชี่ยวชาญการฟื้นฟู';
     } else if (currentLevel >= 2) {
-        disciplineTitle = 'ผู้ควบคุมวงจรสลีป (Circadian Adept)';
+        disciplineTitle = 'ผู้ควบคุมวงจรสลีป';
     }
 
     return (
@@ -31,7 +31,7 @@ export const LevelExpBar: React.FC<LevelExpBarProps> = ({ level, exp }) => {
                 <div className="flex items-center gap-2 min-w-0">
                     <span className="size-2 rounded-full bg-cyan-400 shrink-0" />
                     <span className="font-semibold text-white text-sm tracking-tight tabular-nums">
-                        Level {currentLevel}
+                        เลเวล {currentLevel}
                     </span>
                     <span className="text-zinc-600 font-light">•</span>
                     <span className="text-cyan-400 font-normal truncate">
@@ -47,7 +47,7 @@ export const LevelExpBar: React.FC<LevelExpBarProps> = ({ level, exp }) => {
                         / {expThreshold} XP
                     </span>
                     <span className="text-zinc-600 font-light text-[11px] tabular-nums">
-                        ({expPercentage}%)
+                        {expPercentage}%
                     </span>
                 </div>
             </div>

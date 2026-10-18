@@ -36,7 +36,7 @@ interface MenuItem {
 
 const mainItems: MenuItem[] = [
     {
-        title: 'Dashboard',
+        title: 'แผงควบคุม',
         href: '/dashboard',
         icon: LayoutGrid,
         matches: ['/', '/dashboard'],
@@ -162,9 +162,9 @@ export function AppSidebar() {
 
             {/* Sidebar Content with 3 Groups matching user design */}
             <SidebarContent className="space-y-1">
-                {renderNavGroup('MAIN', mainItems)}
-                {renderNavGroup('PROGRESSION', progressionItems)}
-                {renderNavGroup('SYSTEM', systemItems)}
+                {renderNavGroup('เมนูหลัก', mainItems)}
+                {renderNavGroup('ความก้าวหน้า', progressionItems)}
+                {renderNavGroup('ระบบ', systemItems)}
             </SidebarContent>
 
             {/* Sidebar Footer with Mini HP Indicator & User Profile */}

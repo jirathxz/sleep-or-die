@@ -10,13 +10,13 @@ export const HpBar: React.FC<HpBarProps> = ({ hp, stage }) => {
 
     // Determine status text, color, and indicator dot based on HP and stage
     let barColor = 'bg-emerald-500';
-    let statusText = 'ระบบเสถียร (ปกติ)';
+    let statusText = 'ระบบเสถียร';
     let dotColor = 'bg-emerald-500';
     let statusTextColor = 'text-zinc-400';
 
     if (clampedHp <= 0 || stage === 'shutdown') {
         barColor = 'bg-zinc-700';
-        statusText = 'ระบบหยุดทำงาน (0 HP)';
+        statusText = 'ระบบหยุดทำงาน • พลังชีวิตหมด';
         dotColor = 'bg-zinc-500';
         statusTextColor = 'text-zinc-500';
     } else if (clampedHp <= 30 || stage === 'sleep') {
@@ -38,7 +38,7 @@ export const HpBar: React.FC<HpBarProps> = ({ hp, stage }) => {
                 <div className="flex items-center gap-2.5">
                     <span className="size-2 rounded-full bg-white/40" />
                     <h2 className="text-sm font-medium text-zinc-300">
-                        ระดับพลังชีวิต (Vitality Matrix)
+                        ระดับพลังชีวิต
                     </h2>
                 </div>
 
@@ -57,7 +57,7 @@ export const HpBar: React.FC<HpBarProps> = ({ hp, stage }) => {
                     <span className="text-4xl md:text-5xl font-medium tracking-tight text-white tabular-nums">
                         {clampedHp}
                     </span>
-                    <span className="text-xs text-zinc-500 font-normal">/ 100 HP</span>
+                    <span className="text-xs text-zinc-500 font-normal">/ 100</span>
                 </div>
             </div>
 

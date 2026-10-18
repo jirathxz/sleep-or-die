@@ -46,7 +46,7 @@ export default function SettingsPage() {
                 {/* Header */}
                 <div>
                     <h1 className="text-xl font-medium tracking-tight text-white">
-                        การตั้งค่าระบบ (Unified Settings)
+                        การตั้งค่าระบบ
                     </h1>
                     <p className="text-xs text-zinc-500 font-light mt-0.5">
                         รวมศูนย์การควบคุมพารามิเตอร์การนอนหลับ เสียง และบัญชีผู้ใช้ไว้ในหน้าเดียว
@@ -78,7 +78,7 @@ export default function SettingsPage() {
                                 className="w-full h-11 px-3 bg-[#18181b] text-white rounded-lg border-0 text-base tabular-nums focus:outline-none focus:ring-1 focus:ring-white/20"
                             />
                             <p className="text-[11px] text-zinc-500 font-light">
-                                คำนวณเวลานอนอัตโนมัติ (5 Sleep Cycles + 15 นาที)
+                                คำนวณเวลานอนอัตโนมัติ 5 รอบการนอน เผื่อเวลาหลับ 15 นาที
                             </p>
                         </div>
 
@@ -100,7 +100,7 @@ export default function SettingsPage() {
                             <div className="flex items-center justify-between">
                                 <label className="text-xs text-zinc-400 font-light flex items-center gap-1.5">
                                     <Key className="size-3 text-zinc-400" />
-                                    Token Bot Discord (Discord Bot Token)
+                                    Token Bot Discord
                                 </label>
                                 <button
                                     type="button"
@@ -118,7 +118,7 @@ export default function SettingsPage() {
                                 className="w-full h-11 px-3 bg-[#18181b] text-white rounded-lg border-0 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-white/20"
                             />
                             <p className="text-[11px] text-zinc-500 font-light">
-                                โทเค็นบอท Discord สำหรับรันการเฝ้าระวังสถานะ Presence อัตโนมัติ (DISCORD_BOT_TOKEN)
+                                โทเค็นบอท Discord สำหรับการเฝ้าระวังสถานะอัตโนมัติ
                             </p>
                         </div>
                     </div>
@@ -139,7 +139,7 @@ export default function SettingsPage() {
                 <div className="bg-[#121215] rounded-2xl p-5 md:p-6 space-y-4 shadow-sm">
                     <span className="text-sm font-medium text-white flex items-center gap-2">
                         <Volume2 className="size-4 text-zinc-400" />
-                        เสียงเตือนและสัญญาณไซเรน (Audio Alarm)
+                        เสียงเตือนและสัญญาณไซเรน
                     </span>
 
                     <div className="bg-[#18181b] rounded-xl p-4 flex items-center justify-between text-xs">

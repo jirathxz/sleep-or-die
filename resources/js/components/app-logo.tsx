@@ -11,8 +11,8 @@ export default function AppLogo() {
                 <span className="text-sm font-semibold tracking-tight text-white leading-tight">
                     SleepOrDie
                 </span>
-                <span className="text-[9px] font-medium tracking-wider text-zinc-500 uppercase leading-none mt-0.5">
-                    SLEEP MANAGEMENT
+                <span className="text-[10px] font-normal tracking-wide text-zinc-500 leading-none mt-0.5">
+                    ระบบควบคุมการนอน
                 </span>
             </div>
         </div>

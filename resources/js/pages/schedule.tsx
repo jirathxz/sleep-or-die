@@ -24,7 +24,7 @@ export default function Schedule() {
                 {/* Header */}
                 <div>
                     <h1 className="text-xl font-medium tracking-tight text-white">
-                        ตารางเส้นตายการนอน (Bedtime Schedule)
+                        ตารางเส้นตายการนอน
                     </h1>
                     <p className="text-xs text-zinc-500 font-light mt-0.5">
                         คำนวณและกำหนดเส้นตายเข้านอนรายวัน เพื่อรักษาวินัยและป้องกันการสูญเสียพลังชีวิต
@@ -38,12 +38,12 @@ export default function Schedule() {
                             <Zap className="size-4 text-emerald-400" />
                             สูตรคำนวณการนอนตามหลักสรีรวิทยา
                         </span>
-                        <span className="text-xs text-zinc-500 font-light">5 Sleep Cycles</span>
+                        <span className="text-xs text-zinc-500 font-light">5 รอบการนอน</span>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
                         <div className="bg-[#18181b] rounded-xl p-3 space-y-1">
-                            <span className="text-xs text-zinc-500 font-light">รอบการหลับลึก (90 นาที)</span>
+                            <span className="text-xs text-zinc-500 font-light">รอบการหลับลึก 90 นาที</span>
                             <p className="text-sm font-normal text-white">5 รอบ = 7 ชม. 30 นาที</p>
                         </div>
                         <div className="bg-[#18181b] rounded-xl p-3 space-y-1">

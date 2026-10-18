@@ -11,7 +11,7 @@ export default function Help() {
                 {/* Header */}
                 <div>
                     <h1 className="text-xl font-medium tracking-tight text-white">
-                        คู่มือและความช่วยเหลือ (Help & Documentation)
+                        คู่มือและความช่วยเหลือ
                     </h1>
                     <p className="text-xs text-zinc-500 font-light mt-0.5">
                         คำอธิบายกฎเกณฑ์ กลไกการลงโทษ และเอกสารคู่มือการพัฒนา
@@ -29,21 +29,21 @@ export default function Help() {
                         <div className="bg-[#18181b] rounded-xl p-4 space-y-1">
                             <span className="font-medium text-white">1. การคำนวณเวลานอนอัตโนมัติ</span>
                             <p className="text-zinc-400 font-light leading-relaxed">
-                                เมื่อคุณกำหนดเวลาตื่น ระบบจะคำนวณเวลาที่ควรเข้านอนย้อนหลัง 5 รอบการนอน (Sleep Cycles ละ 90 นาที = 7 ชั่วโมง 30 นาที) บวกระยะเวลาผ่อนคลาย 15 นาที รวมเป็น 7 ชั่วโมง 45 นาที
+                                เมื่อคุณกำหนดเวลาตื่น ระบบจะคำนวณเวลาที่ควรเข้านอนย้อนหลัง 5 รอบการนอน รอบละ 90 นาที รวม 7 ชั่วโมง 30 นาที บวกระยะเวลาผ่อนคลาย 15 นาที รวมเป็น 7 ชั่วโมง 45 นาที
                             </p>
                         </div>
 
                         <div className="bg-[#18181b] rounded-xl p-4 space-y-1">
-                            <span className="font-medium text-white">2. การลดลงของพลังชีวิต (HP Drain)</span>
+                            <span className="font-medium text-white">2. การลดลงของพลังชีวิต</span>
                             <p className="text-zinc-400 font-light leading-relaxed">
-                                หากถึงเวลาเส้นตายแล้วคุณยังไม่กดยืนยันการนอน เลือดจะเริ่มลดลงทันที (1 HP ทุก ๆ 2 นาที) และระบบจะส่งสัญญาณเสียงไซเรนเตือนภัย
+                                หากถึงเวลาเส้นตายแล้วคุณยังไม่กดยืนยันการนอน เลือดจะเริ่มลดลงทันที 1 หน่วย ทุก 2 นาที และระบบจะส่งสัญญาณเสียงไซเรนเตือนภัย
                             </p>
                         </div>
 
                         <div className="bg-[#18181b] rounded-xl p-4 space-y-1">
-                            <span className="font-medium text-white">3. กฎ Permadeath 5 Strikes</span>
+                            <span className="font-medium text-white">3. กฎการระงับบัญชีถาวร 5 สไตรค์</span>
                             <p className="text-zinc-400 font-light leading-relaxed">
-                                หากเลือดลดเหลือ 0 HP จะเกิดการชัตดาวน์และบันทึก 1 สไตรค์ หากสะสมครบ 5 ครั้ง บัญชีจะถูกระงับถาวร (คุณสามารถล้างสไตรค์ได้ 1 ครั้ง เมื่อนอนตรงเวลาติดต่อกันครบ 5 วัน)
+                                หากเลือดลดเหลือ 0 จะเกิดการชัตดาวน์และบันทึก 1 สไตรค์ หากสะสมครบ 5 ครั้ง บัญชีจะถูกระงับถาวร • คุณสามารถล้างสไตรค์ได้ 1 ครั้ง เมื่อนอนตรงเวลาติดต่อกันครบ 5 วัน
                             </p>
                         </div>
                     </div>
@@ -53,7 +53,7 @@ export default function Help() {
                 <div className="bg-[#121215] rounded-2xl p-5 md:p-6 space-y-4 shadow-sm">
                     <span className="text-sm font-medium text-white flex items-center gap-2">
                         <BookOpen className="size-4 text-zinc-400" />
-                        เอกสารและซอร์สโค้ด (Developer Resources)
+                        เอกสารและซอร์สโค้ด
                     </span>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">

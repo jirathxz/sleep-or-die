@@ -12,7 +12,7 @@ export default function History() {
             sleepTime: '23:14 น.',
             wakeTime: '07:02 น.',
             duration: '7 ชม. 48 นาที',
-            status: 'ตรงเวลา (On Time)',
+            status: 'ตรงเวลา',
             reward: '+1 วันสะสม',
             statusColor: 'text-emerald-400',
         },
@@ -21,7 +21,7 @@ export default function History() {
             sleepTime: '23:10 น.',
             wakeTime: '06:55 น.',
             duration: '7 ชม. 45 นาที',
-            status: 'ตรงเวลา (On Time)',
+            status: 'ตรงเวลา',
             reward: '+1 วันสะสม',
             statusColor: 'text-emerald-400',
         },
@@ -30,7 +30,7 @@ export default function History() {
             sleepTime: '23:40 น.',
             wakeTime: '07:30 น.',
             duration: '7 ชม. 50 นาที',
-            status: 'สาย 25 นาที (ใช้ตั๋วฉุกเฉิน)',
+            status: 'สาย 25 นาที • ใช้ตั๋วฉุกเฉิน',
             reward: '-1 ตั๋ว',
             statusColor: 'text-amber-400',
         },
@@ -39,7 +39,7 @@ export default function History() {
             sleepTime: '23:12 น.',
             wakeTime: '07:05 น.',
             duration: '7 ชม. 53 นาที',
-            status: 'ตรงเวลา (On Time)',
+            status: 'ตรงเวลา',
             reward: '+1 วันสะสม',
             statusColor: 'text-emerald-400',
         },
@@ -53,7 +53,7 @@ export default function History() {
                 {/* Header */}
                 <div>
                     <h1 className="text-xl font-medium tracking-tight text-white">
-                        ประวัติการเข้านอนตรงเวลา (Bedtime Discipline Logs)
+                        ประวัติการเข้านอนตรงเวลา
                     </h1>
                     <p className="text-xs text-zinc-500 font-light mt-0.5">
                         บันทึกสถิติความตรงต่อเวลา อัตราการรอดชีวิต และประวัติการกดยืนยันเวลานอน

@@ -28,7 +28,7 @@ export default function BedtimeAlerts() {
     const [alertRules, setAlertRules] = useState<BedtimeAlertRule[]>([
         {
             id: 'rule-1',
-            title: 'แจ้งเตือนผ่อนคลายก่อนนอน (30 นาทีก่อนเส้นตาย)',
+            title: 'แจ้งเตือนผ่อนคลายก่อนนอน • 30 นาทีก่อนเส้นตาย',
             timeBeforeMinutes: 30,
             description: 'ส่งเสียงสัญญาณกระตุ้นให้เริ่มวางงาน สรุปกิจกรรมประจำวัน และเตรียมตัวเข้านอน',
             sound: 'Chime Melodic Pulse',
@@ -37,7 +37,7 @@ export default function BedtimeAlerts() {
         },
         {
             id: 'rule-2',
-            title: 'แจ้งเตือนล็อคดาวน์หน้าจอ (15 นาทีก่อนเส้นตาย)',
+            title: 'แจ้งเตือนล็อคดาวน์หน้าจอ • 15 นาทีก่อนเส้นตาย',
             timeBeforeMinutes: 15,
             description: 'เร่งจังหวะเตือนขั้นสูง บังคับปิดแสงสีฟ้า ปิดหน้าจอ และหยุดใช้งานโซเชียลมีเดีย',
             sound: 'Heartbeat Rhythm',
@@ -46,7 +46,7 @@ export default function BedtimeAlerts() {
         },
         {
             id: 'rule-3',
-            title: 'สัญญาณไซเรนเส้นตายเข้านอน (Deadline Siren)',
+            title: 'สัญญาณไซเรนเส้นตายเข้านอน',
             timeBeforeMinutes: 0,
             description: 'ส่งเสียงไซเรนฉุกเฉินเมื่อถึงเวลา หากไม่กดยืนยันการนอน พลังชีวิตจะเริ่มลดลงทันที',
             sound: 'Emergency Alarm',
@@ -60,14 +60,14 @@ export default function BedtimeAlerts() {
         {
             id: 'sched-1',
             bedtime: sleep_target_time || '23:15',
-            label: 'เวลาเข้านอนวันธรรมดา (จันทร์ - ศุกร์)',
+            label: 'เวลาเข้านอนวันธรรมดา จันทร์ - ศุกร์',
             days: ['จ', 'อ', 'พ', 'พฤ', 'ศ'],
             enabled: true,
         },
         {
             id: 'sched-2',
             bedtime: '00:00',
-            label: 'เวลาเข้านอนสุดสัปดาห์ (เสาร์ - อาทิตย์)',
+            label: 'เวลาเข้านอนสุดสัปดาห์ เสาร์ - อาทิตย์',
             days: ['ส', 'อา'],
             enabled: true,
         },
@@ -116,7 +116,7 @@ export default function BedtimeAlerts() {
                     <div>
                         <h1 className="text-xl font-medium tracking-tight text-white flex items-center gap-2">
                             <Moon className="size-5 text-indigo-400" />
-                            ระบบแจ้งเตือนเวลานอน (Bedtime Alert Protocol)
+                            ระบบแจ้งเตือนเวลานอน
                         </h1>
                         <p className="text-xs text-zinc-500 font-light mt-0.5">
                             เน้นการเฝ้าระวัง แจ้งเตือนก่อนนอน และบังคับวินัยการพักผ่อนตรงเวลา
@@ -137,7 +137,7 @@ export default function BedtimeAlerts() {
                     <div className="flex items-center justify-between">
                         <span className="text-sm font-medium text-white flex items-center gap-2">
                             <BellRing className="size-4 text-emerald-400" />
-                            ขั้นตอนการแจ้งเตือนก่อนถึงเส้นตาย (Countdown Alerts)
+                            ขั้นตอนการแจ้งเตือนก่อนถึงเส้นตาย
                         </span>
                         <span className="text-xs text-zinc-500 font-light">3 ระดับความเข้มข้น</span>
                     </div>

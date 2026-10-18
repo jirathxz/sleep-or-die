@@ -29,19 +29,19 @@ export default function Quests() {
 
     const achievements = [
         {
-            title: 'เริ่มต้นการเปลี่ยนแปลง (First Step)',
+            title: 'เริ่มต้นการเปลี่ยนแปลง',
             description: 'นอนตรงเวลาติดต่อกันครบ 3 วัน',
             progress: `${Math.min(3, days_survived)} / 3 วัน`,
             unlocked: days_survived >= 3,
         },
         {
-            title: 'วินัยเหล็กไหล (Iron Will)',
+            title: 'วินัยเหล็กไหล',
             description: 'รอดชีวิตสะสมครบ 7 วัน รับฟรี 1 ตั๋วขยายเวลา',
             progress: `${Math.min(7, days_survived)} / 7 วัน`,
             unlocked: days_survived >= 7,
         },
         {
-            title: 'ผู้พิชิตรัตติกาล (Night Conqueror)',
+            title: 'ผู้พิชิตรัตติกาล',
             description: 'รอดชีวิตสะสมครบ 30 วันโดยไม่มีสไตรค์ชัตดาวน์',
             progress: `${Math.min(30, days_survived)} / 30 วัน`,
             unlocked: days_survived >= 30,
@@ -57,7 +57,7 @@ export default function Quests() {
                 <div className="flex items-center justify-between">
                     <div>
                         <h1 className="text-xl font-medium tracking-tight text-white">
-                            ภารกิจและรางวัล (Quests & Rewards)
+                            ภารกิจและรางวัล
                         </h1>
                         <p className="text-xs text-zinc-500 font-light mt-0.5">
                             ทำภารกิจประจำวันเพื่อรับ EXP และตั๋วขยายเวลาฉุกเฉิน
@@ -73,7 +73,7 @@ export default function Quests() {
 
                 {/* Daily Quests List */}
                 <div className="bg-[#121215] rounded-2xl p-5 space-y-3 shadow-sm">
-                    <span className="text-sm font-medium text-white">ภารกิจประจำวัน (Daily Tasks)</span>
+                    <span className="text-sm font-medium text-white">ภารกิจประจำวัน</span>
 
                     <div className="space-y-2 pt-1">
                         {dailyQuests.map((quest, index) => (
@@ -107,7 +107,7 @@ export default function Quests() {
 
                 {/* Achievements List */}
                 <div className="bg-[#121215] rounded-2xl p-5 space-y-3 shadow-sm">
-                    <span className="text-sm font-medium text-white">ความสำเร็จสะสม (Achievements)</span>
+                    <span className="text-sm font-medium text-white">ความสำเร็จสะสม</span>
 
                     <div className="space-y-2 pt-1">
                         {achievements.map((ach, index) => (

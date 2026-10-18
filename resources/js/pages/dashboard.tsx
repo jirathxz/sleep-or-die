@@ -112,7 +112,7 @@ export default function Dashboard() {
 
     return (
         <>
-            <Head title="แดชบอร์ด - SleepOrDie" />
+            <Head title="แผงควบคุม - SleepOrDie" />
 
             {/* Emergency Alerts & Vignette Overlays */}
             <StageOverlay stage={stage} secondsRemaining={secondsRemaining} />
@@ -122,7 +122,7 @@ export default function Dashboard() {
                 <div className="flex items-center justify-between pb-1">
                     <div>
                         <h1 className="text-xl font-medium tracking-tight text-white">
-                            แผงควบคุม (Dashboard)
+                            แผงควบคุม
                         </h1>
                         <p className="text-xs text-zinc-500 font-light mt-0.5">
                             ระดับพลังชีวิตและเวลานับถอยหลังสู่เส้นตายเข้านอนคืนนี้
@@ -181,7 +181,7 @@ export default function Dashboard() {
 Dashboard.layout = {
     breadcrumbs: [
         {
-            title: 'Dashboard',
+            title: 'แผงควบคุม',
             href: dashboard(),
         },
     ],

@@ -70,19 +70,19 @@ export function NavUser() {
                         ) : (
                             <div className="space-y-1">
                                 <DropdownMenuLabel className="text-xs text-zinc-400 font-normal px-2 py-1.5">
-                                    เข้าใช้งานแบบ Guest (ชั่วคราว)
+                                    เข้าใช้งานแบบ Guest ชั่วคราว
                                 </DropdownMenuLabel>
                                 <DropdownMenuSeparator className="bg-white/[0.04]" />
                                 <DropdownMenuItem asChild className="rounded-lg hover:bg-zinc-800 focus:bg-zinc-800 cursor-pointer">
                                     <Link href="/login" className="flex items-center gap-2 text-xs py-1.5">
                                         <LogIn className="size-3.5 text-zinc-400" />
-                                        <span>เข้าสู่ระบบ (Log in)</span>
+                                        <span>เข้าสู่ระบบ</span>
                                     </Link>
                                 </DropdownMenuItem>
                                 <DropdownMenuItem asChild className="rounded-lg hover:bg-zinc-800 focus:bg-zinc-800 cursor-pointer">
                                     <Link href="/register" className="flex items-center gap-2 text-xs py-1.5">
                                         <UserPlus className="size-3.5 text-zinc-400" />
-                                        <span>สมัครสมาชิก (Register)</span>
+                                        <span>สมัครสมาชิก</span>
                                     </Link>
                                 </DropdownMenuItem>
                             </div>

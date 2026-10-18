@@ -19,7 +19,7 @@ export default function Progression() {
                 {/* Header */}
                 <div>
                     <h1 className="text-xl font-medium tracking-tight text-white">
-                        สถานะชีวิตและความก้าวหน้า (Vital Progression)
+                        สถานะชีวิตและความก้าวหน้า
                     </h1>
                     <p className="text-xs text-zinc-500 font-light mt-0.5">
                         ระบบระดับวินัย EXP และกฎระเบียบบทลงโทษชัตดาวน์
@@ -32,8 +32,8 @@ export default function Progression() {
                         <div className="space-y-0.5">
                             <span className="text-xs text-zinc-500 font-light">ระดับผู้ควบคุมวินัย</span>
                             <div className="flex items-baseline gap-2">
-                                <span className="text-2xl font-medium text-white">Level {currentLevel}</span>
-                                <span className="text-xs text-emerald-400 font-normal">Circadian Master</span>
+                                <span className="text-2xl font-medium text-white">เลเวล {currentLevel}</span>
+                                <span className="text-xs text-emerald-400 font-normal">ผู้ควบคุมวงจรสลีป</span>
                             </div>
                         </div>
 
@@ -59,9 +59,9 @@ export default function Progression() {
                     <div className="flex items-center justify-between">
                         <span className="text-sm font-medium text-white flex items-center gap-2">
                             <ShieldAlert className="size-4 text-rose-400" />
-                            กฎระเบียบบทลงโทษ (Permadeath Protocol)
+                            กฎระเบียบบทลงโทษการชัตดาวน์
                         </span>
-                        <span className="text-xs text-zinc-500 font-light">5 Strikes Rule</span>
+                        <span className="text-xs text-zinc-500 font-light">กฎสไตรค์ 5 ครั้ง</span>
                     </div>
 
                     <div className="space-y-3 pt-1">
@@ -69,17 +69,17 @@ export default function Progression() {
                             <div className="space-y-0.5">
                                 <span className="text-xs text-zinc-300 font-normal">พลังชีวิตปัจจุบัน</span>
                                 <p className="text-[11px] text-zinc-500 font-light">
-                                    ลดลงทันทีที่เลยเวลานอน และลดลง 1 HP ทุก ๆ 2 นาที
+                                    ลดลงทันทีที่เลยเวลานอน และลดลง 1 หน่วย ทุก 2 นาที
                                 </p>
                             </div>
-                            <span className="text-xl font-medium text-white tabular-nums">{current_hp} HP</span>
+                            <span className="text-xl font-medium text-white tabular-nums">{current_hp}</span>
                         </div>
 
                         <div className="bg-[#18181b] rounded-xl p-4 flex items-center justify-between">
                             <div className="space-y-0.5">
                                 <span className="text-xs text-zinc-300 font-normal">สถิติสไตรค์ชัตดาวน์</span>
                                 <p className="text-[11px] text-zinc-500 font-light">
-                                    หากเลือดลดถึง 0% จะถูกบันทึก 1 สไตรค์ (จะล้าง 1 สไตรค์เมื่อนอนตรงเวลา 5 วันติด)
+                                    หากเลือดลดถึง 0% จะถูกบันทึก 1 สไตรค์ • ล้างสไตรค์ได้เมื่อนอนตรงเวลา 5 วันติดต่อกัน
                                 </p>
                             </div>
                             <span
@@ -93,7 +93,7 @@ export default function Progression() {
 
                         <div className="bg-[#18181b] rounded-xl p-4 flex items-center justify-between">
                             <div className="space-y-0.5">
-                                <span className="text-xs text-zinc-300 font-normal">สถานะการระงับบัญชี (Permanent Death)</span>
+                                <span className="text-xs text-zinc-300 font-normal">สถานะการระงับบัญชีถาวร</span>
                                 <p className="text-[11px] text-zinc-500 font-light">
                                     เมื่อครบ 5 สไตรค์ บัญชีจะถูกระงับถาวรและไม่สามารถกู้คืนได้
                                 </p>

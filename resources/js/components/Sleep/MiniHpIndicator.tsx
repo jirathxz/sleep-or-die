@@ -37,7 +37,7 @@ export function MiniHpIndicator() {
                     </div>
                 </TooltipTrigger>
                 <TooltipContent side="right" className="bg-[#121215] text-white border-0 text-xs rounded-lg p-2 space-y-1">
-                    <p className="font-medium">พลังชีวิต: {clampedHp} / 100 HP</p>
+                    <p className="font-medium">พลังชีวิต: {clampedHp} / 100</p>
                     <p className="text-[10px] text-zinc-400">สไตรค์: {shutdown_stacks} / 5 ครั้ง</p>
                 </TooltipContent>
             </Tooltip>
@@ -54,7 +54,7 @@ export function MiniHpIndicator() {
                 </div>
                 <div className="flex items-center gap-1.5 font-medium tabular-nums">
                     <span className={`size-1.5 rounded-full ${dotColor}`} />
-                    <span className="text-white text-xs">{clampedHp} HP</span>
+                    <span className="text-white text-xs">{clampedHp}%</span>
                 </div>
             </div>
 

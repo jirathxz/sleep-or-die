@@ -50,7 +50,7 @@ export const TombstoneScreen: React.FC<TombstoneScreenProps> = ({ daysSurvived, 
                     <div className="h-px bg-white/[0.04]" />
                     <div className="flex justify-between items-center">
                         <span className="text-zinc-500 font-light">สถานะบัญชี:</span>
-                        <span className="font-medium text-rose-500">DISABLED (PERMADEATH)</span>
+                        <span className="font-medium text-rose-500">ระงับการใช้งานถาวร</span>
                     </div>
                 </div>
 

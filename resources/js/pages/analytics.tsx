@@ -24,7 +24,7 @@ export default function Analytics() {
                 {/* Header */}
                 <div>
                     <h1 className="text-xl font-medium tracking-tight text-white">
-                        สถิติและการวิเคราะห์ (Sleep Analytics)
+                        สถิติและการวิเคราะห์
                     </h1>
                     <p className="text-xs text-zinc-500 font-light mt-0.5">
                         วิเคราะห์ความสม่ำเสมอและคุณภาพของการนอนหลับรายสัปดาห์
@@ -34,7 +34,7 @@ export default function Analytics() {
                 {/* Metric Summary Pods (No duplicate cards) */}
                 <div className="bg-[#121215] rounded-2xl p-5 grid grid-cols-2 sm:grid-cols-4 gap-4 shadow-sm">
                     <div className="space-y-0.5">
-                        <span className="text-xs text-zinc-500 font-light">ความสม่ำเสมอ (Consistency)</span>
+                        <span className="text-xs text-zinc-500 font-light">ความสม่ำเสมอ</span>
                         <p className="text-2xl font-medium text-emerald-400 tabular-nums">94%</p>
                     </div>
                     <div className="space-y-0.5">
@@ -47,7 +47,7 @@ export default function Analytics() {
                     </div>
                     <div className="space-y-0.5">
                         <span className="text-xs text-zinc-500 font-light">ประสิทธิภาพการฟื้นฟู</span>
-                        <p className="text-2xl font-medium text-white tabular-nums">Optimal</p>
+                        <p className="text-2xl font-medium text-white">ยอดเยี่ยม</p>
                     </div>
                 </div>
 

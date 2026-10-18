@@ -41,7 +41,7 @@ type Props = {
 
 const mainNavItems: NavItem[] = [
     {
-        title: 'Dashboard',
+        title: 'แผงควบคุม',
         href: dashboard(),
         icon: LayoutGrid,
     },
@@ -49,13 +49,13 @@ const mainNavItems: NavItem[] = [
 
 const rightNavItems: NavItem[] = [
     {
-        title: 'Repository',
-        href: 'https://github.com/laravel/react-starter-kit',
+        title: 'คลังโค้ด',
+        href: 'https://github.com/jirathxz/sleep-or-die.git',
         icon: Folder,
     },
     {
-        title: 'Documentation',
-        href: 'https://laravel.com/docs/starter-kits#react',
+        title: 'เอกสารคู่มือ',
+        href: 'https://laravel.com/docs',
         icon: BookOpen,
     },
 ];
