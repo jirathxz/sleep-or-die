@@ -6,7 +6,7 @@
   "enforce_system_shutdown": false,
   "idle_threshold_seconds": 30,
   "check_interval_seconds": 2,
-  "supabase_url": "",
-  "supabase_anon_key": "",
+  "supabase_url": "https://ruzurqqvsoyuumaftvoa.supabase.co",
+  "supabase_anon_key": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ1enVycXF2c295dXVtYWZ0dm9hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIzMTczMjMsImV4cCI6MjEwNzg5MzMyM30.-ExmSOoR-DSpGBYqEkpUNBLos3l_ox5GWLc8opGzCkA",
   "supabase_user_id": ""
 }
