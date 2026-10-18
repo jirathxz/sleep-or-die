@@ -201,8 +201,8 @@ export default function Dashboard() {
                     <div className="flex items-center gap-2">
                         <ShieldAlert className="size-3.5 text-destructive" />
                         <span>Account Status:</span>
-                        <Badge variant={shutdownStacks >= 4 ? 'destructive' : 'secondary'} className="font-mono text-[10px]">
-                            {shutdownStacks} / 5 strikes
+                        <Badge variant={shutdown_stacks >= 4 ? 'destructive' : 'secondary'} className="font-mono text-[10px]">
+                            {shutdown_stacks} / 5 strikes
                         </Badge>
                     </div>
                 </footer>
