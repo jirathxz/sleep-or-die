@@ -49,6 +49,8 @@ export default function Dashboard() {
         tickets_count,
         is_disabled,
         last_sleep_confirmed_at,
+        is_in_voice,
+        voice_channel,
         stage,
         hoursRemaining,
         minutesRemaining,
@@ -166,6 +168,8 @@ export default function Dashboard() {
                     wakeUpTime={wake_up_time}
                     onConfirmSleep={confirmSleep}
                     lastConfirmedAt={last_sleep_confirmed_at}
+                    isInVoice={is_in_voice}
+                    voiceChannel={voice_channel}
                     simulationActive={simulationActive}
                     onStartSimulation={startSimulation321}
                     onResetSimulation={resetSimulation}

@@ -1,6 +1,6 @@
 import React from 'react';
 import { SleepStage } from '@/stores/useSleepStore';
-import { Moon, Loader2, Zap, RotateCcw } from 'lucide-react';
+import { Moon, Loader2, Zap, RotateCcw, Volume2 } from 'lucide-react';
 
 interface CountdownDisplayProps {
     hours: number;
@@ -12,6 +12,8 @@ interface CountdownDisplayProps {
     wakeUpTime: string | null;
     onConfirmSleep: () => void;
     lastConfirmedAt: string | null;
+    isInVoice?: boolean;
+    voiceChannel?: string | null;
     simulationActive?: boolean;
     onStartSimulation?: () => void;
     onResetSimulation?: () => void;
@@ -27,6 +29,8 @@ export const CountdownDisplay: React.FC<CountdownDisplayProps> = ({
     wakeUpTime,
     onConfirmSleep,
     lastConfirmedAt,
+    isInVoice = false,
+    voiceChannel = null,
     simulationActive = false,
     onStartSimulation,
     onResetSimulation,
@@ -38,9 +42,14 @@ export const CountdownDisplay: React.FC<CountdownDisplayProps> = ({
     let stageTextColor = 'text-zinc-400';
     let digitsColor = 'text-white';
 
-    const isVerifying = Boolean(lastConfirmedAt);
+    const isVerifying = Boolean(lastConfirmedAt) && !isInVoice;
 
-    if (isVerifying) {
+    if (isInVoice) {
+        stageText = `ตรวจพบอยู่ในห้องคุยเสียง Discord ${voiceChannel ? `("${voiceChannel}")` : ''} • ไม่ถือว่านอน`;
+        dotColor = 'bg-rose-500 animate-pulse';
+        stageTextColor = 'text-rose-400 font-medium';
+        digitsColor = 'text-white';
+    } else if (isVerifying) {
         stageText = 'อยู่ในสถานะเข้านอนแล้ว • หากไม่ออนไลน์ระหว่างเวลานอน ถือว่านอนสำเร็จ';
         dotColor = 'bg-emerald-400 animate-pulse';
         stageTextColor = 'text-emerald-400';

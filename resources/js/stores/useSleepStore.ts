@@ -18,6 +18,8 @@ export interface SleepState {
     exp: number;
     points: number;
     emergency_countdown_seconds: number;
+    is_in_voice: boolean;
+    voice_channel: string | null;
 
     // Derived timer values
     stage: SleepStage;
@@ -163,6 +165,8 @@ export const useSleepStore = create<SleepState>((set, get) => ({
     exp: 150,
     points: 100,
     emergency_countdown_seconds: 60,
+    is_in_voice: false,
+    voice_channel: null,
 
     stage: 'normal',
     totalSecondsRemaining: 86400,
@@ -183,10 +187,22 @@ export const useSleepStore = create<SleepState>((set, get) => ({
             const wakeUp = data.wake_up_time || state.wake_up_time || defaultWakeUp;
             const target = data.sleep_target_time || state.sleep_target_time || calculateSleepTargetLocal(wakeUp);
 
+            const presence = (data as any).discord_presence;
+            const isInVoice = Boolean(presence?.is_in_voice ?? (data as any).is_in_voice ?? state.is_in_voice);
+            const voiceChannel = presence?.voice_channel ?? (data as any).voice_channel ?? state.voice_channel;
+
+            // Rule: หากอยู่ในห้องคุยไม่ถือว่านอน
+            const lastConfirmed = isInVoice
+                ? null
+                : (data.last_sleep_confirmed_at !== undefined ? data.last_sleep_confirmed_at : state.last_sleep_confirmed_at);
+
             // If simulation is running, do NOT clobber running simulation countdown!
             if (state.simulationActive) {
                 return {
                     ...data,
+                    is_in_voice: isInVoice,
+                    voice_channel: voiceChannel,
+                    last_sleep_confirmed_at: lastConfirmed,
                     wake_up_time: wakeUp,
                     sleep_target_time: target,
                     current_hp: state.current_hp,
@@ -199,6 +215,9 @@ export const useSleepStore = create<SleepState>((set, get) => ({
 
             return {
                 ...data,
+                is_in_voice: isInVoice,
+                voice_channel: voiceChannel,
+                last_sleep_confirmed_at: lastConfirmed,
                 wake_up_time: wakeUp,
                 sleep_target_time: target,
                 stage: newStage,
@@ -449,6 +468,11 @@ export const useSleepStore = create<SleepState>((set, get) => ({
 
     confirmSleep: async () => {
         try {
+            if (get().is_in_voice) {
+                alert(`คุณกำลังอยู่ในห้องคุยเสียง Discord ${get().voice_channel ? `("${get().voice_channel}")` : ''} ไม่สามารถยืนยันการนอนได้! กรุณาออกจากห้องคุยก่อน`);
+                return false;
+            }
+
             const csrfToken = getCsrfToken();
             audioManager.stopAllAudio();
 
@@ -466,6 +490,10 @@ export const useSleepStore = create<SleepState>((set, get) => ({
                     const data = await res.json();
                     get().syncUser(data);
                     return true;
+                } else {
+                    const err = await res.json().catch(() => ({}));
+                    alert(err.message || 'ไม่สามารถยืนยันการนอนได้');
+                    return false;
                 }
             }
 

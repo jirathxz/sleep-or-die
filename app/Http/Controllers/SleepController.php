@@ -122,6 +122,18 @@ class SleepController extends Controller
     {
         $user = $request->user();
 
+        // Rule: หากอยู่ในห้องคุยไม่ถือว่านอน
+        $voiceState = $this->sleepEngine->checkUserVoiceState($user);
+        if ($voiceState['in_voice']) {
+            $channelName = $voiceState['voice_channel'] ?? 'ห้องคุยเสียง';
+            return response()->json([
+                'success' => false,
+                'message' => "คุณยังเชื่อมต่ออยู่ในห้องคุยเสียง Discord (\"{$channelName}\") ไม่ถือว่านอน! กรุณาออกจากห้องคุยก่อนยืนยันการนอน",
+                'is_in_voice' => true,
+                'voice_channel' => $channelName,
+            ], 422);
+        }
+
         $newExp = ($user->exp ?? 0) + 150;
         $level = $user->level ?? 1;
         $expThreshold = $level * 500;
@@ -210,6 +222,15 @@ class SleepController extends Controller
 
         $inBedtimeHours = $this->sleepEngine->isWithinBedtimeHours($user);
 
+        // Rule: หากอยู่ในห้องคุยไม่ถือว่านอน
+        $voiceState = $this->sleepEngine->checkUserVoiceState($user);
+        if ($voiceState['in_voice'] && $user->last_sleep_confirmed_at) {
+            $user->update(['last_sleep_confirmed_at' => null]);
+            $user->refresh();
+        }
+
+        $isSleeping = !empty($user->last_sleep_confirmed_at) && !$voiceState['in_voice'];
+
         return response()->json([
             'current_hp' => $user->current_hp,
             'sleep_target_time' => $user->sleep_target_time,
@@ -221,12 +242,17 @@ class SleepController extends Controller
             'points' => $user->points ?? 0,
             'tickets_count' => $user->tickets_count,
             'is_disabled' => $user->is_disabled,
-            'last_sleep_confirmed_at' => $user->last_sleep_confirmed_at,
+            'last_sleep_confirmed_at' => $isSleeping ? $user->last_sleep_confirmed_at : null,
             'discord_user_id' => $user->discord_user_id,
             'discord_bot_token' => $user->discord_bot_token,
-            'discord_presence' => \Illuminate\Support\Facades\Cache::get("discord_presence_{$user->id}"),
+            'discord_presence' => [
+                'is_in_voice' => $voiceState['in_voice'],
+                'voice_channel' => $voiceState['voice_channel'],
+                'guild_name' => $voiceState['guild_name'] ?? null,
+                'effective_status' => $voiceState['in_voice'] ? 'online' : (\Illuminate\Support\Facades\Cache::get("discord_presence_{$user->id}")['raw_status'] ?? 'offline'),
+            ],
             'emergency_countdown_seconds' => $user->emergency_countdown_seconds ?? 60,
-            'is_sleeping' => !empty($user->last_sleep_confirmed_at),
+            'is_sleeping' => $isSleeping,
             'is_within_bedtime_hours' => $inBedtimeHours,
             'morning_rewarded' => $rewarded,
         ]);

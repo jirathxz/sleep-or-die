@@ -148,20 +148,41 @@ class SleepEngineService
         $isOnline = in_array($status, ['online', 'dnd']) ||
             (!empty($meta['is_active']) && empty($meta['screen_locked']) && (!isset($meta['idle_seconds']) || $meta['idle_seconds'] < 60));
 
-        // Rule 2: If user is currently in a voice channel, always considered online
-        if ($isInVoice) {
-            $isOnline = true;
-            $isOffline = false;
-        }
-
         $inBedtimeHours = $this->isWithinBedtimeHours($user);
-
-        // Verification window check (10 mins after manual or auto confirm)
         $isInVerifyingWindow = $user->last_sleep_confirmed_at &&
             $user->last_sleep_confirmed_at->diffInMinutes(now()) <= 10;
 
+        // Rule 2: If user is currently in a voice channel, always considered online and NEVER sleeping
+        if ($isInVoice) {
+            $isOnline = true;
+            $isOffline = false;
+
+            if ($user->last_sleep_confirmed_at) {
+                $user->update(['last_sleep_confirmed_at' => null]);
+
+                if ($inBedtimeHours || $isInVerifyingWindow) {
+                    $this->drainHp($user, 25);
+                    return [
+                        'penalized' => true,
+                        'auto_confirmed' => false,
+                        'is_sleeping' => false,
+                        'message' => 'ตรวจพบผู้ใช้อยู่ในห้องคุยเสียง Discord ระหว่างเวลานอน! ไม่ถือว่านอน และหัก HP 25 แต้ม',
+                        'current_hp' => $user->fresh()->current_hp,
+                    ];
+                }
+
+                return [
+                    'penalized' => false,
+                    'auto_confirmed' => false,
+                    'is_sleeping' => false,
+                    'message' => 'ตรวจพบผู้ใช้อยู่ในห้องคุยเสียง Discord ไม่ถือว่านอน ยกเลิกสถานะการนอนทันที',
+                    'current_hp' => $user->current_hp,
+                ];
+            }
+        }
+
         // Case 1: In bedtime hours and user goes offline / locks PC -> Auto-confirm sleep ("ถือว่าผู้ใช้ไปนอนแล้ว")
-        if ($inBedtimeHours && $isOffline) {
+        if ($inBedtimeHours && $isOffline && !$isInVoice) {
             if (!$user->last_sleep_confirmed_at) {
                 $user->update([
                     'last_sleep_confirmed_at' => now(),
@@ -202,10 +223,85 @@ class SleepEngineService
         return [
             'penalized' => false,
             'auto_confirmed' => false,
-            'is_sleeping' => (bool)$user->last_sleep_confirmed_at,
-            'message' => 'อัปเดตสถานะ Presence เรียบร้อย',
+            'is_sleeping' => !$isInVoice && (bool)$user->last_sleep_confirmed_at,
+            'message' => $isInVoice ? 'ตรวจพบผู้ใช้อยู่ในห้องคุยเสียง Discord ไม่ถือว่านอน' : 'อัปเดตสถานะ Presence เรียบร้อย',
             'current_hp' => $user->current_hp,
         ];
+    }
+
+    /**
+     * Check if user is currently connected to a Discord voice channel.
+     */
+    public function checkUserVoiceState(User $user): array
+    {
+        $cached = \Illuminate\Support\Facades\Cache::get("discord_presence_{$user->id}");
+        if ($cached && isset($cached['is_in_voice'])) {
+            return [
+                'in_voice' => (bool)$cached['is_in_voice'],
+                'voice_channel' => $cached['voice_channel'] ?? null,
+                'guild_name' => $cached['guild_name'] ?? null,
+            ];
+        }
+
+        if (empty($user->discord_bot_token) || empty($user->discord_user_id)) {
+            return ['in_voice' => false, 'voice_channel' => null, 'guild_name' => null];
+        }
+
+        try {
+            $token = trim($user->discord_bot_token);
+            $userId = trim($user->discord_user_id);
+
+            $guildsRes = \Illuminate\Support\Facades\Http::withHeaders([
+                'Authorization' => 'Bot ' . $token,
+                'Accept' => 'application/json',
+            ])->timeout(4)->get('https://discord.com/api/v10/users/@me/guilds');
+
+            if ($guildsRes->successful()) {
+                foreach ($guildsRes->json() as $guild) {
+                    $guildId = $guild['id'];
+                    $voiceRes = \Illuminate\Support\Facades\Http::withHeaders([
+                        'Authorization' => 'Bot ' . $token,
+                        'Accept' => 'application/json',
+                    ])->timeout(3)->get("https://discord.com/api/v10/guilds/{$guildId}/voice-states/{$userId}");
+
+                    if ($voiceRes->successful()) {
+                        $voiceData = $voiceRes->json();
+                        if (!empty($voiceData['channel_id'])) {
+                            $channelName = 'Voice Room';
+                            $channelRes = \Illuminate\Support\Facades\Http::withHeaders([
+                                'Authorization' => 'Bot ' . $token,
+                                'Accept' => 'application/json',
+                            ])->timeout(3)->get("https://discord.com/api/v10/channels/{$voiceData['channel_id']}");
+                            if ($channelRes->successful()) {
+                                $channelName = $channelRes->json('name') ?? $channelName;
+                            }
+
+                            $result = [
+                                'in_voice' => true,
+                                'voice_channel' => $channelName,
+                                'guild_name' => $guild['name'] ?? 'Discord Server',
+                            ];
+
+                            \Illuminate\Support\Facades\Cache::put("discord_presence_{$user->id}", [
+                                'discord_user_id' => $userId,
+                                'effective_status' => 'online',
+                                'raw_status' => 'online',
+                                'is_in_voice' => true,
+                                'voice_channel' => $channelName,
+                                'guild_name' => $guild['name'] ?? null,
+                                'updated_at' => now()->toIso8601String(),
+                            ], now()->addDay());
+
+                            return $result;
+                        }
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Error checking user voice state: ' . $e->getMessage());
+        }
+
+        return ['in_voice' => false, 'voice_channel' => null, 'guild_name' => null];
     }
 
     /**
