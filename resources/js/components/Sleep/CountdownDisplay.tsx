@@ -51,15 +51,15 @@ export const CountdownDisplay: React.FC<CountdownDisplayProps> = ({
         stageTextColor = 'text-amber-400';
         digitsColor = 'text-amber-400';
     } else if (stage === 'alert') {
-        stageText = 'ระยะเตือน: เหลือเวลาอีก 30 นาทีก่อนนอน';
+        stageText = 'ระยะเตือน: เหลือเวลาอีก 10 นาทีก่อนนอน';
         dotColor = 'bg-amber-400';
         stageTextColor = 'text-amber-400';
     } else if (stage === 'lockdown') {
-        stageText = 'ระยะล็อคดาวน์: เหลือเวลาอีก 15 นาที • กำลังบังคับออกจากระบบ Windows';
+        stageText = 'ระยะเตือนล็อคดาวน์: เหลือเวลาอีก 5 นาที (เตรียมตัวนอน)';
         dotColor = 'bg-amber-500';
         stageTextColor = 'text-amber-400';
     } else if (stage === 'sleep') {
-        stageText = `ฉุกเฉิน! มีเวลาอีก ${seconds} วินาทีก่อนพลังชีวิตหมด`;
+        stageText = `ฉุกเฉิน! มีเวลาอีก ${seconds} วินาทีก่อนระบบชัตดาวน์`;
         dotColor = 'bg-rose-500 animate-pulse';
         stageTextColor = 'text-rose-400 font-medium';
         digitsColor = 'text-rose-400';

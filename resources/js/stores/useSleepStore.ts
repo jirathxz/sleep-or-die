@@ -99,12 +99,10 @@ function calculateTimeRemaining(targetTimeString: string | null): {
 
     let diffSeconds = Math.floor((target.getTime() - now.getTime()) / 1000);
 
-    // If deadline was more than 12 hours ago, assume it's for today/tomorrow
-    if (diffSeconds < -43200) {
+    // If target on the current day has already passed by more than 30 minutes,
+    // the deadline has elapsed and belongs to the next occurrence (tomorrow).
+    if (diffSeconds < -1800) {
         target.setDate(target.getDate() + 1);
-        diffSeconds = Math.floor((target.getTime() - now.getTime()) / 1000);
-    } else if (diffSeconds > 43200) {
-        target.setDate(target.getDate() - 1);
         diffSeconds = Math.floor((target.getTime() - now.getTime()) / 1000);
     }
 
@@ -133,13 +131,13 @@ function determineStage(
         return 'sleep';
     }
 
-    if (totalSecondsRemaining <= 900) {
-        // <= 15 minutes
+    if (totalSecondsRemaining <= 300) {
+        // <= 5 minutes (Lockdown stage)
         return 'lockdown';
     }
 
-    if (totalSecondsRemaining <= 1800) {
-        // <= 30 minutes
+    if (totalSecondsRemaining <= 600) {
+        // <= 10 minutes (Alert stage)
         return 'alert';
     }
 
