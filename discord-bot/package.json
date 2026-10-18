@@ -1,0 +1,14 @@
+{
+  "name": "sleepordie-discord-bot",
+  "version": "1.0.0",
+  "description": "Discord Presence tracking worker for SleepOrDie accountability engine",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.16.3",
+    "dotenv": "^16.4.5",
+    "undici": "^6.20.1"
+  }
+}
