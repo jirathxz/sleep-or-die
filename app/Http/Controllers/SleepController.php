@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Services\SleepEngineService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 
 class SleepController extends Controller
@@ -19,6 +20,7 @@ class SleepController extends Controller
         $validated = $request->validate([
             'wake_up_time' => ['nullable', 'string', 'date_format:H:i'],
             'sleep_target_time' => ['nullable', 'string', 'date_format:H:i'],
+            'emergency_countdown_seconds' => ['nullable', 'integer', 'min:10', 'max:300'],
             'discord_user_id' => ['nullable', 'string', 'max:50'],
             'discord_bot_token' => ['nullable', 'string', 'max:255'],
         ]);
@@ -43,6 +45,7 @@ class SleepController extends Controller
         $user->update([
             'wake_up_time' => $wakeUp,
             'sleep_target_time' => $sleepTarget,
+            'emergency_countdown_seconds' => array_key_exists('emergency_countdown_seconds', $validated) ? $validated['emergency_countdown_seconds'] : $user->emergency_countdown_seconds,
             'discord_user_id' => array_key_exists('discord_user_id', $validated) ? $validated['discord_user_id'] : $user->discord_user_id,
             'discord_bot_token' => array_key_exists('discord_bot_token', $validated) ? $validated['discord_bot_token'] : $user->discord_bot_token,
         ]);
@@ -51,6 +54,7 @@ class SleepController extends Controller
             'message' => 'Settings updated successfully',
             'wake_up_time' => $user->wake_up_time,
             'sleep_target_time' => $user->sleep_target_time,
+            'emergency_countdown_seconds' => $user->emergency_countdown_seconds,
             'discord_user_id' => $user->discord_user_id,
             'discord_bot_token' => $user->discord_bot_token,
         ]);
@@ -270,6 +274,80 @@ class SleepController extends Controller
 
         $result = $this->sleepEngine->handlePresence($user, $validated['status'], $source, $meta);
 
+        $bedtimeHour = 23;
+        $bedtimeMinute = 15;
+        if (!empty($user->sleep_target_time)) {
+            $parts = explode(':', $user->sleep_target_time);
+            $bedtimeHour = (int)$parts[0];
+            $bedtimeMinute = (int)($parts[1] ?? 0);
+        }
+
+        $wakeUpHour = 7;
+        $wakeUpMinute = 0;
+        if (!empty($user->wake_up_time)) {
+            $parts = explode(':', $user->wake_up_time);
+            $wakeUpHour = (int)$parts[0];
+            $wakeUpMinute = (int)($parts[1] ?? 0);
+        }
+
+        $result['daemon_config'] = [
+            'emergency_countdown_seconds' => $user->emergency_countdown_seconds ?? 60,
+            'bedtime_hour' => $bedtimeHour,
+            'bedtime_minute' => $bedtimeMinute,
+            'wake_up_hour' => $wakeUpHour,
+            'wake_up_minute' => $wakeUpMinute,
+            'current_hp' => $user->current_hp ?? 100,
+        ];
+
         return response()->json($result);
+    }
+
+    public function daemonLogin(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'email' => ['required', 'email'],
+            'password' => ['required', 'string'],
+        ]);
+
+        $user = User::where('email', $validated['email'])->first();
+
+        if (!$user || !Hash::check($validated['password'], $user->password)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'อีเมลหรือรหัสผ่านไม่ถูกต้อง',
+            ], 401);
+        }
+
+        $bedtimeHour = 23;
+        $bedtimeMinute = 15;
+        if (!empty($user->sleep_target_time)) {
+            $parts = explode(':', $user->sleep_target_time);
+            $bedtimeHour = (int)$parts[0];
+            $bedtimeMinute = (int)($parts[1] ?? 0);
+        }
+
+        $wakeUpHour = 7;
+        $wakeUpMinute = 0;
+        if (!empty($user->wake_up_time)) {
+            $parts = explode(':', $user->wake_up_time);
+            $wakeUpHour = (int)$parts[0];
+            $wakeUpMinute = (int)($parts[1] ?? 0);
+        }
+
+        $token = bin2hex(random_bytes(24));
+
+        return response()->json([
+            'success' => true,
+            'user_id' => $user->id,
+            'email' => $user->email,
+            'name' => $user->name,
+            'token' => $token,
+            'bedtime_hour' => $bedtimeHour,
+            'bedtime_minute' => $bedtimeMinute,
+            'wake_up_hour' => $wakeUpHour,
+            'wake_up_minute' => $wakeUpMinute,
+            'emergency_countdown_seconds' => $user->emergency_countdown_seconds ?? 60,
+            'current_hp' => $user->current_hp ?? 100,
+        ]);
     }
 }
