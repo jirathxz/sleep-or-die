@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Head, usePage, router } from '@inertiajs/react';
-import { Sliders, Volume2, VolumeX, Moon, Shield, User, Key, Bell, Check, Loader2, Bot, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Sliders, Volume2, VolumeX, Moon, Shield, User, Key, Bell, Check, Loader2, Bot, AlertCircle, CheckCircle2, Send, HelpCircle } from 'lucide-react';
 import { useSleepStore } from '@/stores/useSleepStore';
 
 export default function SettingsPage() {
@@ -17,6 +17,8 @@ export default function SettingsPage() {
         toggleAudio,
         saveSettings,
         testDiscordConnection,
+        testAlert,
+        fetchStatus,
     } = useSleepStore();
 
     const [bedtime, setBedtime] = useState(sleep_target_time || user?.sleep_target_time || '23:00');
@@ -30,7 +32,7 @@ export default function SettingsPage() {
     const [savedSuccess, setSavedSuccess] = useState(false);
     const [saving, setSaving] = useState(false);
 
-    // Discord test state
+    // Discord test states
     const [testingDiscord, setTestingDiscord] = useState(false);
     const [testResult, setTestResult] = useState<{
         success: boolean;
@@ -39,26 +41,50 @@ export default function SettingsPage() {
         target_user?: { found: boolean; username?: string; global_name?: string; message?: string } | null;
     } | null>(null);
 
-    // Sync from user if auth loads or updates
+    const [sendingTestDm, setSendingTestDm] = useState(false);
+    const [dmResult, setDmResult] = useState<{
+        success: boolean;
+        message: string;
+        error_code?: number;
+    } | null>(null);
+
+    // Initial fetch on mount to pull latest persisted user settings
     useEffect(() => {
-        if (user?.sleep_target_time) {
-            setBedtime(user.sleep_target_time);
-        } else if (sleep_target_time) {
+        fetchStatus();
+    }, []);
+
+    // Sync from store or user prop when updated
+    useEffect(() => {
+        if (sleep_target_time) {
             setBedtime(sleep_target_time);
+        } else if (user?.sleep_target_time) {
+            setBedtime(user.sleep_target_time);
         }
-        if (user?.discord_bot_token && !discordToken) {
+
+        if (discord_bot_token) {
+            setDiscordToken(discord_bot_token);
+        } else if (user?.discord_bot_token) {
             setDiscordToken(user.discord_bot_token);
         }
-        if (user?.discord_user_id && !discordId) {
+
+        if (discord_user_id) {
+            setDiscordId(discord_user_id);
+        } else if (user?.discord_user_id) {
             setDiscordId(user.discord_user_id);
         }
-        if (user?.wake_up_time) {
+
+        if (wake_up_time) {
+            setWakeTime(wake_up_time);
+        } else if (user?.wake_up_time) {
             setWakeTime(user.wake_up_time);
         }
-        if (user?.emergency_countdown_seconds) {
+
+        if (emergency_countdown_seconds) {
+            setCountdownSeconds(emergency_countdown_seconds);
+        } else if (user?.emergency_countdown_seconds) {
             setCountdownSeconds(user.emergency_countdown_seconds);
         }
-    }, [user?.sleep_target_time, user?.discord_bot_token, user?.discord_user_id, user?.wake_up_time, user?.emergency_countdown_seconds, sleep_target_time]);
+    }, [sleep_target_time, discord_bot_token, discord_user_id, wake_up_time, emergency_countdown_seconds, user]);
 
     const handleTestDiscord = async () => {
         if (!discordToken) {
@@ -77,10 +103,27 @@ export default function SettingsPage() {
         setTestResult(res);
     };
 
+    const handleSendTestDm = async () => {
+        if (!discordToken || !discordId) {
+            setDmResult({
+                success: false,
+                message: 'กรุณากรอกทั้ง Discord Bot Token และ Discord User ID ก่อนทดสอบส่งข้อความ',
+            });
+            return;
+        }
+
+        setSendingTestDm(true);
+        setDmResult(null);
+
+        const res = await testAlert('test', discordToken, discordId);
+        setSendingTestDm(false);
+        setDmResult(res);
+    };
+
     const handleSaveSleep = async (e: React.FormEvent) => {
         e.preventDefault();
         setSaving(true);
-        const ok = await saveSettings(null, discordId, discordToken, Number(countdownSeconds), bedtime);
+        const ok = await saveSettings(wakeTime, discordId, discordToken, Number(countdownSeconds), bedtime);
         setSaving(false);
         if (ok) {
             setSavedSuccess(true);
@@ -136,16 +179,19 @@ export default function SettingsPage() {
                         </div>
 
                         <div className="space-y-1.5">
-                            <label className="text-xs text-zinc-400 font-light">Discord User ID</label>
+                            <label className="text-xs text-zinc-400 font-light flex items-center justify-between">
+                                <span>Discord User ID (ID บัญชีของคุณ)</span>
+                                <span className="text-[10px] text-zinc-500 font-mono">ตัวเลข 17-19 หลัก</span>
+                            </label>
                             <input
                                 type="text"
                                 value={discordId}
                                 onChange={(e) => setDiscordId(e.target.value)}
-                                placeholder="เช่น 123456789012345678"
-                                className="w-full h-11 px-3 bg-[#18181b] text-white rounded-lg border-0 text-sm focus:outline-none focus:ring-1 focus:ring-white/20"
+                                placeholder="เช่น 249539345269784576"
+                                className="w-full h-11 px-3 bg-[#18181b] text-white rounded-lg border-0 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-white/20"
                             />
                             <p className="text-[11px] text-zinc-500 font-light">
-                                บอท Discord จะตรวจจับสถานะออฟไลน์ในช่วงเวลานอน
+                                💡 วิธีคัดลอก: ใน Discord ไปที่ Settings &gt; Advanced &gt; เปิด Developer Mode &gt; คลิกขวาที่โปรไฟล์ตัวเอง &gt; กด "Copy User ID"
                             </p>
                         </div>
 
@@ -172,7 +218,7 @@ export default function SettingsPage() {
                             <div className="flex items-center justify-between">
                                 <label className="text-xs text-zinc-400 font-light flex items-center gap-1.5">
                                     <Key className="size-3 text-zinc-400" />
-                                    Token Bot Discord
+                                    <span>Token Bot Discord (โทเค็นบอทประจำบัญชีคุณ)</span>
                                 </label>
                                 <button
                                     type="button"
@@ -189,26 +235,42 @@ export default function SettingsPage() {
                                 placeholder="เช่น MTIzNDU2Nzg5MDEyMzQ1Njc4.xxxxxx.xxxxxx"
                                 className="w-full h-11 px-3 bg-[#18181b] text-white rounded-lg border-0 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-white/20"
                             />
-                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pt-1">
-                                <p className="text-[11px] text-zinc-500 font-light">
-                                    โทเค็นบอท Discord สำหรับการเฝ้าระวังสถานะอัตโนมัติ
-                                </p>
+                            <p className="text-[11px] text-zinc-500 font-light">
+                                💡 ได้มาจาก <a href="https://discord.com/developers/applications" target="_blank" rel="noreferrer" className="text-indigo-400 hover:underline">Discord Developer Portal</a> &gt; Application ของคุณ &gt; แท็บ Bot &gt; Reset Token / Copy
+                            </p>
+
+                            {/* Dual action buttons: Verify Bot status & Send real test DM */}
+                            <div className="flex flex-wrap items-center gap-2 pt-1">
                                 <button
                                     type="button"
                                     onClick={handleTestDiscord}
-                                    disabled={testingDiscord || !discordToken}
-                                    className="h-8 px-3 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-normal transition-colors flex items-center gap-1.5 self-start sm:self-auto disabled:opacity-40 active:scale-[0.98]"
+                                    disabled={testingDiscord || sendingTestDm || !discordToken}
+                                    className="h-8 px-3 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-normal transition-colors flex items-center gap-1.5 disabled:opacity-40 active:scale-[0.98]"
                                 >
                                     {testingDiscord ? (
                                         <Loader2 className="size-3.5 animate-spin" />
                                     ) : (
                                         <Bot className="size-3.5 text-indigo-400" />
                                     )}
-                                    <span>{testingDiscord ? 'กำลังตรวจสอบการเชื่อมต่อ' : 'ทดสอบการเชื่อมต่อ Discord'}</span>
+                                    <span>{testingDiscord ? 'กำลังตรวจสอบ...' : 'ตรวจสอบสถานะบอท'}</span>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={handleSendTestDm}
+                                    disabled={testingDiscord || sendingTestDm || !discordToken || !discordId}
+                                    className="h-8 px-3.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium transition-colors flex items-center gap-1.5 disabled:opacity-40 active:scale-[0.98] shadow-sm"
+                                >
+                                    {sendingTestDm ? (
+                                        <Loader2 className="size-3.5 animate-spin" />
+                                    ) : (
+                                        <Send className="size-3.5" />
+                                    )}
+                                    <span>{sendingTestDm ? 'กำลังส่ง DM...' : 'ส่งข้อความทดสอบเข้า Discord ของฉัน'}</span>
                                 </button>
                             </div>
 
-                            {/* Test Result Feedback */}
+                            {/* Connection Check Result Feedback */}
                             {testResult && (
                                 <div
                                     className={`p-3.5 rounded-xl text-xs flex flex-col gap-1.5 transition-all mt-1 ${
@@ -237,6 +299,36 @@ export default function SettingsPage() {
                                                         : testResult.target_user.message}
                                                 </p>
                                             )}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Test DM Send Result Feedback */}
+                            {dmResult && (
+                                <div
+                                    className={`p-3.5 rounded-xl text-xs flex flex-col gap-1.5 transition-all mt-1 ${
+                                        dmResult.success
+                                            ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-300'
+                                            : 'bg-rose-500/10 border border-rose-500/20 text-rose-300'
+                                    }`}
+                                >
+                                    <div className="flex items-center gap-2 font-medium">
+                                        {dmResult.success ? (
+                                            <CheckCircle2 className="size-4 text-emerald-400 shrink-0" />
+                                        ) : (
+                                            <AlertCircle className="size-4 text-rose-400 shrink-0" />
+                                        )}
+                                        <span>{dmResult.message}</span>
+                                    </div>
+
+                                    {dmResult.error_code === 50007 && (
+                                        <div className="mt-1.5 p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-lg text-[11px] text-amber-300 space-y-1">
+                                            <p className="font-semibold">คำแนะนำในการแก้ไขปัญหา Error 50007:</p>
+                                            <ol className="list-decimal list-inside space-y-0.5 text-zinc-300 font-light">
+                                                <li>บอทและคุณต้องแชร์ Discord Server เดียวกันอย่างน้อย 1 เซิร์ฟเวอร์ (เชิญบอทเข้า Discord Server ที่คุณอยู่)</li>
+                                                <li>เปิดรับข้อความส่วนตัว: ไปที่ Server Settings &gt; Privacy Settings หรือ User Settings &gt; Privacy &amp; Safety &gt; เปิด "Allow direct messages from server members"</li>
+                                            </ol>
                                         </div>
                                     )}
                                 </div>

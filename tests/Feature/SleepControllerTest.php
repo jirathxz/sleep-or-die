@@ -283,8 +283,15 @@ test('user can update sleep schedule by providing direct sleep target time', fun
 });
 
 test('user can trigger test alert endpoint', function () {
+    Illuminate\Support\Facades\Http::fake([
+        'https://discord.com/api/v10/users/@me/channels' => Illuminate\Support\Facades\Http::response(['id' => 'dm_ch_999'], 200),
+        'https://discord.com/api/v10/channels/dm_ch_999/messages' => Illuminate\Support\Facades\Http::response(['id' => 'msg_111'], 200),
+    ]);
+
     $user = User::factory()->create([
         'sleep_target_time' => '23:00',
+        'discord_user_id' => '123456789012345678',
+        'discord_bot_token' => 'sample_bot_token_abc',
     ]);
 
     $response = $this->actingAs($user)->postJson('/sleep/test-alert', [

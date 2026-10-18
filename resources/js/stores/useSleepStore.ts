@@ -55,9 +55,10 @@ export interface SleepState {
         bot?: { id: string; username: string };
         target_user?: { found: boolean; username?: string; global_name?: string; message?: string } | null;
     }>;
-    testAlert: (stage?: string) => Promise<{
+    testAlert: (stage?: string, token?: string, userId?: string) => Promise<{
         success: boolean;
         message: string;
+        error_code?: number;
     }>;
 }
 
@@ -427,6 +428,8 @@ export const useSleepStore = create<SleepState>((set, get) => ({
                     const data = await res.json();
                     get().syncUser(data);
                     return true;
+                } else {
+                    return false;
                 }
             }
 
@@ -623,7 +626,7 @@ export const useSleepStore = create<SleepState>((set, get) => ({
         }
     },
 
-    testAlert: async (stage = 'deadline') => {
+    testAlert: async (stage = 'test', token?: string, userId?: string) => {
         try {
             const csrfToken = getCsrfToken();
             const res = await fetch('/sleep/test-alert', {
@@ -633,10 +636,21 @@ export const useSleepStore = create<SleepState>((set, get) => ({
                     'Accept': 'application/json',
                     ...(csrfToken ? { 'X-CSRF-TOKEN': csrfToken } : {}),
                 },
-                body: JSON.stringify({ stage }),
+                body: JSON.stringify({
+                    stage,
+                    discord_bot_token: token ?? get().discord_bot_token,
+                    discord_user_id: userId ?? get().discord_user_id,
+                }),
             });
 
-            return await res.json();
+            const data = await res.json();
+            if (data.discord_bot_token !== undefined || data.discord_user_id !== undefined) {
+                set({
+                    discord_bot_token: data.discord_bot_token ?? get().discord_bot_token,
+                    discord_user_id: data.discord_user_id ?? get().discord_user_id,
+                });
+            }
+            return data;
         } catch (e: any) {
             return {
                 success: false,

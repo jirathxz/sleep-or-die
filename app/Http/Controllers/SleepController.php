@@ -21,16 +21,11 @@ class SleepController extends Controller
             'wake_up_time' => ['nullable', 'string', 'date_format:H:i'],
             'sleep_target_time' => ['nullable', 'string', 'date_format:H:i'],
             'emergency_countdown_seconds' => ['nullable', 'integer', 'min:10', 'max:300'],
-            'discord_user_id' => ['nullable', 'string', 'max:50'],
+            'discord_user_id' => ['nullable', 'max:50'],
             'discord_bot_token' => ['nullable', 'string', 'max:255'],
         ]);
 
-        if (empty($validated['wake_up_time']) && empty($validated['sleep_target_time'])) {
-            return response()->json([
-                'message' => 'The wake up time or sleep target time field is required.',
-                'errors' => ['wake_up_time' => ['กรุณาระบุเวลาตื่นนอนหรือเวลาเข้านอน']],
-            ], 422);
-        }
+        $user = $request->user();
 
         $wakeUp = $validated['wake_up_time'] ?? null;
         $sleepTarget = $validated['sleep_target_time'] ?? null;
@@ -41,14 +36,31 @@ class SleepController extends Controller
             $wakeUp = \Illuminate\Support\Carbon::createFromTimeString($sleepTarget)->addMinutes((5 * 90) + 15)->format('H:i');
         }
 
-        $user = $request->user();
-        $user->update([
-            'wake_up_time' => $wakeUp,
-            'sleep_target_time' => $sleepTarget,
-            'emergency_countdown_seconds' => array_key_exists('emergency_countdown_seconds', $validated) ? $validated['emergency_countdown_seconds'] : $user->emergency_countdown_seconds,
-            'discord_user_id' => array_key_exists('discord_user_id', $validated) ? $validated['discord_user_id'] : $user->discord_user_id,
-            'discord_bot_token' => array_key_exists('discord_bot_token', $validated) ? $validated['discord_bot_token'] : $user->discord_bot_token,
-        ]);
+        // If neither was provided and user doesn't have existing target, fall back to default
+        if (empty($wakeUp) && empty($sleepTarget) && empty($user->sleep_target_time)) {
+            $wakeUp = '07:00';
+            $sleepTarget = '23:15';
+        }
+
+        $updateData = [];
+        if ($wakeUp) {
+            $updateData['wake_up_time'] = $wakeUp;
+        }
+        if ($sleepTarget) {
+            $updateData['sleep_target_time'] = $sleepTarget;
+        }
+        if (array_key_exists('emergency_countdown_seconds', $validated) && $validated['emergency_countdown_seconds'] !== null) {
+            $updateData['emergency_countdown_seconds'] = $validated['emergency_countdown_seconds'];
+        }
+        if (array_key_exists('discord_user_id', $validated)) {
+            $updateData['discord_user_id'] = $validated['discord_user_id'] !== null ? trim((string)$validated['discord_user_id']) : null;
+        }
+        if (array_key_exists('discord_bot_token', $validated)) {
+            $updateData['discord_bot_token'] = $validated['discord_bot_token'] !== null ? trim((string)$validated['discord_bot_token']) : null;
+        }
+
+        $user->update($updateData);
+        $user->refresh();
 
         return response()->json([
             'message' => 'Settings updated successfully',
@@ -63,17 +75,47 @@ class SleepController extends Controller
     public function testAlert(Request $request): JsonResponse
     {
         $user = $request->user();
-        $stage = $request->input('stage', 'deadline');
+        $stage = $request->input('stage', 'test');
 
-        $sent = $this->sleepEngine->sendBedtimeAlert($user, $stage);
+        // Allow passing credentials directly in the request or falling back to saved user credentials
+        $token = $request->input('discord_bot_token') ?: $user?->discord_bot_token;
+        $userId = $request->input('discord_user_id') ?: $user?->discord_user_id;
+
+        if (empty($token) || empty($userId)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'กรุณากรอกทั้ง Discord Bot Token และ Discord User ID ก่อนทดสอบส่งการแจ้งเตือน',
+            ], 422);
+        }
+
+        // Auto-save to user if authenticated so it persists immediately
+        if ($user) {
+            $user->update([
+                'discord_bot_token' => trim((string)$token),
+                'discord_user_id' => trim((string)$userId),
+            ]);
+            $user->refresh();
+        }
+
+        $target = $user?->sleep_target_time ?? '23:15';
+        $messages = [
+            'alert' => "🔔 [SleepOrDie] เหลืออีก 10 นาทีจะถึงเวลานอนเป้าหมาย ({$target} น.) กรุณาเตรียมตัวพักผ่อน",
+            'lockdown' => "⚠️ [SleepOrDie] เหลืออีก 5 นาที! เข้าสู่ช่วง Lockdown กรุณาปิดหน้าจอและเตรียมเข้านอน",
+            'deadline' => "🚨 [SleepOrDie] ถึงเวลาเข้านอนแล้ว ({$target} น.)! กรุณาเข้านอนทันที มิเช่นนั้นระบบจะถือว่าทำผิดวินัย",
+            'test' => "✨ [SleepOrDie] ทดสอบระบบสำเร็จ! บอทสามารถส่งข้อความแจ้งเตือนเข้า Discord ของคุณได้เรียบร้อยแล้ว",
+        ];
+
+        $message = $messages[$stage] ?? $messages['test'];
+        $result = $this->sleepEngine->sendDiscordDm($token, $userId, $message);
 
         return response()->json([
-            'success' => $sent,
+            'success' => $result['success'],
             'stage' => $stage,
-            'message' => $sent
-                ? "ส่งการแจ้งเตือนระดับ {$stage} เรียบร้อยแล้ว"
-                : "ไม่สามารถส่งการแจ้งเตือนได้ กรุณาตรวจสอบการตั้งค่า Discord",
-        ]);
+            'message' => $result['message'],
+            'error_code' => $result['error_code'] ?? null,
+            'discord_bot_token' => $user?->discord_bot_token,
+            'discord_user_id' => $user?->discord_user_id,
+        ], $result['success'] ? 200 : 400);
     }
 
     public function confirmSleep(Request $request): JsonResponse
@@ -182,6 +224,7 @@ class SleepController extends Controller
             'last_sleep_confirmed_at' => $user->last_sleep_confirmed_at,
             'discord_user_id' => $user->discord_user_id,
             'discord_bot_token' => $user->discord_bot_token,
+            'emergency_countdown_seconds' => $user->emergency_countdown_seconds ?? 60,
             'is_sleeping' => !empty($user->last_sleep_confirmed_at),
             'is_within_bedtime_hours' => $inBedtimeHours,
             'morning_rewarded' => $rewarded,
@@ -249,6 +292,7 @@ class SleepController extends Controller
                     $updateData['discord_user_id'] = trim($targetUserId);
                 }
                 $request->user()->update($updateData);
+                $request->user()->refresh();
             }
 
             return response()->json([
@@ -259,6 +303,8 @@ class SleepController extends Controller
                     'username' => $botName,
                 ],
                 'target_user' => $targetUserResult,
+                'discord_bot_token' => $request->user()?->discord_bot_token,
+                'discord_user_id' => $request->user()?->discord_user_id,
             ]);
         } catch (\Throwable $e) {
             return response()->json([
