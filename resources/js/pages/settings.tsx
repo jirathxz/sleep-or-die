@@ -10,6 +10,7 @@ export default function SettingsPage() {
     const {
         wake_up_time,
         discord_user_id,
+        discord_bot_token,
         audioEnabled,
         toggleAudio,
         saveSettings,
@@ -17,6 +18,8 @@ export default function SettingsPage() {
 
     const [wakeTime, setWakeTime] = useState(wake_up_time || '07:00');
     const [discordId, setDiscordId] = useState(discord_user_id || '');
+    const [discordToken, setDiscordToken] = useState(discord_bot_token || '');
+    const [showToken, setShowToken] = useState(false);
     const [savedSuccess, setSavedSuccess] = useState(false);
     const [saving, setSaving] = useState(false);
 
@@ -27,7 +30,7 @@ export default function SettingsPage() {
     const handleSaveSleep = async (e: React.FormEvent) => {
         e.preventDefault();
         setSaving(true);
-        const ok = await saveSettings(wakeTime, discordId);
+        const ok = await saveSettings(wakeTime, discordId, discordToken);
         setSaving(false);
         if (ok) {
             setSavedSuccess(true);
@@ -89,7 +92,33 @@ export default function SettingsPage() {
                                 className="w-full h-11 px-3 bg-[#18181b] text-white rounded-lg border-0 text-sm focus:outline-none focus:ring-1 focus:ring-white/20"
                             />
                             <p className="text-[11px] text-zinc-500 font-light">
-                                บอท Discord จะตรวจจับสถานะออฟไลน์ในช่วง 10 นาทีแรก
+                                บอท Discord จะตรวจจับสถานะออฟไลน์ในช่วงเวลานอน
+                            </p>
+                        </div>
+
+                        <div className="space-y-1.5 sm:col-span-2">
+                            <div className="flex items-center justify-between">
+                                <label className="text-xs text-zinc-400 font-light flex items-center gap-1.5">
+                                    <Key className="size-3 text-zinc-400" />
+                                    Token Bot Discord (Discord Bot Token)
+                                </label>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowToken(!showToken)}
+                                    className="text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors"
+                                >
+                                    {showToken ? 'ซ่อน' : 'แสดง'}
+                                </button>
+                            </div>
+                            <input
+                                type={showToken ? 'text' : 'password'}
+                                value={discordToken}
+                                onChange={(e) => setDiscordToken(e.target.value)}
+                                placeholder="เช่น MTIzNDU2Nzg5MDEyMzQ1Njc4.xxxxxx.xxxxxx"
+                                className="w-full h-11 px-3 bg-[#18181b] text-white rounded-lg border-0 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-white/20"
+                            />
+                            <p className="text-[11px] text-zinc-500 font-light">
+                                โทเค็นบอท Discord สำหรับรันการเฝ้าระวังสถานะ Presence อัตโนมัติ (DISCORD_BOT_TOKEN)
                             </p>
                         </div>
                     </div>

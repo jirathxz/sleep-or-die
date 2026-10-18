@@ -38,6 +38,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
     'tickets_count',
     'is_disabled',
     'discord_user_id',
+    'discord_bot_token',
     'last_sleep_confirmed_at',
 ])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]

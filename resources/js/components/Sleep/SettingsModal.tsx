@@ -14,9 +14,10 @@ interface SettingsModalProps {
     onClose: () => void;
     currentWakeUpTime: string | null;
     currentDiscordId: string | null;
+    currentDiscordBotToken?: string | null;
     audioEnabled: boolean;
     onToggleAudio: () => void;
-    onSave: (wakeUpTime: string, discordId?: string) => Promise<boolean>;
+    onSave: (wakeUpTime: string, discordId?: string, discordBotToken?: string) => Promise<boolean>;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -24,18 +25,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     onClose,
     currentWakeUpTime,
     currentDiscordId,
+    currentDiscordBotToken,
     audioEnabled,
     onToggleAudio,
     onSave,
 }) => {
     const [wakeUpTime, setWakeUpTime] = useState(currentWakeUpTime || '07:00');
     const [discordId, setDiscordId] = useState(currentDiscordId || '');
+    const [discordToken, setDiscordToken] = useState(currentDiscordBotToken || '');
     const [saving, setSaving] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setSaving(true);
-        const success = await onSave(wakeUpTime, discordId);
+        const success = await onSave(wakeUpTime, discordId, discordToken);
         setSaving(false);
         if (success) {
             onClose();
@@ -87,7 +90,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             className="w-full h-11 px-3.5 bg-[#18181b] text-white placeholder:text-zinc-600 rounded-lg border-0 text-sm font-normal focus:outline-none focus:ring-1 focus:ring-white/20 transition-all"
                         />
                         <p className="text-[11px] text-zinc-500 font-light">
-                            บอท Discord จะเฝ้าระวังว่าออฟไลน์จริงหรือไม่ในช่วง 10 นาทีแรกของการนอน
+                            บอท Discord จะตรวจจับสถานะออฟไลน์ในช่วงเวลานอน
+                        </p>
+                    </div>
+
+                    {/* Discord Bot Token Input */}
+                    <div className="space-y-1.5">
+                        <label htmlFor="discord_token" className="text-xs text-zinc-300 font-normal">
+                            Token Bot Discord (DISCORD_BOT_TOKEN)
+                        </label>
+                        <input
+                            id="discord_token"
+                            type="password"
+                            placeholder="เช่น MTIzNDU2Nzg5MDEyMzQ1Njc4.xxxxxx.xxxxxx"
+                            value={discordToken}
+                            onChange={(e) => setDiscordToken(e.target.value)}
+                            className="w-full h-11 px-3.5 bg-[#18181b] text-white placeholder:text-zinc-600 rounded-lg border-0 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-white/20 transition-all"
+                        />
+                        <p className="text-[11px] text-zinc-500 font-light">
+                            โทเค็นสำหรับบอท Discord ในการตรวจจับสถานะ Presence อัตโนมัติ
                         </p>
                     </div>
 

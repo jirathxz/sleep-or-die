@@ -11,6 +11,7 @@ test('user can update sleep schedule and receive calculated target', function ()
     $response = $this->actingAs($user)->postJson('/sleep/settings', [
         'wake_up_time' => '06:30',
         'discord_user_id' => '1234567890',
+        'discord_bot_token' => 'bot_token_secret_123',
     ]);
 
     $response->assertOk()
@@ -18,9 +19,11 @@ test('user can update sleep schedule and receive calculated target', function ()
             'sleep_target_time' => '22:45',
             'wake_up_time' => '06:30',
             'discord_user_id' => '1234567890',
+            'discord_bot_token' => 'bot_token_secret_123',
         ]);
 
-    expect($user->fresh()->sleep_target_time)->toBe('22:45');
+    expect($user->fresh()->sleep_target_time)->toBe('22:45')
+        ->and($user->fresh()->discord_bot_token)->toBe('bot_token_secret_123');
 });
 
 test('user can confirm sleep which sets last_sleep_confirmed_at', function () {

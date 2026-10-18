@@ -18,6 +18,7 @@ class SleepController extends Controller
         $validated = $request->validate([
             'wake_up_time' => ['required', 'string', 'date_format:H:i'],
             'discord_user_id' => ['nullable', 'string', 'max:50'],
+            'discord_bot_token' => ['nullable', 'string', 'max:255'],
         ]);
 
         $sleepTarget = $this->sleepEngine->calculateSleepTarget($validated['wake_up_time']);
@@ -26,7 +27,8 @@ class SleepController extends Controller
         $user->update([
             'wake_up_time' => $validated['wake_up_time'],
             'sleep_target_time' => $sleepTarget,
-            'discord_user_id' => $validated['discord_user_id'] ?? $user->discord_user_id,
+            'discord_user_id' => array_key_exists('discord_user_id', $validated) ? $validated['discord_user_id'] : $user->discord_user_id,
+            'discord_bot_token' => array_key_exists('discord_bot_token', $validated) ? $validated['discord_bot_token'] : $user->discord_bot_token,
         ]);
 
         return response()->json([
@@ -34,6 +36,7 @@ class SleepController extends Controller
             'wake_up_time' => $user->wake_up_time,
             'sleep_target_time' => $user->sleep_target_time,
             'discord_user_id' => $user->discord_user_id,
+            'discord_bot_token' => $user->discord_bot_token,
         ]);
     }
 
@@ -108,6 +111,7 @@ class SleepController extends Controller
             'tickets_count' => $user->tickets_count,
             'is_disabled' => $user->is_disabled,
             'last_sleep_confirmed_at' => $user->last_sleep_confirmed_at,
+            'discord_bot_token' => $user->discord_bot_token,
             'is_sleeping' => !empty($user->last_sleep_confirmed_at),
             'is_within_bedtime_hours' => $inBedtimeHours,
             'morning_rewarded' => $rewarded,

@@ -12,6 +12,7 @@ export interface SleepState {
     tickets_count: number;
     is_disabled: boolean;
     discord_user_id: string | null;
+    discord_bot_token: string | null;
     last_sleep_confirmed_at: string | null;
     level: number;
     exp: number;
@@ -35,7 +36,7 @@ export interface SleepState {
     toggleAudio: (enabled?: boolean) => void;
     startSimulation321: () => void;
     resetSimulation: () => void;
-    saveSettings: (wakeUpTime: string, discordUserId?: string) => Promise<boolean>;
+    saveSettings: (wakeUpTime: string, discordUserId?: string, discordBotToken?: string) => Promise<boolean>;
     confirmSleep: () => Promise<boolean>;
     useTicket: () => Promise<boolean>;
     fetchStatus: () => Promise<void>;
@@ -129,6 +130,7 @@ export const useSleepStore = create<SleepState>((set, get) => ({
     tickets_count: 1, // 1 emergency ticket
     is_disabled: false,
     discord_user_id: null,
+    discord_bot_token: null,
     last_sleep_confirmed_at: null,
     level: 1,
     exp: 150,
@@ -349,7 +351,7 @@ export const useSleepStore = create<SleepState>((set, get) => ({
         set({ audioEnabled: next });
     },
 
-    saveSettings: async (wakeUpTime: string, discordUserId?: string) => {
+    saveSettings: async (wakeUpTime: string, discordUserId?: string, discordBotToken?: string) => {
         try {
             const calculatedTarget = calculateSleepTargetLocal(wakeUpTime);
             const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
@@ -366,6 +368,7 @@ export const useSleepStore = create<SleepState>((set, get) => ({
                     body: JSON.stringify({
                         wake_up_time: wakeUpTime,
                         discord_user_id: discordUserId,
+                        discord_bot_token: discordBotToken,
                     }),
                 });
 
@@ -381,6 +384,7 @@ export const useSleepStore = create<SleepState>((set, get) => ({
                 wake_up_time: wakeUpTime,
                 sleep_target_time: calculatedTarget,
                 discord_user_id: discordUserId || null,
+                discord_bot_token: discordBotToken || null,
             });
             return true;
         } catch {
