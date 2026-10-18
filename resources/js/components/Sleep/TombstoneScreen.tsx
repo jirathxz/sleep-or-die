@@ -1,10 +1,6 @@
 import React from 'react';
 import { router } from '@inertiajs/react';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
-import { Skull, LogOut, Flame, ShieldAlert } from 'lucide-react';
+import { Skull, LogOut } from 'lucide-react';
 
 interface TombstoneScreenProps {
     daysSurvived: number;
@@ -17,71 +13,59 @@ export const TombstoneScreen: React.FC<TombstoneScreenProps> = ({ daysSurvived, 
     };
 
     return (
-        <div className="fixed inset-0 z-50 bg-black/95 flex flex-col items-center justify-center p-6 text-center select-none overflow-y-auto animate-in fade-in duration-700">
-            <Card className="max-w-md w-full border-destructive/50 bg-card/90 backdrop-blur-2xl shadow-2xl relative overflow-hidden">
-                <CardHeader className="flex flex-col items-center pb-2 pt-8">
-                    <div className="size-16 rounded-2xl bg-destructive/10 border border-destructive/30 flex items-center justify-center text-destructive mb-3">
-                        <Skull className="size-8" />
+        <div className="fixed inset-0 z-50 bg-[#09090b] flex flex-col items-center justify-center p-6 text-center select-none overflow-y-auto">
+            <div className="max-w-md w-full bg-[#121215] rounded-2xl p-6 md:p-8 space-y-6 shadow-2xl">
+                {/* Header */}
+                <div className="flex flex-col items-center space-y-3">
+                    <div className="size-12 rounded-xl bg-rose-500/10 flex items-center justify-center text-rose-500">
+                        <Skull className="size-6" />
                     </div>
 
-                    <Badge variant="destructive" className="font-mono text-xs tracking-widest uppercase mb-1">
-                        PERMADEATH STRIKE LIMIT EXCEEDED
-                    </Badge>
-
-                    <CardTitle className="text-2xl font-mono font-black tracking-tight uppercase text-destructive">
-                        Account Terminated
-                    </CardTitle>
-
-                    <CardDescription className="text-xs font-mono text-muted-foreground">
-                        Disciplinary Failure Protocol Enforced
-                    </CardDescription>
-                </CardHeader>
-
-                <CardContent className="space-y-4 pt-4">
-                    <div className="rounded-xl border border-border/80 bg-background/50 p-4 space-y-2.5 text-xs font-mono text-left">
-                        <div className="flex justify-between items-center">
-                            <span className="text-muted-foreground">DECEASED:</span>
-                            <span className="font-bold text-foreground">{userName}</span>
-                        </div>
-                        <Separator />
-                        <div className="flex justify-between items-center">
-                            <span className="text-muted-foreground flex items-center gap-1.5">
-                                <Flame className="size-3.5 text-orange-400" />
-                                PEAK SURVIVAL:
-                            </span>
-                            <span className="font-bold text-emerald-400">{daysSurvived} Days</span>
-                        </div>
-                        <Separator />
-                        <div className="flex justify-between items-center">
-                            <span className="text-muted-foreground flex items-center gap-1.5">
-                                <ShieldAlert className="size-3.5 text-destructive" />
-                                CAUSE:
-                            </span>
-                            <span className="font-bold text-destructive">5 Shutdown Strikes</span>
-                        </div>
-                        <Separator />
-                        <div className="flex justify-between items-center">
-                            <span className="text-muted-foreground">ACCOUNT STATUS:</span>
-                            <span className="font-black text-destructive">DISABLED</span>
-                        </div>
+                    <div className="space-y-1">
+                        <h1 className="text-xl font-medium text-white tracking-tight">
+                            บัญชีถูกระงับการใช้งานถาวร
+                        </h1>
+                        <p className="text-xs text-zinc-400 font-light">
+                            สะสมโทษชัตดาวน์ครบ 5 ครั้ง ผิดเจตนารมณ์วินัยการนอน
+                        </p>
                     </div>
+                </div>
 
-                    <p className="text-xs text-muted-foreground font-mono leading-relaxed px-2">
-                        คุณถูกระงับบัญชีอย่างถาวรเนื่องจากสะสมความล้มเหลวครบ 5 ครั้ง ผิดเจตนารมณ์ในการปรับพฤติกรรมการนอน
-                    </p>
-                </CardContent>
+                {/* Subject dossier (No Border, Tonal Surface) */}
+                <div className="bg-[#18181b] rounded-xl p-4 space-y-2.5 text-xs text-left">
+                    <div className="flex justify-between items-center">
+                        <span className="text-zinc-500 font-light">ชื่อผู้ใช้งาน:</span>
+                        <span className="font-normal text-white">{userName}</span>
+                    </div>
+                    <div className="h-px bg-white/[0.04]" />
+                    <div className="flex justify-between items-center">
+                        <span className="text-zinc-500 font-light">สถิติรอดชีวิตสูงสุด:</span>
+                        <span className="font-normal text-emerald-400">{daysSurvived} วัน</span>
+                    </div>
+                    <div className="h-px bg-white/[0.04]" />
+                    <div className="flex justify-between items-center">
+                        <span className="text-zinc-500 font-light">สาเหตุการระงับ:</span>
+                        <span className="font-normal text-rose-400">ชัตดาวน์สะสม 5/5 ครั้ง</span>
+                    </div>
+                    <div className="h-px bg-white/[0.04]" />
+                    <div className="flex justify-between items-center">
+                        <span className="text-zinc-500 font-light">สถานะบัญชี:</span>
+                        <span className="font-medium text-rose-500">DISABLED (PERMADEATH)</span>
+                    </div>
+                </div>
 
-                <CardFooter className="pt-2 pb-6 flex justify-center">
-                    <Button
-                        variant="outline"
-                        onClick={handleLogout}
-                        className="w-full font-mono text-xs uppercase tracking-wider gap-2 border-border hover:bg-destructive/10 hover:text-destructive"
-                    >
-                        <LogOut className="size-4" />
-                        Sign Out (ยอมรับผลกรรม)
-                    </Button>
-                </CardFooter>
-            </Card>
+                <p className="text-xs text-zinc-500 font-light leading-relaxed">
+                    วินัยการนอนคือความรับผิดชอบพื้นฐานของร่างกาย การพักผ่อนไม่เพียงพอส่งผลกระทบโดยตรงต่อชีวิตจริง
+                </p>
+
+                <button
+                    onClick={handleLogout}
+                    className="w-full h-10 rounded-lg bg-white text-zinc-950 font-medium text-xs hover:bg-zinc-200 transition-colors flex items-center justify-center gap-2"
+                >
+                    <LogOut className="size-4" />
+                    <span>ออกจากระบบ</span>
+                </button>
+            </div>
         </div>
     );
 };

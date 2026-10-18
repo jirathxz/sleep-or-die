@@ -6,12 +6,9 @@ import { SettingsModal } from '@/components/Sleep/SettingsModal';
 import { StageOverlay } from '@/components/Sleep/StageOverlay';
 import { StatsBadge } from '@/components/Sleep/StatsBadge';
 import { TombstoneScreen } from '@/components/Sleep/TombstoneScreen';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { dashboard } from '@/routes';
 import { useSleepStore } from '@/stores/useSleepStore';
-import { Volume2, VolumeX, Settings, Hourglass, Shield, ShieldAlert } from 'lucide-react';
+import { Volume2, VolumeX, Settings, Shield, ShieldAlert } from 'lucide-react';
 
 interface PageProps {
     auth: {
@@ -87,85 +84,77 @@ export default function Dashboard() {
     }, [auth, syncUser, tick, fetchStatus]);
 
     if (is_disabled) {
-        return <TombstoneScreen daysSurvived={days_survived} userName={auth?.user?.name || 'Subject'} />;
+        return <TombstoneScreen daysSurvived={days_survived} userName={auth?.user?.name || 'ผู้ใช้งาน'} />;
     }
 
     return (
         <>
-            <Head title="SleepOrDie - Hardcore Sleep Accountability" />
+            <Head title="SleepOrDie - ระบบควบคุมวินัยการนอนหลับ" />
 
             <StageOverlay stage={stage} />
 
-            <div className="min-h-screen bg-background text-foreground p-4 md:p-8 flex flex-col justify-between selection:bg-primary selection:text-primary-foreground">
-                {/* Header with shadcn Button and Badge */}
-                <header className="max-w-4xl w-full mx-auto flex items-center justify-between pb-6 border-b border-border/80">
-                    <div className="flex items-center gap-3">
-                        <div className="size-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shadow-sm">
-                            <Hourglass className="size-5" />
-                        </div>
-                        <div>
-                            <div className="flex items-center gap-2">
-                                <h1 className="text-lg md:text-xl font-black font-mono tracking-tight text-foreground uppercase">
-                                    Sleep Or Die
-                                </h1>
-                                <Badge variant="secondary" className="font-mono text-[10px] px-1.5 py-0 uppercase">
-                                    v1.0-shadcn
-                                </Badge>
-                            </div>
-                            <p className="text-[11px] font-mono text-muted-foreground">
-                                Hardcore Biological Discipline Protocol
-                            </p>
-                        </div>
+            <div className="min-h-screen bg-[#09090b] text-[#ffffff] p-4 md:p-8 flex flex-col justify-between selection:bg-white selection:text-zinc-950">
+                {/* Header: Minimalist, No Badge, No Border */}
+                <header className="max-w-3xl w-full mx-auto flex items-center justify-between pb-5">
+                    <div>
+                        <h1 className="text-lg md:text-xl font-medium tracking-tight text-white uppercase">
+                            Sleep Or Die
+                        </h1>
+                        <p className="text-xs text-zinc-500 font-light">
+                            ระบบควบคุมและตรวจจับวินัยการนอนหลับ
+                        </p>
                     </div>
 
                     <div className="flex items-center gap-2">
                         {auth?.user ? (
-                            <span className="text-xs font-mono text-muted-foreground hidden sm:inline mr-2">
-                                Operator: <span className="font-bold text-foreground">{auth.user.name}</span>
+                            <span className="text-xs text-zinc-400 font-light hidden sm:inline mr-2">
+                                ผู้ใช้งาน: <span className="font-normal text-white">{auth.user.name}</span>
                             </span>
                         ) : (
-                            <div className="flex items-center gap-1.5 mr-1">
-                                <Button variant="ghost" size="sm" asChild className="font-mono text-xs">
-                                    <Link href="/login">Log in</Link>
-                                </Button>
-                                <Button size="sm" asChild className="font-mono text-xs font-bold">
-                                    <Link href="/register">Register</Link>
-                                </Button>
+                            <div className="flex items-center gap-2 mr-1">
+                                <Link
+                                    href="/login"
+                                    className="h-8 px-3 rounded-lg text-xs font-normal text-zinc-400 hover:text-white transition-colors flex items-center"
+                                >
+                                    เข้าสู่ระบบ
+                                </Link>
+                                <Link
+                                    href="/register"
+                                    className="h-8 px-3.5 rounded-lg bg-white text-zinc-950 text-xs font-medium hover:bg-zinc-200 transition-colors flex items-center"
+                                >
+                                    สมัครสมาชิก
+                                </Link>
                             </div>
                         )}
 
-                        <Button
-                            variant="outline"
-                            size="icon"
+                        <button
                             onClick={() => toggleAudio()}
-                            className="size-9 rounded-xl border-border/80"
-                            title={audioEnabled ? 'Mute Audio' : 'Unmute Audio'}
+                            className="size-9 rounded-lg bg-[#18181b] hover:bg-[#27272a] text-zinc-300 flex items-center justify-center transition-colors"
+                            title={audioEnabled ? 'ปิดเสียงแจ้งเตือน' : 'เปิดเสียงแจ้งเตือน'}
                         >
                             {audioEnabled ? (
                                 <Volume2 className="size-4 text-emerald-400" />
                             ) : (
-                                <VolumeX className="size-4 text-muted-foreground" />
+                                <VolumeX className="size-4 text-zinc-500" />
                             )}
-                        </Button>
+                        </button>
 
-                        <Button
-                            variant="outline"
-                            size="sm"
+                        <button
                             onClick={() => setSettingsOpen(true)}
-                            className="font-mono text-xs gap-2 rounded-xl border-border/80"
+                            className="h-9 px-3 rounded-lg bg-[#18181b] hover:bg-[#27272a] text-xs font-normal text-zinc-300 flex items-center gap-2 transition-colors"
                         >
                             <Settings className="size-3.5" />
-                            <span className="hidden sm:inline">Settings</span>
-                        </Button>
+                            <span className="hidden sm:inline">ตั้งค่า</span>
+                        </button>
                     </div>
                 </header>
 
-                {/* Main Dashboard Space */}
-                <main className="max-w-4xl w-full mx-auto my-8 space-y-6">
+                {/* Main Space: Compact Proximity, Single Focal Point */}
+                <main className="max-w-3xl w-full mx-auto my-4 space-y-4">
                     {/* Vitality Matrix HP Bar */}
                     <HpBar hp={current_hp} stage={stage} />
 
-                    {/* Countdown Display & Action Button */}
+                    {/* Countdown Display & Primary Sleep Action */}
                     <CountdownDisplay
                         hours={hoursRemaining}
                         minutes={minutesRemaining}
@@ -178,7 +167,7 @@ export default function Dashboard() {
                         lastConfirmedAt={last_sleep_confirmed_at}
                     />
 
-                    {/* Gamification Badges & Strike Counter */}
+                    {/* Unified Stats & Extension Module (No duplicate cards, No badges) */}
                     <StatsBadge
                         daysSurvived={days_survived}
                         shutdownStacks={shutdown_stacks}
@@ -188,22 +177,26 @@ export default function Dashboard() {
                     />
                 </main>
 
-                {/* Footer with shadcn Badges and Separator */}
-                <footer className="max-w-4xl w-full mx-auto pt-6 border-t border-border/80 flex flex-col sm:flex-row items-center justify-between text-xs font-mono text-muted-foreground gap-3">
+                {/* Footer: Subtle Divider, Clean Inline Typography (Strictly No Badge) */}
+                <footer className="max-w-3xl w-full mx-auto pt-5 flex flex-col sm:flex-row items-center justify-between text-xs text-zinc-500 font-light gap-2">
                     <div className="flex items-center gap-2">
-                        <Shield className="size-3.5 text-primary" />
+                        <Shield className="size-3.5 text-zinc-400" />
                         <span>Discord Guard:</span>
-                        <Badge variant="outline" className="font-mono text-[10px]">
-                            {discord_user_id ? `Target ID: ${discord_user_id}` : 'Unbound'}
-                        </Badge>
+                        <span className="text-zinc-300 font-normal">
+                            {discord_user_id ? `ID: ${discord_user_id}` : 'ยังไม่เชื่อมต่อ'}
+                        </span>
                     </div>
 
                     <div className="flex items-center gap-2">
-                        <ShieldAlert className="size-3.5 text-destructive" />
-                        <span>Account Status:</span>
-                        <Badge variant={shutdown_stacks >= 4 ? 'destructive' : 'secondary'} className="font-mono text-[10px]">
-                            {shutdown_stacks} / 5 strikes
-                        </Badge>
+                        <ShieldAlert className="size-3.5 text-zinc-400" />
+                        <span>สถานะบัญชี:</span>
+                        <span
+                            className={`font-normal ${
+                                shutdown_stacks >= 4 ? 'text-rose-400' : 'text-zinc-300'
+                            }`}
+                        >
+                            {shutdown_stacks} / 5 สไตรค์
+                        </span>
                     </div>
                 </footer>
 

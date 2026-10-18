@@ -1,7 +1,4 @@
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { HeartPulse, Skull, AlertTriangle, ShieldCheck } from 'lucide-react';
 
 interface HpBarProps {
     hp: number;
@@ -11,77 +8,75 @@ interface HpBarProps {
 export const HpBar: React.FC<HpBarProps> = ({ hp, stage }) => {
     const clampedHp = Math.max(0, Math.min(100, hp));
 
-    let barGradient = 'bg-gradient-to-r from-emerald-500 to-green-500';
-    let statusText = 'STABLE VITALITY';
-    let statusBadgeVariant: 'default' | 'secondary' | 'destructive' | 'outline' = 'outline';
-    let statusIcon = <ShieldCheck className="size-3.5 text-emerald-400" />;
-    let statusColor = 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10';
+    // Determine status text, color, and indicator dot based on HP and stage
+    let barColor = 'bg-emerald-500';
+    let statusText = 'ระบบเสถียร (ปกติ)';
+    let dotColor = 'bg-emerald-500';
+    let statusTextColor = 'text-zinc-400';
 
     if (clampedHp <= 0 || stage === 'shutdown') {
-        barGradient = 'bg-neutral-800';
-        statusText = 'SYSTEM TERMINATED (0 HP)';
-        statusBadgeVariant = 'destructive';
-        statusIcon = <Skull className="size-3.5 text-neutral-400" />;
-        statusColor = 'text-neutral-400 border-neutral-700 bg-neutral-900';
+        barColor = 'bg-zinc-700';
+        statusText = 'ระบบหยุดทำงาน (0 HP)';
+        dotColor = 'bg-zinc-500';
+        statusTextColor = 'text-zinc-500';
     } else if (clampedHp <= 30 || stage === 'sleep') {
-        barGradient = 'bg-gradient-to-r from-red-600 via-rose-500 to-red-700 animate-pulse';
-        statusText = 'CRITICAL FAILURE IMMINENT';
-        statusBadgeVariant = 'destructive';
-        statusIcon = <AlertTriangle className="size-3.5 text-red-400 animate-bounce" />;
-        statusColor = 'text-red-400 border-red-500/50 bg-red-500/10 shadow-lg shadow-red-500/20';
+        barColor = 'bg-rose-500';
+        statusText = 'วิกฤต: เลือดลดต่อเนื่อง';
+        dotColor = 'bg-rose-500 animate-pulse';
+        statusTextColor = 'text-rose-400';
     } else if (clampedHp <= 65 || stage === 'lockdown') {
-        barGradient = 'bg-gradient-to-r from-amber-500 to-orange-500';
-        statusText = 'LOCKDOWN - HP AT RISK';
-        statusBadgeVariant = 'secondary';
-        statusIcon = <HeartPulse className="size-3.5 text-amber-400" />;
-        statusColor = 'text-amber-400 border-amber-500/40 bg-amber-500/10';
+        barColor = 'bg-amber-500';
+        statusText = 'ล็อคดาวน์: เตรียมปิดเครื่อง';
+        dotColor = 'bg-amber-500';
+        statusTextColor = 'text-amber-400';
     }
 
     return (
-        <Card className="border-border/60 bg-card/60 backdrop-blur-xl shadow-2xl overflow-hidden relative">
-            <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
-                <div className="flex items-center gap-2">
-                    <HeartPulse className="size-5 text-primary" />
-                    <CardTitle className="text-sm font-mono tracking-wider uppercase font-semibold">
-                        Vital Health Matrix
-                    </CardTitle>
+        <section className="bg-[#121215] rounded-2xl p-5 md:p-6 space-y-4 shadow-sm select-none">
+            {/* Header: Title and Status Dot (Strictly No Badge) */}
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                    <span className="size-2 rounded-full bg-white/40" />
+                    <h2 className="text-sm font-medium text-zinc-300">
+                        ระดับพลังชีวิต (Vitality Matrix)
+                    </h2>
                 </div>
 
-                <Badge variant={statusBadgeVariant} className={`font-mono text-[11px] gap-1.5 px-2.5 py-0.5 uppercase ${statusColor}`}>
-                    {statusIcon}
-                    {statusText}
-                </Badge>
-            </CardHeader>
+                <div className="flex items-center gap-2 text-xs font-normal">
+                    <span className={`size-2 rounded-full ${dotColor}`} />
+                    <span className={statusTextColor}>{statusText}</span>
+                </div>
+            </div>
 
-            <CardContent className="space-y-3">
-                <div className="flex justify-between items-baseline font-mono">
-                    <span className="text-xs text-muted-foreground uppercase tracking-widest">
-                        Remaining Capacity
+            {/* Readout Display */}
+            <div className="flex items-baseline justify-between pt-1">
+                <span className="text-xs text-zinc-500 font-light">
+                    ความจุพลังงานปัจจุบัน
+                </span>
+                <div className="flex items-baseline gap-1.5">
+                    <span className="text-4xl md:text-5xl font-medium tracking-tight text-white tabular-nums">
+                        {clampedHp}
                     </span>
-                    <div className="flex items-baseline gap-1">
-                        <span className="text-2xl font-black tracking-tight font-mono text-foreground">
-                            {clampedHp}
-                        </span>
-                        <span className="text-xs text-muted-foreground">/ 100 HP</span>
-                    </div>
+                    <span className="text-xs text-zinc-500 font-normal">/ 100 HP</span>
                 </div>
+            </div>
 
-                {/* Progress bar container */}
-                <div className="relative w-full h-4 bg-muted/50 rounded-full overflow-hidden border border-border/80 p-0.5">
-                    <div
-                        className={`h-full rounded-full transition-all duration-700 ease-out shadow-md ${barGradient}`}
-                        style={{ width: `${clampedHp}%` }}
-                    />
-                </div>
+            {/* Progress Bar Container (Concentric Radius: rounded-lg with inner rounded-md) */}
+            <div className="w-full h-3 bg-[#18181b] rounded-lg p-0.5 overflow-hidden">
+                <div
+                    className={`h-full rounded-md transition-all duration-700 ease-out ${barColor}`}
+                    style={{ width: `${clampedHp}%` }}
+                />
+            </div>
 
-                <div className="flex justify-between px-1 text-[10px] text-muted-foreground font-mono">
-                    <span>0% (DIE)</span>
-                    <span>25%</span>
-                    <span>50%</span>
-                    <span>75%</span>
-                    <span>100% (STABLE)</span>
-                </div>
-            </CardContent>
-        </Card>
+            {/* Scale Markers */}
+            <div className="flex justify-between text-[11px] text-zinc-500 font-light pt-0.5">
+                <span>0% ชัตดาวน์</span>
+                <span>25%</span>
+                <span>50%</span>
+                <span>75%</span>
+                <span>100% เต็มกำลัง</span>
+            </div>
+        </section>
     );
 };

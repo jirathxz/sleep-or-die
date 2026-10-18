@@ -1,10 +1,6 @@
 import React from 'react';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
 import { SleepStage } from '@/stores/useSleepStore';
-import { Clock, Moon, ShieldAlert, Sparkles, Loader2 } from 'lucide-react';
+import { Moon, Loader2 } from 'lucide-react';
 
 interface CountdownDisplayProps {
     hours: number;
@@ -31,117 +27,110 @@ export const CountdownDisplay: React.FC<CountdownDisplayProps> = ({
 }) => {
     const pad = (n: number) => n.toString().padStart(2, '0');
 
-    let badgeText = 'BEDTIME PROTOCOL ACTIVE';
-    let badgeVariant: 'default' | 'secondary' | 'destructive' | 'outline' = 'secondary';
-    let badgeClass = 'text-muted-foreground border-border bg-secondary/50';
-    let digitsColor = 'text-foreground';
+    let stageText = 'ระบบนับถอยหลังสู่การนอนหลับ';
+    let dotColor = 'bg-white/40';
+    let stageTextColor = 'text-zinc-400';
+    let digitsColor = 'text-white';
 
     if (stage === 'alert') {
-        badgeText = 'STAGE 1: APPROACHING BEDTIME (30M)';
-        badgeVariant = 'secondary';
-        badgeClass = 'text-amber-400 border-amber-500/40 bg-amber-500/10';
-        digitsColor = 'text-amber-400';
+        stageText = 'ระยะเตือน: เหลือเวลาอีก 30 นาทีก่อนนอน';
+        dotColor = 'bg-amber-400';
+        stageTextColor = 'text-amber-400';
     } else if (stage === 'lockdown') {
-        badgeText = 'STAGE 2: SYSTEM LOCKDOWN (15M)';
-        badgeVariant = 'destructive';
-        badgeClass = 'text-orange-400 border-orange-500/50 bg-orange-500/10 shadow-md shadow-orange-500/20';
-        digitsColor = 'text-orange-400';
+        stageText = 'ระยะล็อคดาวน์: เหลือเวลาอีก 15 นาที';
+        dotColor = 'bg-amber-500';
+        stageTextColor = 'text-amber-400';
     } else if (stage === 'sleep') {
-        badgeText = 'STAGE 3: DEADLINE EXCEEDED // DRAINING HP';
-        badgeVariant = 'destructive';
-        badgeClass = 'text-red-400 border-red-500/60 bg-red-500/20 animate-pulse';
-        digitsColor = 'text-red-500 animate-pulse';
+        stageText = 'เลยเวลานอนแล้ว: กำลังสูญเสียพลังชีวิต';
+        dotColor = 'bg-rose-500 animate-pulse';
+        stageTextColor = 'text-rose-400';
+        digitsColor = 'text-rose-400';
     } else if (stage === 'shutdown') {
-        badgeText = 'STAGE 4: NIGHT SHUTDOWN (HP 0)';
-        badgeVariant = 'outline';
-        badgeClass = 'text-neutral-500 border-neutral-700 bg-neutral-900';
-        digitsColor = 'text-neutral-600';
+        stageText = 'เข้าสู่สภาวะชัตดาวน์ (ปิดระบบ)';
+        dotColor = 'bg-zinc-600';
+        stageTextColor = 'text-zinc-500';
+        digitsColor = 'text-zinc-600';
     }
 
     const isVerifying = Boolean(lastConfirmedAt);
 
     return (
-        <Card className="border-border/60 bg-card/60 backdrop-blur-xl shadow-2xl relative overflow-hidden text-center transition-all duration-500">
-            <CardHeader className="flex flex-col items-center pb-2 pt-6">
-                <Badge variant={badgeVariant} className={`font-mono text-xs px-3.5 py-1 tracking-widest gap-2 uppercase ${badgeClass}`}>
-                    <Clock className="size-3.5" />
-                    {badgeText}
-                </Badge>
-            </CardHeader>
+        <section className="bg-[#121215] rounded-2xl p-6 md:p-8 text-center space-y-6 shadow-sm select-none">
+            {/* Status Indicator (Strictly No Badge) */}
+            <div className="flex items-center justify-center gap-2 text-xs font-normal">
+                <span className={`size-2 rounded-full ${dotColor}`} />
+                <span className={stageTextColor}>{stageText}</span>
+            </div>
 
-            <CardContent className="space-y-6 pt-2 pb-8">
-                {/* Digits Display */}
-                <div className="flex items-center justify-center gap-2 md:gap-5 my-2">
-                    <div className="flex flex-col items-center">
-                        <span className={`text-6xl md:text-8xl font-black font-mono tracking-tight ${digitsColor}`}>
-                            {pad(hours)}
-                        </span>
-                        <span className="text-[10px] font-mono uppercase text-muted-foreground tracking-widest mt-1">
-                            Hours
-                        </span>
-                    </div>
-
-                    <span className={`text-5xl md:text-7xl font-bold font-mono pb-6 ${digitsColor}`}>:</span>
-
-                    <div className="flex flex-col items-center">
-                        <span className={`text-6xl md:text-8xl font-black font-mono tracking-tight ${digitsColor}`}>
-                            {pad(minutes)}
-                        </span>
-                        <span className="text-[10px] font-mono uppercase text-muted-foreground tracking-widest mt-1">
-                            Minutes
-                        </span>
-                    </div>
-
-                    <span className={`text-5xl md:text-7xl font-bold font-mono pb-6 ${digitsColor}`}>:</span>
-
-                    <div className="flex flex-col items-center">
-                        <span className={`text-6xl md:text-8xl font-black font-mono tracking-tight ${digitsColor}`}>
-                            {pad(seconds)}
-                        </span>
-                        <span className="text-[10px] font-mono uppercase text-muted-foreground tracking-widest mt-1">
-                            Seconds
-                        </span>
-                    </div>
+            {/* Countdown Digits (20% Crisp White & High Contrast) */}
+            <div className="flex items-center justify-center gap-3 md:gap-6 my-2">
+                <div className="flex flex-col items-center min-w-[70px] md:min-w-[90px]">
+                    <span className={`text-5xl md:text-7xl font-medium tracking-tight tabular-nums ${digitsColor}`}>
+                        {pad(hours)}
+                    </span>
+                    <span className="text-[11px] text-zinc-500 font-light mt-1">
+                        ชั่วโมง
+                    </span>
                 </div>
 
-                {/* Sub schedule details with shadcn Separator */}
-                <div className="flex justify-center items-center gap-6 text-xs text-muted-foreground font-mono pt-4">
-                    <div>
-                        Target Sleep: <span className="font-bold text-foreground">{sleepTargetTime || '--:--'}</span>
-                    </div>
-                    <Separator orientation="vertical" className="h-4" />
-                    <div>
-                        Target Wake: <span className="font-bold text-foreground">{wakeUpTime || '--:--'}</span>
-                    </div>
+                <span className={`text-4xl md:text-6xl font-light pb-4 ${digitsColor} opacity-40`}>:</span>
+
+                <div className="flex flex-col items-center min-w-[70px] md:min-w-[90px]">
+                    <span className={`text-5xl md:text-7xl font-medium tracking-tight tabular-nums ${digitsColor}`}>
+                        {pad(minutes)}
+                    </span>
+                    <span className="text-[11px] text-zinc-500 font-light mt-1">
+                        นาที
+                    </span>
                 </div>
 
-                {/* Action button using shadcn Button */}
-                <div className="max-w-md mx-auto pt-2">
-                    {isVerifying ? (
-                        <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-mono flex items-center justify-center gap-3">
-                            <Loader2 className="size-4 animate-spin text-amber-400" />
-                            <span>DISCORD PRESENCE VERIFICATION IN PROGRESS (10M)</span>
-                        </div>
-                    ) : (
-                        <Button
-                            size="lg"
-                            onClick={onConfirmSleep}
-                            disabled={stage === 'shutdown'}
-                            variant={stage === 'sleep' ? 'destructive' : 'default'}
-                            className={`w-full py-6 text-base font-mono font-bold tracking-wide transition-all shadow-xl ${
-                                stage === 'sleep'
-                                    ? 'bg-red-600 hover:bg-red-500 text-white animate-bounce'
-                                    : stage === 'lockdown'
-                                      ? 'bg-amber-500 hover:bg-amber-400 text-black font-black'
-                                      : 'bg-primary text-primary-foreground'
-                            }`}
-                        >
-                            <Moon className="size-5 mr-2" />
-                            Confirm Sleep (เข้าสู่นิทรา)
-                        </Button>
-                    )}
+                <span className={`text-4xl md:text-6xl font-light pb-4 ${digitsColor} opacity-40`}>:</span>
+
+                <div className="flex flex-col items-center min-w-[70px] md:min-w-[90px]">
+                    <span className={`text-5xl md:text-7xl font-medium tracking-tight tabular-nums ${digitsColor}`}>
+                        {pad(seconds)}
+                    </span>
+                    <span className="text-[11px] text-zinc-500 font-light mt-1">
+                        วินาที
+                    </span>
                 </div>
-            </CardContent>
-        </Card>
+            </div>
+
+            {/* Target Schedule Details (Subdued, Clean Layout) */}
+            <div className="flex items-center justify-center gap-4 text-xs text-zinc-400 font-light">
+                <span>
+                    เป้าหมายเข้านอน: <span className="text-zinc-200 font-normal">{sleepTargetTime || '--:--'} น.</span>
+                </span>
+                <span className="text-zinc-700">•</span>
+                <span>
+                    เป้าหมายตื่น: <span className="text-zinc-200 font-normal">{wakeUpTime || '--:--'} น.</span>
+                </span>
+            </div>
+
+            {/* Action Trigger (Ergonomic, Perfect Radius, No AI Gimmicks) */}
+            <div className="max-w-xs mx-auto pt-2">
+                {isVerifying ? (
+                    <div className="p-3.5 rounded-lg bg-[#18181b] text-amber-300 text-xs font-normal flex items-center justify-center gap-2.5">
+                        <Loader2 className="size-4 animate-spin text-amber-400" />
+                        <span>กำลังยืนยันสถานะออฟไลน์ผ่าน Discord (10 นาที)</span>
+                    </div>
+                ) : (
+                    <button
+                        onClick={onConfirmSleep}
+                        disabled={stage === 'shutdown'}
+                        className={`w-full h-11 px-6 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 shadow-sm ${
+                            stage === 'sleep'
+                                ? 'bg-rose-500 text-white hover:bg-rose-600'
+                                : stage === 'shutdown'
+                                  ? 'bg-[#18181b] text-zinc-600 cursor-not-allowed'
+                                  : 'bg-white text-zinc-950 hover:bg-zinc-200 active:scale-[0.99]'
+                        }`}
+                    >
+                        <Moon className="size-4" />
+                        <span>ยืนยันการเข้านอน</span>
+                    </button>
+                )}
+            </div>
+        </section>
     );
 };
