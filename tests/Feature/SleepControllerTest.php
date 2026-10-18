@@ -110,3 +110,100 @@ test('discord presence update ignores offline status during verification window'
     expect($user->fresh()->last_sleep_confirmed_at)->not->toBeNull()
         ->and($user->fresh()->current_hp)->toBe(100);
 });
+
+test('going offline during bedtime hours automatically confirms sleep', function () {
+    // Current time is within bedtime hours (e.g. 23:30 with bedtime 23:15, wake 07:00)
+    $now = now()->setTime(23, 30);
+    Carbon\Carbon::setTestNow($now);
+
+    $user = User::factory()->create([
+        'discord_user_id' => 'user_auto_sleep',
+        'sleep_target_time' => '23:15',
+        'wake_up_time' => '07:00',
+        'last_sleep_confirmed_at' => null,
+        'current_hp' => 100,
+    ]);
+
+    $response = $this->postJson('/api/presence/update', [
+        'discord_user_id' => 'user_auto_sleep',
+        'status' => 'offline',
+    ]);
+
+    $response->assertOk()
+        ->assertJson([
+            'penalized' => false,
+            'auto_confirmed' => true,
+            'is_sleeping' => true,
+        ]);
+
+    expect($user->fresh()->last_sleep_confirmed_at)->not->toBeNull();
+
+    Carbon\Carbon::setTestNow();
+});
+
+test('desktop daemon can report screen lock or idle to auto confirm sleep', function () {
+    $now = now()->setTime(23, 00); // 23:00 is within Alert window (T-30m = 22:45)
+    Carbon\Carbon::setTestNow($now);
+
+    $user = User::factory()->create([
+        'sleep_target_time' => '23:15',
+        'wake_up_time' => '07:00',
+        'last_sleep_confirmed_at' => null,
+        'current_hp' => 100,
+    ]);
+
+    $response = $this->postJson('/api/presence/update', [
+        'user_id' => $user->id,
+        'source' => 'desktop_daemon',
+        'status' => 'idle',
+        'screen_locked' => true,
+        'idle_seconds' => 120,
+    ]);
+
+    $response->assertOk()
+        ->assertJson([
+            'penalized' => false,
+            'auto_confirmed' => true,
+            'is_sleeping' => true,
+        ]);
+
+    expect($user->fresh()->last_sleep_confirmed_at)->not->toBeNull();
+
+    Carbon\Carbon::setTestNow();
+});
+
+test('morning wake up time automatically awards survival reward if slept through night', function () {
+    // Night sleep confirmed at 23:15
+    $night = now()->setTime(23, 15);
+    Carbon\Carbon::setTestNow($night);
+
+    $user = User::factory()->create([
+        'sleep_target_time' => '23:15',
+        'wake_up_time' => '07:00',
+        'last_sleep_confirmed_at' => $night,
+        'days_survived' => 3,
+        'level' => 1,
+        'exp' => 100,
+        'current_hp' => 90,
+    ]);
+
+    // Morning at 07:30
+    $morning = now()->addDay()->setTime(7, 30);
+    Carbon\Carbon::setTestNow($morning);
+
+    $response = $this->actingAs($user)->getJson('/sleep/status');
+
+    $response->assertOk()
+        ->assertJson([
+            'days_survived' => 4,
+            'current_hp' => 100,
+            'morning_rewarded' => true,
+        ]);
+
+    expect($user->fresh()->days_survived)->toBe(4)
+        ->and($user->fresh()->current_hp)->toBe(100)
+        ->and($user->fresh()->exp)->toBe(250);
+
+    Carbon\Carbon::setTestNow();
+});
+

@@ -103,4 +103,118 @@ class SleepEngineService
             'last_sleep_confirmed_at' => null,
         ]);
     }
+
+    /**
+     * Determine if current time falls within bedtime / sleep hours (from Alert T-30m until wake up time).
+     */
+    public function isWithinBedtimeHours(User $user, mixed $now = null): bool
+    {
+        $now = $now ? Carbon::parse($now) : now();
+        $wakeUpTime = $user->wake_up_time ?? '07:00';
+        $sleepTarget = $user->sleep_target_time ?? $this->calculateSleepTarget($wakeUpTime);
+
+        $targetCarbon = Carbon::createFromTimeString($sleepTarget);
+        $alertCarbon = $targetCarbon->copy()->subMinutes(30);
+        $wakeCarbon = Carbon::createFromTimeString($wakeUpTime);
+
+        $nowMinutes = $now->hour * 60 + $now->minute;
+        $alertMinutes = $alertCarbon->hour * 60 + $alertCarbon->minute;
+        $wakeMinutes = $wakeCarbon->hour * 60 + $wakeCarbon->minute;
+
+        if ($alertMinutes > $wakeMinutes) {
+            // Crosses midnight (e.g. Alert 22:45 to Wake 07:00)
+            return $nowMinutes >= $alertMinutes || $nowMinutes <= $wakeMinutes;
+        } else {
+            // Same day (e.g. Alert 07:30 to Wake 16:00)
+            return $nowMinutes >= $alertMinutes && $nowMinutes <= $wakeMinutes;
+        }
+    }
+
+    /**
+     * Process presence update from Discord bot or C++ desktop daemon.
+     * Auto-confirms sleep if offline during bedtime hours, or penalizes if caught active.
+     */
+    public function handlePresence(User $user, string $status, string $source = 'discord', array $meta = []): array
+    {
+        $status = strtolower($status);
+        $isOffline = in_array($status, ['offline', 'idle', 'invisible']) ||
+            (!empty($meta['screen_locked'])) ||
+            (isset($meta['idle_seconds']) && $meta['idle_seconds'] >= 60);
+
+        $isOnline = in_array($status, ['online', 'dnd']) ||
+            (!empty($meta['is_active']) && empty($meta['screen_locked']) && (!isset($meta['idle_seconds']) || $meta['idle_seconds'] < 60));
+
+        $inBedtimeHours = $this->isWithinBedtimeHours($user);
+
+        // Verification window check (10 mins after manual or auto confirm)
+        $isInVerifyingWindow = $user->last_sleep_confirmed_at &&
+            $user->last_sleep_confirmed_at->diffInMinutes(now()) <= 10;
+
+        // Case 1: In bedtime hours and user goes offline / locks PC -> Auto-confirm sleep ("ถือว่าผู้ใช้ไปนอนแล้ว")
+        if ($inBedtimeHours && $isOffline) {
+            if (!$user->last_sleep_confirmed_at) {
+                $user->update([
+                    'last_sleep_confirmed_at' => now(),
+                ]);
+
+                return [
+                    'penalized' => false,
+                    'auto_confirmed' => true,
+                    'is_sleeping' => true,
+                    'message' => 'ตรวจพบผู้ใช้ออฟไลน์/ล็อคหน้าจอในช่วงเวลานอน ถือว่าเข้านอนเรียบร้อยแล้ว',
+                    'current_hp' => $user->current_hp,
+                ];
+            }
+
+            return [
+                'penalized' => false,
+                'auto_confirmed' => false,
+                'is_sleeping' => true,
+                'message' => 'ผู้ใช้ยังคงอยู่ในสถานะเข้านอนอย่างปลอดภัย',
+                'current_hp' => $user->current_hp,
+            ];
+        }
+
+        // Case 2: User was marked sleeping, but came back online during sleep hours or verification window (Cheating detected!)
+        if (($inBedtimeHours || $isInVerifyingWindow) && $isOnline && $user->last_sleep_confirmed_at) {
+            $user->update(['last_sleep_confirmed_at' => null]);
+            $this->drainHp($user, 25);
+
+            return [
+                'penalized' => true,
+                'auto_confirmed' => false,
+                'is_sleeping' => false,
+                'message' => 'ตรวจพบผู้ใช้กลับมาออนไลน์หรือใช้งานคอมพิวเตอร์ระหว่างเวลานอน! หัก HP 25 แต้ม',
+                'current_hp' => $user->fresh()->current_hp,
+            ];
+        }
+
+        return [
+            'penalized' => false,
+            'auto_confirmed' => false,
+            'is_sleeping' => (bool)$user->last_sleep_confirmed_at,
+            'message' => 'อัปเดตสถานะ Presence เรียบร้อย',
+            'current_hp' => $user->current_hp,
+        ];
+    }
+
+    /**
+     * Check and reward night survival if user slept through the night and it is now morning.
+     */
+    public function checkMorningReward(User $user, mixed $now = null): bool
+    {
+        $now = $now ? Carbon::parse($now) : now();
+        if (!$user->last_sleep_confirmed_at || $user->is_disabled) {
+            return false;
+        }
+
+        if (!$this->isWithinBedtimeHours($user, $now)) {
+            if ($user->last_sleep_confirmed_at->diffInMinutes($now) >= 60) {
+                $this->rewardSurvival($user);
+                return true;
+            }
+        }
+
+        return false;
+    }
 }

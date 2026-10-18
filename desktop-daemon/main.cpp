@@ -1,19 +1,21 @@
-﻿/**
+/**
  * SleepOrDie Native Windows Desktop Guard Daemon
  * Hardcore Biological Discipline & Night Curfew Enforcer
  *
  * Win32 API Integration:
  * - GetLastInputInfo: Detects keyboard/mouse activity & evasion
  * - Beep / PlaySound: Hardware audio alerts for Alert, Lockdown, Emergency Alarm, Shutdown
- * - LockWorkStation: Instantly locks Windows workstation upon curfew breach
- * - InitiateSystemShutdown: Enforces PC shutdown on 0% HP
+ * - LockWorkStation: Instantly locks Windows workstation (Sign Out) upon Lockdown
+ * - WinHTTP: Native HTTP presence reporting to SleepOrDie Web API
  */
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <shellapi.h>
 #include <mmsystem.h>
+#include <winhttp.h>
 #include <iostream>
+#include <fstream>
 #include <string>
 #include <sstream>
 #include <ctime>
@@ -23,27 +25,79 @@
 #pragma comment(lib, "user32.lib")
 #pragma comment(lib, "shell32.lib")
 #pragma comment(lib, "winmm.lib")
+#pragma comment(lib, "winhttp.lib")
 
 enum class SleepStage {
     Normal,
     Alert,      // T-30m
-    Lockdown,   // T-15m
-    Sleep,      // Deadline Exceeded (HP Draining)
-    Shutdown    // HP 0% (System Power-down / Lock)
+    Lockdown,   // T-15m (Windows Sign Out / Screen Lock)
+    Sleep,      // Deadline Exceeded (HP Draining - 30s emergency)
+    Shutdown    // HP 0% (Disciplinary Shutdown)
 };
 
 struct DaemonConfig {
     int bedtimeHour = 23;
     int bedtimeMinute = 15;
+    std::wstring apiHost = L"127.0.0.1";
+    int apiPort = 8000;
+    std::wstring apiPath = L"/api/presence/update";
+    std::string discordUserId = "";
+    int userId = 1;
     bool enableAudio = true;
-    bool lockOnShutdown = true;
+    bool lockWorkstationOnLockdown = true;
     bool enforcePcPoweroff = false;
+    int idleThresholdSeconds = 60;
+    int checkIntervalSeconds = 2;
     int currentHp = 100;
 };
 
 // Global daemon state
 DaemonConfig config;
 SleepStage currentStage = SleepStage::Normal;
+
+void LoadConfigJson() {
+    std::ifstream file("config.json");
+    if (!file.is_open()) return;
+    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    file.close();
+
+    auto findInt = [&](const std::string& key, int defaultVal) -> int {
+        size_t pos = content.find("\"" + key + "\"");
+        if (pos == std::string::npos) return defaultVal;
+        size_t colon = content.find(":", pos);
+        if (colon == std::string::npos) return defaultVal;
+        size_t start = content.find_first_of("0123456789", colon);
+        if (start == std::string::npos) return defaultVal;
+        try {
+            return std::stoi(content.substr(start));
+        } catch (...) {
+            return defaultVal;
+        }
+    };
+
+    auto findString = [&](const std::string& key, const std::string& defaultVal) -> std::string {
+        size_t pos = content.find("\"" + key + "\"");
+        if (pos == std::string::npos) return defaultVal;
+        size_t colon = content.find(":", pos);
+        if (colon == std::string::npos) return defaultVal;
+        size_t firstQuote = content.find("\"", colon);
+        if (firstQuote == std::string::npos) return defaultVal;
+        size_t secondQuote = content.find("\"", firstQuote + 1);
+        if (secondQuote == std::string::npos) return defaultVal;
+        return content.substr(firstQuote + 1, secondQuote - firstQuote - 1);
+    };
+
+    config.bedtimeHour = findInt("bedtime_hour", config.bedtimeHour);
+    config.bedtimeMinute = findInt("bedtime_minute", config.bedtimeMinute);
+    config.userId = findInt("user_id", config.userId);
+    config.discordUserId = findString("discord_user_id", config.discordUserId);
+    config.idleThresholdSeconds = findInt("idle_threshold_seconds", config.idleThresholdSeconds);
+    config.checkIntervalSeconds = findInt("check_interval_seconds", config.checkIntervalSeconds);
+
+    if (content.find("\"lock_workstation_on_lockdown\": false") != std::string::npos) {
+        config.lockWorkstationOnLockdown = false;
+    }
+}
 
 /**
  * Returns seconds since last user input (keyboard or mouse)
@@ -135,6 +189,59 @@ void PrintConsoleUnicode(const std::wstring& text) {
 }
 
 /**
+ * Native HTTP presence reporting to SleepOrDie API via WinHTTP
+ */
+bool SendPresenceHttp(const std::wstring& host, int port, const std::wstring& path, const std::string& jsonPayload) {
+    HINTERNET hSession = WinHttpOpen(L"SleepOrDieGuard/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+    if (!hSession) return false;
+
+    HINTERNET hConnect = WinHttpConnect(hSession, host.c_str(), (INTERNET_PORT)port, 0);
+    if (!hConnect) {
+        WinHttpCloseHandle(hSession);
+        return false;
+    }
+
+    HINTERNET hRequest = WinHttpOpenRequest(hConnect, L"POST", path.c_str(), NULL, WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES, 0);
+    if (!hRequest) {
+        WinHttpCloseHandle(hConnect);
+        WinHttpCloseHandle(hSession);
+        return false;
+    }
+
+    std::wstring headers = L"Content-Type: application/json\r\nAccept: application/json\r\n";
+    BOOL bResults = WinHttpSendRequest(
+        hRequest,
+        headers.c_str(), (DWORD)headers.length(),
+        (LPVOID)jsonPayload.c_str(), (DWORD)jsonPayload.length(),
+        (DWORD)jsonPayload.length(), 0
+    );
+
+    if (bResults) {
+        bResults = WinHttpReceiveResponse(hRequest, NULL);
+    }
+
+    WinHttpCloseHandle(hRequest);
+    WinHttpCloseHandle(hConnect);
+    WinHttpCloseHandle(hSession);
+    return bResults == TRUE;
+}
+
+void ReportPresence(const std::string& status, int idleSeconds, bool screenLocked) {
+    std::string json = "{\"source\":\"desktop_daemon\",\"status\":\"" + status + "\",\"idle_seconds\":" + std::to_string(idleSeconds) + ",\"screen_locked\":" + (screenLocked ? "true" : "false");
+    if (!config.discordUserId.empty()) {
+        json += ",\"discord_user_id\":\"" + config.discordUserId + "\"";
+    }
+    if (config.userId > 0) {
+        json += ",\"user_id\":" + std::to_string(config.userId);
+    }
+    json += "}";
+
+    std::thread([json]() {
+        SendPresenceHttp(config.apiHost, config.apiPort, config.apiPath, json);
+    }).detach();
+}
+
+/**
  * Native Windows Toast / Message Alert (Async non-blocking popup)
  */
 void ShowWindowsAlert(const std::wstring& title, const std::wstring& message, UINT iconType) {
@@ -171,6 +278,8 @@ void ExecuteEnforcement() {
     PrintConsoleUnicode(L">>> [0% HP: SYSTEM SHUTDOWN ENFORCED (TEST MODE: MSGBOX)] <<<\n");
     PrintConsoleUnicode(L"=======================================================\n");
     PlaySoundForStage(SleepStage::Shutdown);
+
+    ReportPresence("shutdown", 0, true);
 
     // Using Windows MessageBox for test mode as requested (instead of locking or turning off PC)
     MessageBoxW(
@@ -221,12 +330,15 @@ int main(int argc, char* argv[]) {
     SetConsoleOutputCP(CP_UTF8);
     SetConsoleCP(CP_UTF8);
 
+    LoadConfigJson();
+
     std::cout << "============================================================\n";
     std::cout << "       SLEEP OR DIE - NATIVE WINDOWS DESKTOP GUARD          \n";
     std::cout << "    Hardcore Biological Discipline & Night Curfew Enforcer  \n";
     std::cout << "============================================================\n";
     std::cout << " Target Bedtime: " << config.bedtimeHour << ":" << (config.bedtimeMinute < 10 ? "0" : "") << config.bedtimeMinute << "\n";
     std::cout << " Emergency Window: 30 seconds before HP runs out (100% -> 0%)\n";
+    std::cout << " Lockdown Action: Windows Sign Out / LockWorkStation at T-15m\n";
     std::cout << " Monitoring active user presence via Win32 API...\n";
     std::cout << " Type 'SleepOrDieGuard.exe --test' to simulate 3-2-1 bedtime deadline.\n";
     std::cout << "------------------------------------------------------------\n\n";
@@ -236,6 +348,7 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
+    int tickCount = 0;
     bool running = true;
     while (running) {
         long secondsRemaining = GetSecondsUntilBedtime(config.bedtimeHour, config.bedtimeMinute);
@@ -252,17 +365,37 @@ int main(int argc, char* argv[]) {
             newStage = SleepStage::Normal;
         }
 
-        // Stage transition alerts
+        // Stage transition alerts & physical enforcement
         if (newStage != currentStage) {
             currentStage = newStage;
             PlaySoundForStage(currentStage);
 
             if (currentStage == SleepStage::Alert) {
                 ShowWindowsAlert(L"SleepOrDie เตือนเวลานอน", L"เหลือเวลา 30 นาทีก่อนถึงเส้นตาย เริ่มวางงานและพักสายตา", MB_ICONINFORMATION);
+                ReportPresence("idle", (int)idleSeconds, false);
             } else if (currentStage == SleepStage::Lockdown) {
-                ShowWindowsAlert(L"SleepOrDie ล็อคดาวน์", L"เหลือเวลา 15 นาทีสุดท้าย! ปิดหน้าจอคอมพิวเตอร์ทันที", MB_ICONWARNING);
+                ShowWindowsAlert(L"SleepOrDie ล็อคดาวน์ (Windows Sign Out)", L"เหลือเวลา 15 นาทีสุดท้าย! กำลังล็อคหน้าจอเพื่อให้ออกจากระบบทันที", MB_ICONWARNING);
+                if (config.lockWorkstationOnLockdown) {
+                    PrintConsoleUnicode(L"[LOCKDOWN ENFORCED] Windows Sign Out / LockWorkStation initiated!\n");
+                    LockWorkStation(); // Native Windows Sign Out / Lock screen!
+                }
+                ReportPresence("offline", 900, true);
             } else if (currentStage == SleepStage::Sleep) {
-                ShowWindowsAlert(L"SleepOrDie เลยเวลานอน", L"เลยเส้นตายแล้ว! มีเวลา 30 วินาทีก่อน HP หมดและเครื่องจะถูกล็อค", MB_ICONERROR);
+                ShowWindowsAlert(L"SleepOrDie เลยเวลานอน", L"เลยเส้นตายแล้ว! มีเวลา 30 วินาทีก่อน HP หมดและเครื่องจะถูกปิดระบบ", MB_ICONERROR);
+                ReportPresence("online", (int)idleSeconds, false);
+            }
+        }
+
+        // Periodic presence heartbeat: detect if user complies and leaves PC (auto-confirms sleep)
+        if (++tickCount % 5 == 0) {
+            if (currentStage == SleepStage::Alert || currentStage == SleepStage::Lockdown || currentStage == SleepStage::Sleep) {
+                if (idleSeconds >= (DWORD)config.idleThresholdSeconds) {
+                    // User has not touched mouse/keyboard -> considered sleeping!
+                    ReportPresence("offline", (int)idleSeconds, currentStage == SleepStage::Lockdown);
+                } else if (idleSeconds < 10) {
+                    // User is actively evading and typing
+                    ReportPresence("online", (int)idleSeconds, false);
+                }
             }
         }
 
@@ -282,8 +415,8 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        // Sleep for 1 second before next tick
-        Sleep(1000);
+        // Sleep for checkIntervalSeconds
+        Sleep(config.checkIntervalSeconds * 1000);
     }
 
     return 0;

@@ -56,7 +56,9 @@ client.on('presenceUpdate', async (oldPresence, newPresence) => {
         if (statusCode === 200) {
             const data = JSON.parse(responseText);
             if (data.penalized) {
-                console.warn(`[PENALTY TRIGGERED] User ${userId} was penalized for activity during sleep window! HP: ${data.current_hp}`);
+                console.warn(`[PENALTY TRIGGERED] User ${userId} was active during sleep window! HP: ${data.current_hp}`);
+            } else if (data.auto_confirmed) {
+                console.log(`[SLEEP AUTO-CONFIRMED] User ${userId} went offline/idle during sleep window - Sleep confirmed!`);
             }
         }
     } catch (err) {

@@ -81,6 +81,21 @@ export default function Dashboard() {
         }
 
         fetchStatus();
+
+        const handleFocus = () => {
+            fetchStatus();
+        };
+
+        const pollTimer = setInterval(() => {
+            fetchStatus();
+        }, 15000);
+
+        window.addEventListener('focus', handleFocus);
+
+        return () => {
+            window.removeEventListener('focus', handleFocus);
+            clearInterval(pollTimer);
+        };
     }, [auth?.user?.id]);
 
     useEffect(() => {

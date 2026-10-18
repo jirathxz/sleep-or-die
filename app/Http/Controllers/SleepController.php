@@ -89,6 +89,14 @@ class SleepController extends Controller
     {
         $user = $request->user();
 
+        // Check if user survived the night and award morning reward
+        $rewarded = $this->sleepEngine->checkMorningReward($user);
+        if ($rewarded) {
+            $user->refresh();
+        }
+
+        $inBedtimeHours = $this->sleepEngine->isWithinBedtimeHours($user);
+
         return response()->json([
             'current_hp' => $user->current_hp,
             'sleep_target_time' => $user->sleep_target_time,
@@ -100,39 +108,51 @@ class SleepController extends Controller
             'tickets_count' => $user->tickets_count,
             'is_disabled' => $user->is_disabled,
             'last_sleep_confirmed_at' => $user->last_sleep_confirmed_at,
+            'is_sleeping' => !empty($user->last_sleep_confirmed_at),
+            'is_within_bedtime_hours' => $inBedtimeHours,
+            'morning_rewarded' => $rewarded,
         ]);
     }
 
     public function handlePresenceUpdate(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'discord_user_id' => ['required', 'string'],
+            'discord_user_id' => ['nullable', 'string'],
+            'user_id' => ['nullable', 'integer'],
+            'email' => ['nullable', 'string'],
             'status' => ['required', 'string'],
+            'source' => ['nullable', 'string'],
+            'idle_seconds' => ['nullable', 'numeric'],
+            'screen_locked' => ['nullable', 'boolean'],
+            'is_active' => ['nullable', 'boolean'],
         ]);
 
-        $user = User::where('discord_user_id', $validated['discord_user_id'])->first();
+        $user = null;
+        if (!empty($validated['discord_user_id'])) {
+            $user = User::where('discord_user_id', $validated['discord_user_id'])->first();
+        } elseif (!empty($validated['user_id'])) {
+            $user = User::find($validated['user_id']);
+        } elseif (!empty($validated['email'])) {
+            $user = User::where('email', $validated['email'])->first();
+        }
+
+        if (!$user && $request->user()) {
+            $user = $request->user();
+        }
 
         if (! $user) {
             return response()->json(['message' => 'User not found'], 404);
         }
 
-        $isInVerifyingWindow = $user->last_sleep_confirmed_at &&
-            $user->last_sleep_confirmed_at->diffInMinutes(now()) <= 10;
+        $source = $validated['source'] ?? 'discord';
+        $meta = [
+            'idle_seconds' => $validated['idle_seconds'] ?? null,
+            'screen_locked' => $validated['screen_locked'] ?? false,
+            'is_active' => $validated['is_active'] ?? null,
+        ];
 
-        if ($isInVerifyingWindow && in_array($validated['status'], ['online', 'dnd'])) {
-            $user->update(['last_sleep_confirmed_at' => null]);
-            $this->sleepEngine->drainHp($user, 25);
+        $result = $this->sleepEngine->handlePresence($user, $validated['status'], $source, $meta);
 
-            return response()->json([
-                'penalized' => true,
-                'message' => 'Target detected active during sleep verification window. HP penalized.',
-                'current_hp' => $user->fresh()->current_hp,
-            ]);
-        }
-
-        return response()->json([
-            'penalized' => false,
-            'message' => 'Target status received.',
-        ]);
+        return response()->json($result);
     }
 }

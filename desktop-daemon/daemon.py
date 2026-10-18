@@ -46,6 +46,41 @@ def lock_workstation():
     print("\n[LOCKOUT] Locking Windows Workstation immediately...")
     user32.LockWorkStation()
 
+def report_presence(status: str, idle_seconds: float, screen_locked: bool, config: dict):
+    """Sends presence telemetry to SleepOrDie API."""
+    import urllib.request
+    import threading
+
+    payload = {
+        "source": "desktop_daemon",
+        "status": status,
+        "idle_seconds": int(idle_seconds),
+        "screen_locked": screen_locked,
+    }
+    if config.get("discord_user_id"):
+        payload["discord_user_id"] = config["discord_user_id"]
+    if config.get("user_id"):
+        payload["user_id"] = config["user_id"]
+
+    def _send():
+        try:
+            req = urllib.request.Request(
+                config.get("api_url", "http://127.0.0.1:8000/api/presence/update"),
+                data=json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "application/json", "Accept": "application/json"},
+                method="POST"
+            )
+            with urllib.request.urlopen(req, timeout=3) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                if data.get("penalized"):
+                    print(f" >>> [PENALTY] Caught online during sleep! Current HP: {data.get('current_hp')}")
+                elif data.get("auto_confirmed"):
+                    print(" >>> [AUTO SLEEP CONFIRMED] User is offline/locked - Sleep recorded!")
+        except Exception:
+            pass
+
+    threading.Thread(target=_send, daemon=True).start()
+
 def play_stage_sound(stage: str):
     """Generates stage-specific audio cues using Windows Beep."""
     try:
@@ -200,10 +235,22 @@ def main():
 
                 if current_stage == "alert":
                     print("[ALERT - T-30m] เหลือเวลา 30 นาที! เริ่มปิดงานและพักสายตา")
+                    report_presence("idle", idle_seconds, False, config)
                 elif current_stage == "lockdown":
-                    print("[LOCKDOWN - T-15m] เหลือเวลา 15 นาที! บันทึกงานและปิดเครื่องทันที")
+                    print("[LOCKDOWN - T-15m] เหลือเวลา 15 นาที! กำลังล็อคหน้าจอเพื่อให้ออกจากระบบทันที")
+                    if config.get("lock_workstation_on_lockdown", True):
+                        lock_workstation()
+                    report_presence("offline", 900, True, config)
                 elif current_stage == "sleep":
-                    print("[SLEEP - DEADLINE] เลยเวลานอนแล้ว! มีเวลา 30 วินาทีก่อน HP หมดและเครื่องจะถูกล็อค")
+                    print("[SLEEP - DEADLINE] เลยเวลานอนแล้ว! มีเวลา 30 วินาทีก่อน HP หมดและเครื่องจะถูกปิดระบบ")
+                    report_presence("online", idle_seconds, False, config)
+
+            # Heartbeat check: detect if user complies and leaves PC during sleep hours
+            if current_stage in ["alert", "lockdown", "sleep"]:
+                if idle_seconds >= config.get("idle_threshold_seconds", 60):
+                    report_presence("offline", idle_seconds, current_stage == "lockdown", config)
+                elif idle_seconds < 10:
+                    report_presence("online", idle_seconds, False, config)
 
             # Bedtime curfew breached: 30 seconds emergency countdown before HP hits 0%
             if current_stage == "sleep":

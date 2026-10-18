@@ -38,7 +38,14 @@ export const CountdownDisplay: React.FC<CountdownDisplayProps> = ({
     let stageTextColor = 'text-zinc-400';
     let digitsColor = 'text-white';
 
-    if (simulationActive && !isPastDeadline) {
+    const isVerifying = Boolean(lastConfirmedAt);
+
+    if (isVerifying) {
+        stageText = 'อยู่ในสถานะเข้านอนแล้ว (หากไม่ออนไลน์ระหว่างเวลานอน ถือว่านอนสำเร็จ)';
+        dotColor = 'bg-emerald-400 animate-pulse';
+        stageTextColor = 'text-emerald-400';
+        digitsColor = 'text-emerald-400';
+    } else if (simulationActive && !isPastDeadline) {
         stageText = `โหมดจำลอง: นับถอยหลังสู่เวลานอน (${seconds} วิ)`;
         dotColor = 'bg-amber-400 animate-ping';
         stageTextColor = 'text-amber-400';
@@ -48,7 +55,7 @@ export const CountdownDisplay: React.FC<CountdownDisplayProps> = ({
         dotColor = 'bg-amber-400';
         stageTextColor = 'text-amber-400';
     } else if (stage === 'lockdown') {
-        stageText = 'ระยะล็อคดาวน์: เหลือเวลาอีก 15 นาที';
+        stageText = 'ระยะล็อคดาวน์: เหลือเวลาอีก 15 นาที (กำลังบังคับ Windows Sign Out)';
         dotColor = 'bg-amber-500';
         stageTextColor = 'text-amber-400';
     } else if (stage === 'sleep') {
@@ -62,8 +69,6 @@ export const CountdownDisplay: React.FC<CountdownDisplayProps> = ({
         stageTextColor = 'text-zinc-500';
         digitsColor = 'text-zinc-600';
     }
-
-    const isVerifying = Boolean(lastConfirmedAt);
 
     return (
         <section className="bg-[#121215] rounded-2xl p-6 md:p-8 text-center space-y-6 shadow-sm select-none">
@@ -126,9 +131,9 @@ export const CountdownDisplay: React.FC<CountdownDisplayProps> = ({
                     </div>
                 )}
                 {isVerifying ? (
-                    <div className="p-3.5 rounded-lg bg-[#18181b] text-amber-300 text-xs font-normal flex items-center justify-center gap-2.5">
-                        <Loader2 className="size-4 animate-spin text-amber-400" />
-                        <span>กำลังยืนยันสถานะออฟไลน์ผ่าน Discord (10 นาที)</span>
+                    <div className="p-3.5 rounded-lg bg-[#18181b] text-emerald-300 text-xs font-normal flex items-center justify-center gap-2.5">
+                        <Moon className="size-4 text-emerald-400" />
+                        <span>อยู่ในสถานะนอน (ตรวจจับออฟไลน์ผ่าน Discord / C++ Guard)</span>
                     </div>
                 ) : (
                     <button
