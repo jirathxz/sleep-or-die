@@ -13,6 +13,8 @@ export interface SleepState {
     is_disabled: boolean;
     discord_user_id: string | null;
     last_sleep_confirmed_at: string | null;
+    level: number;
+    exp: number;
 
     // Derived timer values
     stage: SleepStage;
@@ -127,6 +129,8 @@ export const useSleepStore = create<SleepState>((set, get) => ({
     is_disabled: false,
     discord_user_id: null,
     last_sleep_confirmed_at: null,
+    level: 1,
+    exp: 150,
 
     stage: 'normal',
     totalSecondsRemaining: 86400,
@@ -378,8 +382,20 @@ export const useSleepStore = create<SleepState>((set, get) => ({
             }
 
             // Local fallback for guest
+            const { level, exp } = get();
+            let newExp = (exp || 0) + 150;
+            let currentLvl = level || 1;
+            let threshold = currentLvl * 500;
+            while (newExp >= threshold) {
+                newExp -= threshold;
+                currentLvl += 1;
+                threshold = currentLvl * 500;
+            }
+
             get().syncUser({
                 last_sleep_confirmed_at: new Date().toISOString(),
+                level: currentLvl,
+                exp: newExp,
             });
             return true;
         } catch {

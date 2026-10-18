@@ -4,11 +4,11 @@ import { Activity, ShieldAlert, Award, Zap, Skull } from 'lucide-react';
 import { useSleepStore } from '@/stores/useSleepStore';
 
 export default function Progression() {
-    const { current_hp, shutdown_stacks, days_survived } = useSleepStore();
+    const { current_hp, shutdown_stacks, days_survived, level, exp } = useSleepStore();
 
-    const currentLevel = Math.floor(days_survived / 7) + 1;
-    const currentExp = (days_survived % 7) * 150;
-    const nextLevelExp = 7 * 150;
+    const currentLevel = Math.max(1, level || 1);
+    const currentExp = Math.max(0, exp || 0);
+    const nextLevelExp = currentLevel * 500;
     const expPercentage = Math.min(100, Math.round((currentExp / nextLevelExp) * 100));
 
     return (

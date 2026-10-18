@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { Head, usePage } from '@inertiajs/react';
 import { CountdownDisplay } from '@/components/Sleep/CountdownDisplay';
 import { HpBar } from '@/components/Sleep/HpBar';
+import { LevelExpBar } from '@/components/Sleep/LevelExpBar';
 import { StageOverlay } from '@/components/Sleep/StageOverlay';
 import { StatsBadge } from '@/components/Sleep/StatsBadge';
 import { TombstoneScreen } from '@/components/Sleep/TombstoneScreen';
@@ -20,6 +21,8 @@ interface PageProps {
             sleep_target_time?: string | null;
             shutdown_stacks?: number;
             days_survived?: number;
+            level?: number;
+            exp?: number;
             tickets_count?: number;
             is_disabled?: boolean;
             discord_user_id?: string | null;
@@ -38,6 +41,8 @@ export default function Dashboard() {
         sleep_target_time,
         shutdown_stacks,
         days_survived,
+        level,
+        exp,
         tickets_count,
         is_disabled,
         last_sleep_confirmed_at,
@@ -122,7 +127,10 @@ export default function Dashboard() {
                 {/* 1. Vitality Matrix HP Bar (100% Health Status) */}
                 <HpBar hp={current_hp} stage={stage} />
 
-                {/* 2. Countdown Display & Primary Sleep Action + 3-2-1 Test Simulation */}
+                {/* 2. Level & EXP Progression Progress Bar */}
+                <LevelExpBar level={level} exp={exp} />
+
+                {/* 3. Countdown Display & Primary Sleep Action + 3-2-1 Test Simulation */}
                 <CountdownDisplay
                     hours={hoursRemaining}
                     minutes={minutesRemaining}

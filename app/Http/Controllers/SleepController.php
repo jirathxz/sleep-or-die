@@ -40,13 +40,29 @@ class SleepController extends Controller
     public function confirmSleep(Request $request): JsonResponse
     {
         $user = $request->user();
+
+        $newExp = ($user->exp ?? 0) + 150;
+        $level = $user->level ?? 1;
+        $expThreshold = $level * 500;
+
+        while ($newExp >= $expThreshold) {
+            $newExp -= $expThreshold;
+            $level += 1;
+            $expThreshold = $level * 500;
+        }
+
         $user->update([
             'last_sleep_confirmed_at' => now(),
+            'exp' => $newExp,
+            'level' => $level,
         ]);
 
         return response()->json([
             'message' => 'Sleep confirmed. Entering verification window.',
             'last_sleep_confirmed_at' => $user->last_sleep_confirmed_at,
+            'level' => $user->level,
+            'exp' => $user->exp,
+            'exp_gained' => 150,
         ]);
     }
 
@@ -79,6 +95,8 @@ class SleepController extends Controller
             'wake_up_time' => $user->wake_up_time,
             'shutdown_stacks' => $user->shutdown_stacks,
             'days_survived' => $user->days_survived,
+            'level' => $user->level ?? 1,
+            'exp' => $user->exp ?? 0,
             'tickets_count' => $user->tickets_count,
             'is_disabled' => $user->is_disabled,
             'last_sleep_confirmed_at' => $user->last_sleep_confirmed_at,

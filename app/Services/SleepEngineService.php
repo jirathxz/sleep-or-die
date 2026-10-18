@@ -83,11 +83,23 @@ class SleepEngineService
             $stacks = max(0, $stacks - 1);
         }
 
+        $newExp = ($user->exp ?? 0) + 150;
+        $level = $user->level ?? 1;
+        $expThreshold = $level * 500;
+
+        while ($newExp >= $expThreshold) {
+            $newExp -= $expThreshold;
+            $level += 1;
+            $expThreshold = $level * 500;
+        }
+
         $user->update([
             'days_survived' => $days,
             'tickets_count' => $tickets,
             'shutdown_stacks' => $stacks,
             'current_hp' => 100,
+            'level' => $level,
+            'exp' => $newExp,
             'last_sleep_confirmed_at' => null,
         ]);
     }

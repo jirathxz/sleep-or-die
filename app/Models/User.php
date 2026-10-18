@@ -33,6 +33,8 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
     'current_hp',
     'shutdown_stacks',
     'days_survived',
+    'level',
+    'exp',
     'tickets_count',
     'is_disabled',
     'discord_user_id',
@@ -53,6 +55,8 @@ class User extends Authenticatable
         'current_hp' => 100,
         'shutdown_stacks' => 0,
         'days_survived' => 0,
+        'level' => 1,
+        'exp' => 0,
         'tickets_count' => 0,
         'is_disabled' => false,
     ];
