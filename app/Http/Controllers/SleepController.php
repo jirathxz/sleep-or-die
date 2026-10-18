@@ -120,6 +120,29 @@ class SleepController extends Controller
         ]);
     }
 
+    public function useRation(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        if (! $user) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $newHp = min(100, ($user->current_hp ?? 100) + 30);
+        $newTickets = ($user->tickets_count ?? 0) + 1;
+
+        $user->update([
+            'current_hp' => $newHp,
+            'tickets_count' => $newTickets,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'current_hp' => $user->fresh()->current_hp,
+            'tickets_count' => $user->fresh()->tickets_count,
+            'message' => 'ใช้ Ration: ฟื้นฟู HP +30% และได้รับตั๋วฉุกเฉิน +1 ใบ',
+        ]);
+    }
+
     public function status(Request $request): JsonResponse
     {
         $user = $request->user();

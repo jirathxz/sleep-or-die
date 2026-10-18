@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from '@/lib/i18n';
 
 interface LevelExpBarProps {
     level: number;
@@ -6,6 +7,7 @@ interface LevelExpBarProps {
 }
 
 export const LevelExpBar: React.FC<LevelExpBarProps> = ({ level, exp }) => {
+    const { t } = useTranslation();
     const currentLevel = Math.max(1, level || 1);
     const currentExp = Math.max(0, exp || 0);
     const expThreshold = currentLevel * 500;
@@ -13,15 +15,15 @@ export const LevelExpBar: React.FC<LevelExpBarProps> = ({ level, exp }) => {
     const remainingExp = Math.max(0, expThreshold - currentExp);
 
     // Dynamic discipline titles based on level
-    let disciplineTitle = 'มือใหม่หัดนอน';
+    let disciplineTitle = t('discipline_1');
     if (currentLevel >= 5) {
-        disciplineTitle = 'เทพแห่งการพักผ่อน';
+        disciplineTitle = t('discipline_5');
     } else if (currentLevel >= 4) {
-        disciplineTitle = 'ปรมาจารย์วินัยนิทรา';
+        disciplineTitle = t('discipline_4');
     } else if (currentLevel >= 3) {
-        disciplineTitle = 'ผู้เชี่ยวชาญการฟื้นฟู';
+        disciplineTitle = t('discipline_3');
     } else if (currentLevel >= 2) {
-        disciplineTitle = 'ผู้ควบคุมวงจรสลีป';
+        disciplineTitle = t('discipline_2');
     }
 
     return (
@@ -31,7 +33,7 @@ export const LevelExpBar: React.FC<LevelExpBarProps> = ({ level, exp }) => {
                 <div className="flex items-center gap-2 min-w-0">
                     <span className="size-2 rounded-full bg-cyan-400 shrink-0" />
                     <span className="font-semibold text-white text-sm tracking-tight tabular-nums">
-                        เลเวล {currentLevel}
+                        {t('level_label')} {currentLevel}
                     </span>
                     <span className="text-zinc-600 font-light">•</span>
                     <span className="text-cyan-400 font-normal truncate">

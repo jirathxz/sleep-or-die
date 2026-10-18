@@ -13,6 +13,8 @@ Route::inertia('history', 'history')->name('history');
 
 // Progression & Gamification Modules (PROGRESSION)
 Route::inertia('progression', 'progression')->name('progression');
+Route::inertia('inventory', 'inventory')->name('inventory');
+Route::inertia('market', 'market')->name('market');
 Route::inertia('quests', 'quests')->name('quests');
 Route::inertia('analytics', 'analytics')->name('analytics');
 
@@ -27,6 +29,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('settings', [SleepController::class, 'saveSettings'])->name('settings');
         Route::post('confirm', [SleepController::class, 'confirmSleep'])->name('confirm');
         Route::post('ticket', [SleepController::class, 'useTicket'])->name('ticket');
+        Route::post('use-ration', [SleepController::class, 'useRation'])->name('use-ration');
         Route::get('status', [SleepController::class, 'status'])->name('status');
         Route::post('test-discord', [SleepController::class, 'testDiscord'])->name('test-discord');
         Route::post('test-alert', [SleepController::class, 'testAlert'])->name('test-alert');

@@ -3,31 +3,34 @@ import { Link, usePage } from '@inertiajs/react';
 import { LayoutGrid, BellRing, Calendar, History, Menu } from 'lucide-react';
 import { useSidebar } from '@/components/ui/sidebar';
 
+import { useTranslation } from '@/lib/i18n';
+
 export function BottomNavigation() {
     const { url } = usePage();
     const { setOpenMobile } = useSidebar();
+    const { t } = useTranslation();
 
     const navItems = [
         {
-            title: 'แผงควบคุม',
+            key: 'nav_dashboard',
             href: '/dashboard',
             match: ['/', '/dashboard'],
             icon: LayoutGrid,
         },
         {
-            title: 'แจ้งเตือนนอน',
+            key: 'nav_alarms',
             href: '/alarms',
             match: ['/alarms', '/bedtime-alerts'],
             icon: BellRing,
         },
         {
-            title: 'ตารางการนอน',
+            key: 'nav_schedule',
             href: '/schedule',
             match: ['/schedule'],
             icon: Calendar,
         },
         {
-            title: 'ประวัติ',
+            key: 'nav_history',
             href: '/history',
             match: ['/history'],
             icon: History,
@@ -43,6 +46,7 @@ export function BottomNavigation() {
             {navItems.map((item) => {
                 const active = isCurrent(item.match);
                 const Icon = item.icon;
+                const title = t(item.key);
                 return (
                     <Link
                         key={item.href}
@@ -52,7 +56,7 @@ export function BottomNavigation() {
                         }`}
                     >
                         <Icon className={`size-5 ${active ? 'text-white' : 'text-zinc-500'}`} />
-                        <span className="text-[10px] tracking-tight">{item.title}</span>
+                        <span className="text-[10px] tracking-tight">{title}</span>
                     </Link>
                 );
             })}

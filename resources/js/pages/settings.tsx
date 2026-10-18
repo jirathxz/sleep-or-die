@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Head, usePage, router } from '@inertiajs/react';
-import { Sliders, Volume2, VolumeX, Moon, Shield, User, Key, Bell, Check, Loader2, Bot, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Sliders, Volume2, VolumeX, Moon, Shield, User, Key, Bell, Check, Loader2, Bot, AlertCircle, CheckCircle2, Languages } from 'lucide-react';
 import { useSleepStore } from '@/stores/useSleepStore';
 
 export default function SettingsPage() {
@@ -23,6 +23,17 @@ export default function SettingsPage() {
     const [showToken, setShowToken] = useState(false);
     const [savedSuccess, setSavedSuccess] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [languageMode, setLanguageMode] = useState<string>(() => {
+        return typeof window !== 'undefined' ? localStorage.getItem('sleep_language_mode') || 'normal' : 'normal';
+    });
+
+    const handleLanguageChange = (mode: 'normal' | 'tactical') => {
+        setLanguageMode(mode);
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('sleep_language_mode', mode);
+            window.dispatchEvent(new Event('sleep_language_mode_changed'));
+        }
+    };
 
     // Discord test state
     const [testingDiscord, setTestingDiscord] = useState(false);
@@ -247,6 +258,70 @@ export default function SettingsPage() {
                             {audioEnabled ? <Volume2 className="size-3.5" /> : <VolumeX className="size-3.5" />}
                             <span>{audioEnabled ? 'เปิดใช้งานอยู่' : 'ปิดเสียง'}</span>
                         </button>
+                    </div>
+                </div>
+
+                {/* Section 2.5: Language & Display Mode */}
+                <div className="bg-[#121215] rounded-2xl p-5 md:p-6 space-y-4 shadow-sm">
+                    <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-white flex items-center gap-2">
+                            <Languages className="size-4 text-zinc-400" />
+                            โหมดภาษาและการแสดงผล
+                        </span>
+                        <span className="text-[11px] font-mono text-zinc-500">
+                            {languageMode === 'tactical' ? '[ TACTICAL ACTIVE ]' : '[ STANDARD ]'}
+                        </span>
+                    </div>
+
+                    <div className="bg-[#18181b] rounded-xl p-4 space-y-3">
+                        <div className="space-y-0.5">
+                            <span className="font-normal text-white text-xs">สไตล์การใช้คำในระบบ</span>
+                            <p className="text-[11px] text-zinc-500 font-light">
+                                เลือกระหว่างภาษาปกติเข้าใจง่าย หรือโหมดชายขายโลกแบบ Tactical HUD
+                            </p>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                            <button
+                                type="button"
+                                onClick={() => handleLanguageChange('normal')}
+                                className={`p-3.5 rounded-xl border text-left transition-all ${
+                                    languageMode === 'normal'
+                                        ? 'bg-zinc-800/80 border-emerald-500/50 text-white ring-1 ring-emerald-500/30'
+                                        : 'bg-[#121215] border-white/5 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40'
+                                }`}
+                            >
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-medium text-white">ภาษาไทย (คนปกติ)</span>
+                                    {languageMode === 'normal' && (
+                                        <Check className="size-3.5 text-emerald-400" />
+                                    )}
+                                </div>
+                                <p className="text-[11px] text-zinc-500 font-light mt-1">
+                                    ภาษาทางการ ชัดเจน อ่านง่าย ไม่ซับซ้อน (ภาษาไทย 100%)
+                                </p>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => handleLanguageChange('tactical')}
+                                className={`p-3.5 rounded-xl border text-left transition-all font-mono ${
+                                    languageMode === 'tactical'
+                                        ? 'bg-zinc-800/80 border-emerald-500/50 text-white ring-1 ring-emerald-500/30'
+                                        : 'bg-[#121215] border-white/5 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40'
+                                }`}
+                            >
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-medium text-emerald-400">TACTICAL HUD (ชายขายโลก)</span>
+                                    {languageMode === 'tactical' && (
+                                        <Check className="size-3.5 text-emerald-400" />
+                                    )}
+                                </div>
+                                <p className="text-[11px] text-zinc-500 font-light mt-1 font-sans">
+                                    Full Tactical Military HUD Interface (English 100%)
+                                </p>
+                            </button>
+                        </div>
                     </div>
                 </div>
 

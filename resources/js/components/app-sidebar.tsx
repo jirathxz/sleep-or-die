@@ -7,6 +7,8 @@ import {
     Calendar,
     History,
     Activity,
+    Briefcase,
+    Store,
     Trophy,
     BarChart3,
     Sliders,
@@ -27,8 +29,10 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 
+import { useTranslation } from '@/lib/i18n';
+
 interface MenuItem {
-    title: string;
+    key: string;
     href: string;
     icon: React.ComponentType<{ className?: string }>;
     matches?: string[];
@@ -36,25 +40,25 @@ interface MenuItem {
 
 const mainItems: MenuItem[] = [
     {
-        title: 'แผงควบคุม',
+        key: 'nav_dashboard',
         href: '/dashboard',
         icon: LayoutGrid,
         matches: ['/', '/dashboard'],
     },
     {
-        title: 'แจ้งเตือนเวลานอน',
+        key: 'nav_alarms',
         href: '/alarms',
         icon: BellRing,
         matches: ['/alarms', '/bedtime-alerts'],
     },
     {
-        title: 'ตารางการนอน',
+        key: 'nav_schedule',
         href: '/schedule',
         icon: Calendar,
         matches: ['/schedule'],
     },
     {
-        title: 'ประวัติการนอน',
+        key: 'nav_history',
         href: '/history',
         icon: History,
         matches: ['/history'],
@@ -63,19 +67,31 @@ const mainItems: MenuItem[] = [
 
 const progressionItems: MenuItem[] = [
     {
-        title: 'สถานะชีวิต',
+        key: 'nav_progression',
         href: '/progression',
         icon: Activity,
         matches: ['/progression'],
     },
     {
-        title: 'ภารกิจและรางวัล',
+        key: 'nav_inventory',
+        href: '/inventory',
+        icon: Briefcase,
+        matches: ['/inventory'],
+    },
+    {
+        key: 'nav_market',
+        href: '/market',
+        icon: Store,
+        matches: ['/market'],
+    },
+    {
+        key: 'nav_quests',
         href: '/quests',
         icon: Trophy,
         matches: ['/quests'],
     },
     {
-        title: 'สถิติการนอน',
+        key: 'nav_analytics',
         href: '/analytics',
         icon: BarChart3,
         matches: ['/analytics'],
@@ -84,13 +100,13 @@ const progressionItems: MenuItem[] = [
 
 const systemItems: MenuItem[] = [
     {
-        title: 'ตั้งค่า',
+        key: 'nav_settings',
         href: '/settings',
         icon: Sliders,
         matches: ['/settings'],
     },
     {
-        title: 'ช่วยเหลือ',
+        key: 'nav_help',
         href: '/help',
         icon: HelpCircle,
         matches: ['/help'],
@@ -99,6 +115,7 @@ const systemItems: MenuItem[] = [
 
 export function AppSidebar() {
     const { url } = usePage();
+    const { t, isTactical } = useTranslation();
 
     const isItemActive = (item: MenuItem) => {
         if (item.matches) {
@@ -116,13 +133,14 @@ export function AppSidebar() {
                 {items.map((item) => {
                     const active = isItemActive(item);
                     const Icon = item.icon;
+                    const title = t(item.key);
 
                     return (
-                        <SidebarMenuItem key={item.title}>
+                        <SidebarMenuItem key={item.key}>
                             <SidebarMenuButton
                                 asChild
                                 isActive={active}
-                                tooltip={{ children: item.title }}
+                                tooltip={{ children: title }}
                                 className={`rounded-xl px-2.5 py-2 text-xs font-normal transition-colors ${
                                     active
                                         ? 'bg-[#18181b] text-white font-medium'
@@ -131,7 +149,7 @@ export function AppSidebar() {
                             >
                                 <Link href={item.href} prefetch className="flex items-center gap-3">
                                     <Icon className={`size-4 shrink-0 ${active ? 'text-white' : 'text-zinc-400'}`} />
-                                    <span className="truncate">{item.title}</span>
+                                    <span className="truncate">{title}</span>
                                 </Link>
                             </SidebarMenuButton>
                         </SidebarMenuItem>
@@ -162,9 +180,9 @@ export function AppSidebar() {
 
             {/* Sidebar Content with 3 Groups matching user design */}
             <SidebarContent className="space-y-1">
-                {renderNavGroup('เมนูหลัก', mainItems)}
-                {renderNavGroup('ความก้าวหน้า', progressionItems)}
-                {renderNavGroup('ระบบ', systemItems)}
+                {renderNavGroup(t('group_main'), mainItems)}
+                {renderNavGroup(t('group_progression'), progressionItems)}
+                {renderNavGroup(t('group_system'), systemItems)}
             </SidebarContent>
 
             {/* Sidebar Footer with Mini HP Indicator & User Profile */}

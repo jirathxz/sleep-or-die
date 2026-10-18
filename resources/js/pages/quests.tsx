@@ -1,27 +1,29 @@
 import React from 'react';
 import { Head } from '@inertiajs/react';
-import { Trophy, CheckCircle2, Circle, Ticket, Star, Sparkles } from 'lucide-react';
+import { CheckCircle2, Circle, Ticket } from 'lucide-react';
 import { useSleepStore } from '@/stores/useSleepStore';
+import { useTranslation } from '@/lib/i18n';
 
 export default function Quests() {
     const { tickets_count, days_survived, stage } = useSleepStore();
+    const { t } = useTranslation();
 
     const dailyQuests = [
         {
-            title: 'ปิดหน้าจอก่อนเวลาเส้นตาย',
-            description: 'กดยืนยันการนอนก่อนถึงเวลาเป้าหมาย 23:15 น.',
+            title: t('quest_d1_title'),
+            description: t('quest_d1_desc'),
             reward: '+100 XP',
             completed: stage === 'normal',
         },
         {
-            title: 'ตรวจจับออฟไลน์ผ่าน Discord',
-            description: 'คงสถานะออฟไลน์ให้ครบ 10 นาทีแรกหลังยืนยันการนอน',
+            title: t('quest_d2_title'),
+            description: t('quest_d2_desc'),
             reward: '+50 XP',
             completed: false,
         },
         {
-            title: 'รักษาพลังชีวิตเต็ม 100%',
-            description: 'ไม่ปล่อยให้หลอดเลือดเริ่มลดลงในคืนนี้',
+            title: t('quest_d3_title'),
+            description: t('quest_d3_desc'),
             reward: '+150 XP',
             completed: true,
         },
@@ -29,51 +31,53 @@ export default function Quests() {
 
     const achievements = [
         {
-            title: 'เริ่มต้นการเปลี่ยนแปลง',
-            description: 'นอนตรงเวลาติดต่อกันครบ 3 วัน',
-            progress: `${Math.min(3, days_survived)} / 3 วัน`,
+            title: t('ach_1_title'),
+            description: t('ach_1_desc'),
+            progress: `${Math.min(3, days_survived)} / 3 ${t('unit_days')}`,
             unlocked: days_survived >= 3,
         },
         {
-            title: 'วินัยเหล็กไหล',
-            description: 'รอดชีวิตสะสมครบ 7 วัน รับฟรี 1 ตั๋วขยายเวลา',
-            progress: `${Math.min(7, days_survived)} / 7 วัน`,
+            title: t('ach_2_title'),
+            description: t('ach_2_desc'),
+            progress: `${Math.min(7, days_survived)} / 7 ${t('unit_days')}`,
             unlocked: days_survived >= 7,
         },
         {
-            title: 'ผู้พิชิตรัตติกาล',
-            description: 'รอดชีวิตสะสมครบ 30 วันโดยไม่มีสไตรค์ชัตดาวน์',
-            progress: `${Math.min(30, days_survived)} / 30 วัน`,
+            title: t('ach_3_title'),
+            description: t('ach_3_desc'),
+            progress: `${Math.min(30, days_survived)} / 30 ${t('unit_days')}`,
             unlocked: days_survived >= 30,
         },
     ];
 
     return (
         <>
-            <Head title="ภารกิจและรางวัล - SleepOrDie" />
+            <Head title={`${t('quests_title')} - SleepOrDie`} />
 
             <div className="max-w-3xl w-full mx-auto p-4 md:p-6 space-y-6 select-none">
                 {/* Header */}
                 <div className="flex items-center justify-between">
                     <div>
                         <h1 className="text-xl font-medium tracking-tight text-white">
-                            ภารกิจและรางวัล
+                            {t('quests_title')}
                         </h1>
                         <p className="text-xs text-zinc-500 font-light mt-0.5">
-                            ทำภารกิจประจำวันเพื่อรับ EXP และตั๋วขยายเวลาฉุกเฉิน
+                            {t('quests_desc')}
                         </p>
                     </div>
 
                     <div className="flex items-center gap-2 bg-[#121215] rounded-xl px-3.5 py-2">
                         <Ticket className="size-4 text-amber-400" />
-                        <span className="text-xs text-zinc-400 font-light">ตั๋วที่มี:</span>
-                        <span className="text-sm font-medium text-white tabular-nums">{tickets_count} ใบ</span>
+                        <span className="text-xs text-zinc-400 font-light">{t('quests_my_tickets')}</span>
+                        <span className="text-sm font-medium text-white tabular-nums">
+                            {tickets_count} {t('quests_tickets_unit')}
+                        </span>
                     </div>
                 </div>
 
                 {/* Daily Quests List */}
                 <div className="bg-[#121215] rounded-2xl p-5 space-y-3 shadow-sm">
-                    <span className="text-sm font-medium text-white">ภารกิจประจำวัน</span>
+                    <span className="text-sm font-medium text-white">{t('quests_daily_title')}</span>
 
                     <div className="space-y-2 pt-1">
                         {dailyQuests.map((quest, index) => (
@@ -84,7 +88,7 @@ export default function Quests() {
                                 <div className="space-y-1">
                                     <div className="flex items-center gap-2">
                                         {quest.completed ? (
-                                            <CheckCircle2 className="size-4 text-emerald-400 shrink-0" />
+                                             <CheckCircle2 className="size-4 text-emerald-400 shrink-0" />
                                         ) : (
                                             <Circle className="size-4 text-zinc-600 shrink-0" />
                                         )}
@@ -107,7 +111,7 @@ export default function Quests() {
 
                 {/* Achievements List */}
                 <div className="bg-[#121215] rounded-2xl p-5 space-y-3 shadow-sm">
-                    <span className="text-sm font-medium text-white">ความสำเร็จสะสม</span>
+                    <span className="text-sm font-medium text-white">{t('quests_achievements_title')}</span>
 
                     <div className="space-y-2 pt-1">
                         {achievements.map((ach, index) => (
@@ -125,7 +129,7 @@ export default function Quests() {
                                         {ach.progress}
                                     </span>
                                     <p className="text-[10px] text-zinc-500 font-light">
-                                        {ach.unlocked ? 'ปลดล็อคแล้ว' : 'กำลังดำเนินการ'}
+                                        {ach.unlocked ? t('ach_status_unlocked') : t('ach_status_progress')}
                                     </p>
                                 </div>
                             </div>

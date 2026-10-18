@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from '@/lib/i18n';
 
 interface HpBarProps {
     hp: number;
@@ -7,76 +8,100 @@ interface HpBarProps {
 
 export const HpBar: React.FC<HpBarProps> = ({ hp, stage }) => {
     const clampedHp = Math.max(0, Math.min(100, hp));
+    const { t, isTactical } = useTranslation();
 
-    // Determine status text, color, and indicator dot based on HP and stage
-    let barColor = 'bg-emerald-500';
-    let statusText = 'ระบบเสถียร';
-    let dotColor = 'bg-emerald-500';
-    let statusTextColor = 'text-zinc-400';
+    // กำหนดสีและข้อความสถานะตามโหมดภาษา
+    let barColor = isTactical ? 'bg-[#9ab874]' : 'bg-emerald-500';
+    let statusText = t('hp_status_normal');
+    let dotColor = isTactical ? 'bg-[#9ab874]' : 'bg-emerald-500';
+    let statusTextColor = isTactical ? 'text-[#9ab874]' : 'text-zinc-400';
 
     if (clampedHp <= 0 || stage === 'shutdown') {
         barColor = 'bg-zinc-700';
-        statusText = 'ระบบหยุดทำงาน • พลังชีวิตหมด';
+        statusText = t('hp_status_dead');
         dotColor = 'bg-zinc-500';
         statusTextColor = 'text-zinc-500';
     } else if (clampedHp <= 30 || stage === 'sleep') {
         barColor = 'bg-rose-500';
-        statusText = 'วิกฤต: เลือดลดต่อเนื่อง';
+        statusText = t('hp_status_critical');
         dotColor = 'bg-rose-500 animate-pulse';
         statusTextColor = 'text-rose-400';
     } else if (clampedHp <= 65 || stage === 'lockdown') {
         barColor = 'bg-amber-500';
-        statusText = 'ล็อคดาวน์: เตรียมปิดเครื่อง';
+        statusText = t('hp_status_caution');
         dotColor = 'bg-amber-500';
         statusTextColor = 'text-amber-400';
     }
 
     return (
-        <section className="bg-[#121215] rounded-2xl p-5 md:p-6 space-y-4 shadow-sm select-none">
-            {/* Header: Title and Status Dot (Strictly No Badge) */}
+        <section
+            className={`bg-[#121215] rounded-2xl p-5 md:p-6 space-y-4 shadow-sm select-none border relative overflow-hidden transition-all ${
+                isTactical
+                    ? 'border-[#9ab874]/30 shadow-[0_0_30px_rgba(154,184,116,0.06)]'
+                    : 'border-white/5'
+            }`}
+        >
+            {/* Tactical HUD Corner Brackets (เฉพาะโหมดชายขายโลก) */}
+            {isTactical && (
+                <>
+                    <div className="absolute top-0 left-0 w-2.5 h-2.5 border-t-2 border-l-2 border-[#9ab874]" />
+                    <div className="absolute top-0 right-0 w-2.5 h-2.5 border-t-2 border-r-2 border-[#9ab874]" />
+                    <div className="absolute bottom-0 left-0 w-2.5 h-2.5 border-b-2 border-l-2 border-[#9ab874]" />
+                    <div className="absolute bottom-0 right-0 w-2.5 h-2.5 border-b-2 border-r-2 border-[#9ab874]" />
+                </>
+            )}
+
+            {/* Header: Title ตามโหมดที่เลือก */}
             <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                    <span className="size-2 rounded-full bg-white/40" />
-                    <h2 className="text-sm font-medium text-zinc-300">
-                        ระดับพลังชีวิต
+                <div className="flex items-center gap-2">
+                    <span className={`size-2 rounded-sm ${isTactical ? 'bg-[#9ab874]' : 'bg-white/40'}`} />
+                    <h2 className="text-xs font-mono tracking-wider text-zinc-300 uppercase">
+                        {t('hp_title')}
                     </h2>
                 </div>
 
-                <div className="flex items-center gap-2 text-xs font-normal">
+                <div className="flex items-center gap-2 text-xs font-mono">
                     <span className={`size-2 rounded-full ${dotColor}`} />
                     <span className={statusTextColor}>{statusText}</span>
                 </div>
             </div>
 
-            {/* Readout Display */}
+            {/* Readout Display: ตัวเลขอัตราพลังงาน */}
             <div className="flex items-baseline justify-between pt-1">
-                <span className="text-xs text-zinc-500 font-light">
-                    ความจุพลังงานปัจจุบัน
+                <span className="text-xs font-mono text-zinc-500">
+                    {isTactical ? 'ENERGY CAPACITY' : 'ความจุพลังงานปัจจุบัน'}
                 </span>
                 <div className="flex items-baseline gap-1.5">
-                    <span className="text-4xl md:text-5xl font-medium tracking-tight text-white tabular-nums">
+                    <span className="text-4xl md:text-5xl font-mono font-bold tracking-tight text-white tabular-nums">
                         {clampedHp}
                     </span>
-                    <span className="text-xs text-zinc-500 font-normal">/ 100</span>
+                    <span className="text-xs font-mono text-zinc-500">/ 100 HP</span>
                 </div>
             </div>
 
-            {/* Progress Bar Container (Concentric Radius: rounded-lg with inner rounded-md) */}
-            <div className="w-full h-3 bg-[#18181b] rounded-lg p-0.5 overflow-hidden">
+            {/* Progress Bar พร้อมขีด Segment ยุทธวิธี */}
+            <div className="relative w-full h-3.5 bg-[#18181b] rounded-md p-0.5 overflow-hidden border border-white/5">
                 <div
-                    className={`h-full rounded-md transition-all duration-700 ease-out ${barColor}`}
+                    className={`h-full rounded-sm transition-all duration-700 ease-out ${barColor}`}
                     style={{ width: `${clampedHp}%` }}
                 />
+                {/* ขีดแบ่งช่องเกจยุทธวิธี (Segment Divider) */}
+                <div className="absolute inset-0 flex justify-between pointer-events-none px-1">
+                    {[...Array(10)].map((_, i) => (
+                        <div key={i} className="w-[1px] h-full bg-black/40" />
+                    ))}
+                </div>
             </div>
 
-            {/* Scale Markers */}
-            <div className="flex justify-between text-[11px] text-zinc-500 font-light pt-0.5">
-                <span>0% ชัตดาวน์</span>
-                <span>25%</span>
-                <span>50%</span>
-                <span>75%</span>
-                <span>100% เต็มกำลัง</span>
+            {/* Scale Markers สเกลวัดระดับตามโหมด */}
+            <div className="flex justify-between text-[10px] font-mono text-zinc-500 pt-0.5">
+                <span>{isTactical ? '[0% SHUTDOWN]' : '0% ชัตดาวน์'}</span>
+                <span>{isTactical ? '[25%]' : '25%'}</span>
+                <span>{isTactical ? '[50%]' : '50%'}</span>
+                <span>{isTactical ? '[75%]' : '75%'}</span>
+                <span>{isTactical ? '[100% OPTIMAL]' : '100% เต็มกำลัง'}</span>
             </div>
         </section>
     );
 };
+

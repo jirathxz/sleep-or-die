@@ -1,20 +1,23 @@
 import React from 'react';
 import { Head } from '@inertiajs/react';
-import { HelpCircle, FolderGit2, BookOpen, ExternalLink, ShieldCheck, Skull, Zap } from 'lucide-react';
+import { FolderGit2, BookOpen, ExternalLink, Zap } from 'lucide-react';
+import { useTranslation } from '@/lib/i18n';
 
 export default function Help() {
+    const { t } = useTranslation();
+
     return (
         <>
-            <Head title="ช่วยเหลือและคู่มือ - SleepOrDie" />
+            <Head title={`${t('help_title')} - SleepOrDie`} />
 
             <div className="max-w-3xl w-full mx-auto p-4 md:p-6 space-y-6 select-none">
                 {/* Header */}
                 <div>
                     <h1 className="text-xl font-medium tracking-tight text-white">
-                        คู่มือและความช่วยเหลือ
+                        {t('help_title')}
                     </h1>
                     <p className="text-xs text-zinc-500 font-light mt-0.5">
-                        คำอธิบายกฎเกณฑ์ กลไกการลงโทษ และเอกสารคู่มือการพัฒนา
+                        {t('help_desc')}
                     </p>
                 </div>
 
@@ -22,38 +25,38 @@ export default function Help() {
                 <div className="bg-[#121215] rounded-2xl p-5 md:p-6 space-y-4 shadow-sm">
                     <span className="text-sm font-medium text-white flex items-center gap-2">
                         <Zap className="size-4 text-emerald-400" />
-                        กลไกการทำงานของ SleepOrDie
+                        {t('help_mechanics_title')}
                     </span>
 
                     <div className="space-y-3 text-xs">
                         <div className="bg-[#18181b] rounded-xl p-4 space-y-1">
-                            <span className="font-medium text-white">1. การคำนวณเวลานอนอัตโนมัติ</span>
+                            <span className="font-medium text-white">{t('help_rule1_title')}</span>
                             <p className="text-zinc-400 font-light leading-relaxed">
-                                เมื่อคุณกำหนดเวลาตื่น ระบบจะคำนวณเวลาที่ควรเข้านอนย้อนหลัง 5 รอบการนอน รอบละ 90 นาที รวม 7 ชั่วโมง 30 นาที บวกระยะเวลาผ่อนคลาย 15 นาที รวมเป็น 7 ชั่วโมง 45 นาที
+                                {t('help_rule1_desc')}
                             </p>
                         </div>
 
                         <div className="bg-[#18181b] rounded-xl p-4 space-y-1">
-                            <span className="font-medium text-white">2. การลดลงของพลังชีวิต</span>
+                            <span className="font-medium text-white">{t('help_rule2_title')}</span>
                             <p className="text-zinc-400 font-light leading-relaxed">
-                                หากถึงเวลาเส้นตายแล้วคุณยังไม่กดยืนยันการนอน เลือดจะเริ่มลดลงทันที 1 หน่วย ทุก 2 นาที และระบบจะส่งสัญญาณเสียงไซเรนเตือนภัย
+                                {t('help_rule2_desc')}
                             </p>
                         </div>
 
                         <div className="bg-[#18181b] rounded-xl p-4 space-y-1">
-                            <span className="font-medium text-white">3. กฎการระงับบัญชีถาวร 5 สไตรค์</span>
+                            <span className="font-medium text-white">{t('help_rule3_title')}</span>
                             <p className="text-zinc-400 font-light leading-relaxed">
-                                หากเลือดลดเหลือ 0 จะเกิดการชัตดาวน์และบันทึก 1 สไตรค์ หากสะสมครบ 5 ครั้ง บัญชีจะถูกระงับถาวร • คุณสามารถล้างสไตรค์ได้ 1 ครั้ง เมื่อนอนตรงเวลาติดต่อกันครบ 5 วัน
+                                {t('help_rule3_desc')}
                             </p>
                         </div>
                     </div>
                 </div>
 
-                {/* Section 2: Developer & Documentation Links (Requirement #2) */}
+                {/* Section 2: Developer & Documentation Links */}
                 <div className="bg-[#121215] rounded-2xl p-5 md:p-6 space-y-4 shadow-sm">
                     <span className="text-sm font-medium text-white flex items-center gap-2">
                         <BookOpen className="size-4 text-zinc-400" />
-                        เอกสารและซอร์สโค้ด
+                        {t('help_docs_title')}
                     </span>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
@@ -66,8 +69,8 @@ export default function Help() {
                             <div className="flex items-center gap-3">
                                 <FolderGit2 className="size-5 text-zinc-400 group-hover:text-white" />
                                 <div>
-                                    <span className="font-medium text-white">GitHub Repository</span>
-                                    <p className="text-[11px] text-zinc-500 font-light">ซอร์สโค้ดและ Discord Bot</p>
+                                    <span className="font-medium text-white">{t('help_gh_title')}</span>
+                                    <p className="text-[11px] text-zinc-500 font-light">{t('help_gh_desc')}</p>
                                 </div>
                             </div>
                             <ExternalLink className="size-4 text-zinc-600 group-hover:text-white" />
@@ -82,8 +85,8 @@ export default function Help() {
                             <div className="flex items-center gap-3">
                                 <BookOpen className="size-5 text-zinc-400 group-hover:text-white" />
                                 <div>
-                                    <span className="font-medium text-white">Framework Docs</span>
-                                    <p className="text-[11px] text-zinc-500 font-light">Laravel 12 & Inertia React</p>
+                                    <span className="font-medium text-white">{t('help_framework_title')}</span>
+                                    <p className="text-[11px] text-zinc-500 font-light">{t('help_framework_desc')}</p>
                                 </div>
                             </div>
                             <ExternalLink className="size-4 text-zinc-600 group-hover:text-white" />

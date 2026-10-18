@@ -119,6 +119,42 @@ class AudioManager {
         }
     }
 
+    private hitmanHowl: Howl | null = null;
+
+    /**
+     * Hitman Final Stage: Play invisible.mp3 loop
+     */
+    public playHitmanBgm() {
+        this.stopAllAudio();
+        if (!this.hitmanHowl) {
+            this.hitmanHowl = new Howl({
+                src: ['/invisible.mp3'],
+                html5: true,
+                loop: true,
+                volume: 0.6,
+            });
+        }
+        if (!this.hitmanHowl.playing()) {
+            this.hitmanHowl.play();
+        }
+    }
+
+    /**
+     * Stop Hitman BGM
+     */
+    public stopHitmanBgm() {
+        if (this.hitmanHowl) {
+            this.hitmanHowl.stop();
+        }
+    }
+
+    /**
+     * Retro 8-bit Codec beep tone
+     */
+    public playCodecBeep(freq: number = 1200, duration: number = 0.06, type: OscillatorType = 'sine') {
+        this.playSynthTone(freq, duration, type, 0.15);
+    }
+
     /**
      * Stop all active audio loops and intervals
      */
@@ -131,6 +167,10 @@ class AudioManager {
         if (this.currentLoop) {
             this.currentLoop.stop();
             this.currentLoop = null;
+        }
+
+        if (this.hitmanHowl) {
+            this.hitmanHowl.stop();
         }
     }
 

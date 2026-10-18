@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Head } from '@inertiajs/react';
 import { BellRing, Moon, Plus, Repeat, Trash2, Clock, Send, Check, Loader2, AlertCircle } from 'lucide-react';
 import { useSleepStore } from '@/stores/useSleepStore';
+import { useTranslation } from '@/lib/i18n';
 
 interface BedtimeAlertRule {
     id: string;
@@ -22,6 +23,7 @@ interface CustomBedtimeSchedule {
 }
 
 export default function BedtimeAlerts() {
+    const { t, isTactical } = useTranslation();
     const {
         sleep_target_time,
         wake_up_time,
@@ -158,7 +160,7 @@ export default function BedtimeAlerts() {
 
     return (
         <>
-            <Head title="ตั้งเวลาแจ้งเตือนเวลานอน - SleepOrDie" />
+            <Head title={`${t('alarms_title')} - SleepOrDie`} />
 
             <div className="max-w-3xl w-full mx-auto p-4 md:p-6 space-y-6 select-none">
                 {/* Header: Focused on Bedtime Discipline */}
@@ -166,10 +168,10 @@ export default function BedtimeAlerts() {
                     <div>
                         <h1 className="text-xl font-medium tracking-tight text-white flex items-center gap-2">
                             <Moon className="size-5 text-indigo-400" />
-                            ระบบตั้งเวลาแจ้งเวลานอน
+                            {t('alarms_title')}
                         </h1>
                         <p className="text-xs text-zinc-500 font-light mt-0.5">
-                            กำหนดเวลาเข้านอน ระบบจะคำนวณและแจ้งเตือนตามลำดับขั้นตอนก่อนถึงเส้นตาย
+                            {t('alarms_desc')}
                         </p>
                     </div>
 
@@ -178,7 +180,7 @@ export default function BedtimeAlerts() {
                         className="h-9 px-3.5 rounded-lg bg-white text-zinc-950 text-xs font-medium hover:bg-zinc-200 transition-colors flex items-center gap-1.5 active:scale-[0.99]"
                     >
                         <Plus className="size-4" />
-                        <span>เพิ่มกำหนดเวลานอน</span>
+                        <span>{t('alarms_add_btn')}</span>
                     </button>
                 </div>
 
@@ -187,12 +189,12 @@ export default function BedtimeAlerts() {
                     <div className="flex items-center justify-between">
                         <span className="text-sm font-medium text-white flex items-center gap-2">
                             <Clock className="size-4 text-emerald-400" />
-                            เป้าหมายเวลาเข้านอนหลัก (Active Bedtime Target)
+                            {t('alarms_primary_target')}
                         </span>
                         {saveSuccess && (
                             <span className="text-xs text-emerald-400 flex items-center gap-1">
                                 <Check className="size-3.5" />
-                                บันทึกสำเร็จ
+                                {isTactical ? 'SAVED' : 'บันทึกสำเร็จ'}
                             </span>
                         )}
                     </div>
@@ -200,8 +202,8 @@ export default function BedtimeAlerts() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
                         <div className="space-y-1.5">
                             <label className="text-xs text-zinc-400 font-light flex items-center justify-between">
-                                <span>เวลาตื่นนอนเป้าหมาย</span>
-                                <span className="text-[11px] text-zinc-500">(คำนวณ 5 Sleep Cycles)</span>
+                                <span>{t('alarms_wake_label')}</span>
+                                <span className="text-[11px] text-zinc-500">{isTactical ? '5 CYCLES' : '(คำนวณ 5 Sleep Cycles)'}</span>
                             </label>
                             <input
                                 type="time"
@@ -214,18 +216,20 @@ export default function BedtimeAlerts() {
 
                         <div className="space-y-1.5">
                             <label className="text-xs text-zinc-400 font-light flex items-center justify-between">
-                                <span>เวลาเข้านอนเป้าหมาย</span>
-                                <span className="text-[11px] text-emerald-400 font-medium">เส้นตายเข้านอน</span>
+                                <span>{t('alarms_sleep_label')}</span>
+                                <span className="text-[11px] text-emerald-400 font-medium">{isTactical ? 'DEADLINE' : 'เส้นตายเข้านอน'}</span>
                             </label>
                             <div className="w-full h-11 px-3 bg-[#18181b] text-white rounded-lg flex items-center text-lg tabular-nums">
-                                {activeTarget} น.
+                                {activeTarget} {isTactical ? 'HRS' : 'น.'}
                             </div>
                         </div>
                     </div>
 
                     <div className="flex items-center justify-between pt-2">
                         <span className="text-[11px] text-zinc-500 font-light">
-                            คำนวณถอยหลัง 7 ชั่วโมง 45 นาที (90 นาที × 5 รอบ + 15 นาทีเพื่อผล็อยหลับ)
+                            {isTactical
+                                ? 'CALCULATED: 7 HRS 45 MIN (90 MIN × 5 CYCLES + 15 MIN LATENCY)'
+                                : 'คำนวณถอยหลัง 7 ชั่วโมง 45 นาที (90 นาที × 5 รอบ + 15 นาทีเพื่อผล็อยหลับ)'}
                         </span>
                         <button
                             type="submit"
@@ -233,7 +237,7 @@ export default function BedtimeAlerts() {
                             className="h-9 px-5 rounded-lg bg-white text-zinc-950 text-xs font-medium hover:bg-zinc-200 transition-colors flex items-center gap-1.5 disabled:opacity-50"
                         >
                             {isSaving ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
-                            <span>บันทึกการตั้งค่า</span>
+                            <span>{t('alarms_save_btn')}</span>
                         </button>
                     </div>
                 </form>
@@ -261,9 +265,11 @@ export default function BedtimeAlerts() {
                     <div className="flex items-center justify-between">
                         <span className="text-sm font-medium text-white flex items-center gap-2">
                             <BellRing className="size-4 text-emerald-400" />
-                            ลำดับขั้นตอนการแจ้งเตือนอัตโนมัติ
+                            {t('alarms_rules_title')}
                         </span>
-                        <span className="text-xs text-zinc-500 font-light">3 ระดับความเข้มข้น</span>
+                        <span className="text-xs text-zinc-500 font-light">
+                            {isTactical ? '3 ESCALATION TIERS' : '3 ระดับความเข้มข้น'}
+                        </span>
                     </div>
 
                     <div className="space-y-3 pt-1">
@@ -305,7 +311,7 @@ export default function BedtimeAlerts() {
                                         ) : (
                                             <Send className="size-3" />
                                         )}
-                                        <span>ทดสอบเตือน</span>
+                                        <span>{t('alarms_test_alert')}</span>
                                     </button>
 
                                     <button

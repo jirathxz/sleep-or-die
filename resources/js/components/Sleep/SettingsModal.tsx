@@ -34,6 +34,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     const [discordId, setDiscordId] = useState(currentDiscordId || '');
     const [discordToken, setDiscordToken] = useState(currentDiscordBotToken || '');
     const [saving, setSaving] = useState(false);
+    const [languageMode, setLanguageMode] = useState<string>(() => {
+        return typeof window !== 'undefined' ? localStorage.getItem('sleep_language_mode') || 'normal' : 'normal';
+    });
+
+    const handleLanguageChange = (mode: 'normal' | 'tactical') => {
+        setLanguageMode(mode);
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('sleep_language_mode', mode);
+            window.dispatchEvent(new Event('sleep_language_mode_changed'));
+        }
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -131,6 +142,45 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         >
                             {audioEnabled ? <Volume2 className="size-4" /> : <VolumeX className="size-4" />}
                         </button>
+                    </div>
+
+                    {/* Language Mode Selector (คนปกติ vs ชายขายโลก) */}
+                    <div className="p-3.5 rounded-lg bg-[#18181b] space-y-2.5 border border-white/5">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs text-zinc-200 font-normal">โหมดภาษาและข้อความ</span>
+                            <span className="text-[11px] font-mono text-zinc-400">
+                                {languageMode === 'tactical' ? '[ ชายขายโลก ]' : '[ คนปกติ ]'}
+                            </span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                            <button
+                                type="button"
+                                onClick={() => handleLanguageChange('normal')}
+                                className={`h-9 px-3 rounded-md text-xs font-medium transition-all ${
+                                    languageMode === 'normal'
+                                        ? 'bg-white text-zinc-950 font-semibold shadow-sm'
+                                        : 'bg-[#121215] text-zinc-400 hover:text-white border border-white/5'
+                                }`}
+                            >
+                                คนปกติ
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleLanguageChange('tactical')}
+                                className={`h-9 px-3 rounded-md text-xs font-mono transition-all ${
+                                    languageMode === 'tactical'
+                                        ? 'bg-[#9ab874] text-zinc-950 font-bold shadow-sm'
+                                        : 'bg-[#121215] text-zinc-400 hover:text-white border border-white/5'
+                                }`}
+                            >
+                                ชายขายโลก
+                            </button>
+                        </div>
+                        <p className="text-[11px] text-zinc-500 font-light">
+                            {languageMode === 'tactical'
+                                ? '// PROTOCOL: ใช้ศัพท์ยุทธวิธี MGS และรหัสแจ้งเตือนแบบเกมเอาชีวิตรอด'
+                                : 'ใช้ภาษาไทยทั่วไป อ่านง่าย สบายตา ไม่สับสน'}
+                        </p>
                     </div>
 
                     <DialogFooter className="pt-3 gap-2">

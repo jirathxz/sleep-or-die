@@ -5,10 +5,18 @@ import { AlertTriangle, AlertCircle } from 'lucide-react';
 interface StageOverlayProps {
     stage: SleepStage;
     secondsRemaining?: number;
+    isConfirmed?: boolean;
+    simulationActive?: boolean;
 }
 
-export const StageOverlay: React.FC<StageOverlayProps> = ({ stage, secondsRemaining }) => {
-    if (stage === 'normal') return null;
+export const StageOverlay: React.FC<StageOverlayProps> = ({
+    stage,
+    secondsRemaining,
+    isConfirmed = false,
+    simulationActive = false,
+}) => {
+    // ซ่อนการแจ้งเตือนทั้งหมดหากสถานะปกติ หรือยืนยันนอนแล้ว (เว้นแต่จะอยู่ในโหมดทดสอบจำลอง)
+    if (stage === 'normal' || (isConfirmed && !simulationActive)) return null;
 
     if (stage === 'alert') {
         return (

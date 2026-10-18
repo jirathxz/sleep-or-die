@@ -1,28 +1,42 @@
 import React from 'react';
 import { Head } from '@inertiajs/react';
-import { Activity, ShieldAlert, Award, Zap, Skull } from 'lucide-react';
+import { ShieldAlert } from 'lucide-react';
 import { useSleepStore } from '@/stores/useSleepStore';
+import { useTranslation } from '@/lib/i18n';
 
 export default function Progression() {
-    const { current_hp, shutdown_stacks, days_survived, level, exp } = useSleepStore();
+    const { current_hp, shutdown_stacks, level, exp } = useSleepStore();
+    const { t } = useTranslation();
 
     const currentLevel = Math.max(1, level || 1);
     const currentExp = Math.max(0, exp || 0);
     const nextLevelExp = currentLevel * 500;
     const expPercentage = Math.min(100, Math.round((currentExp / nextLevelExp) * 100));
 
+    const disciplineTitle = t(
+        currentLevel >= 5
+            ? 'discipline_5'
+            : currentLevel >= 4
+            ? 'discipline_4'
+            : currentLevel >= 3
+            ? 'discipline_3'
+            : currentLevel >= 2
+            ? 'discipline_2'
+            : 'discipline_1'
+    );
+
     return (
         <>
-            <Head title="สถานะชีวิต - SleepOrDie" />
+            <Head title={`${t('progression_title')} - SleepOrDie`} />
 
             <div className="max-w-3xl w-full mx-auto p-4 md:p-6 space-y-6 select-none">
                 {/* Header */}
                 <div>
                     <h1 className="text-xl font-medium tracking-tight text-white">
-                        สถานะชีวิตและความก้าวหน้า
+                        {t('progression_title')}
                     </h1>
                     <p className="text-xs text-zinc-500 font-light mt-0.5">
-                        ระบบระดับวินัย EXP และกฎระเบียบบทลงโทษชัตดาวน์
+                        {t('progression_desc')}
                     </p>
                 </div>
 
@@ -30,15 +44,15 @@ export default function Progression() {
                 <div className="bg-[#121215] rounded-2xl p-5 space-y-4 shadow-sm">
                     <div className="flex items-center justify-between">
                         <div className="space-y-0.5">
-                            <span className="text-xs text-zinc-500 font-light">ระดับผู้ควบคุมวินัย</span>
+                            <span className="text-xs text-zinc-500 font-light">{t('progression_tier_label')}</span>
                             <div className="flex items-baseline gap-2">
-                                <span className="text-2xl font-medium text-white">เลเวล {currentLevel}</span>
-                                <span className="text-xs text-emerald-400 font-normal">ผู้ควบคุมวงจรสลีป</span>
+                                <span className="text-2xl font-medium text-white">{t('level_label')} {currentLevel}</span>
+                                <span className="text-xs text-emerald-400 font-normal">{disciplineTitle}</span>
                             </div>
                         </div>
 
                         <div className="text-right space-y-0.5">
-                            <span className="text-xs text-zinc-500 font-light">EXP สะสม</span>
+                            <span className="text-xs text-zinc-500 font-light">{t('progression_exp_label')}</span>
                             <p className="text-xs font-normal text-zinc-300 tabular-nums">
                                 {currentExp} / {nextLevelExp} XP
                             </p>
@@ -59,17 +73,17 @@ export default function Progression() {
                     <div className="flex items-center justify-between">
                         <span className="text-sm font-medium text-white flex items-center gap-2">
                             <ShieldAlert className="size-4 text-rose-400" />
-                            กฎระเบียบบทลงโทษการชัตดาวน์
+                            {t('progression_shutdown_rules')}
                         </span>
-                        <span className="text-xs text-zinc-500 font-light">กฎสไตรค์ 5 ครั้ง</span>
+                        <span className="text-xs text-zinc-500 font-light">{t('progression_strike_rule_badge')}</span>
                     </div>
 
                     <div className="space-y-3 pt-1">
                         <div className="bg-[#18181b] rounded-xl p-4 flex items-center justify-between">
                             <div className="space-y-0.5">
-                                <span className="text-xs text-zinc-300 font-normal">พลังชีวิตปัจจุบัน</span>
+                                <span className="text-xs text-zinc-300 font-normal">{t('progression_hp_current')}</span>
                                 <p className="text-[11px] text-zinc-500 font-light">
-                                    ลดลงทันทีที่เลยเวลานอน และลดลง 1 หน่วย ทุก 2 นาที
+                                    {t('progression_hp_desc')}
                                 </p>
                             </div>
                             <span className="text-xl font-medium text-white tabular-nums">{current_hp}</span>
@@ -77,9 +91,9 @@ export default function Progression() {
 
                         <div className="bg-[#18181b] rounded-xl p-4 flex items-center justify-between">
                             <div className="space-y-0.5">
-                                <span className="text-xs text-zinc-300 font-normal">สถิติสไตรค์ชัตดาวน์</span>
+                                <span className="text-xs text-zinc-300 font-normal">{t('progression_strikes_title')}</span>
                                 <p className="text-[11px] text-zinc-500 font-light">
-                                    หากเลือดลดถึง 0% จะถูกบันทึก 1 สไตรค์ • ล้างสไตรค์ได้เมื่อนอนตรงเวลา 5 วันติดต่อกัน
+                                    {t('progression_strikes_desc')}
                                 </p>
                             </div>
                             <span
@@ -93,12 +107,12 @@ export default function Progression() {
 
                         <div className="bg-[#18181b] rounded-xl p-4 flex items-center justify-between">
                             <div className="space-y-0.5">
-                                <span className="text-xs text-zinc-300 font-normal">สถานะการระงับบัญชีถาวร</span>
+                                <span className="text-xs text-zinc-300 font-normal">{t('progression_lockout_title')}</span>
                                 <p className="text-[11px] text-zinc-500 font-light">
-                                    เมื่อครบ 5 สไตรค์ บัญชีจะถูกระงับถาวรและไม่สามารถกู้คืนได้
+                                    {t('progression_lockout_desc')}
                                 </p>
                             </div>
-                            <span className="text-xs font-normal text-emerald-400">ปกติ (ACTIVE)</span>
+                            <span className="text-xs font-normal text-emerald-400">{t('progression_status_active')}</span>
                         </div>
                     </div>
                 </div>

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from '@/lib/i18n';
 
 interface StatsBadgeProps {
     daysSurvived: number;
@@ -15,6 +16,8 @@ export const StatsBadge: React.FC<StatsBadgeProps> = ({
     onUseTicket,
     stage,
 }) => {
+    const { t, isTactical } = useTranslation();
+
     return (
         <section className="bg-[#121215] rounded-2xl p-5 md:p-6 shadow-sm select-none">
             {/* Unified 3-column Tonal Layout (Anti-AI Cliché: No repetitive cards, No badges) */}
@@ -22,16 +25,16 @@ export const StatsBadge: React.FC<StatsBadgeProps> = ({
                 {/* 1. Days Survived */}
                 <div className="space-y-1 md:pr-4">
                     <span className="text-xs text-zinc-500 font-light">
-                        วันรอดชีวิตสะสม
+                        {t('stats_survived')}
                     </span>
                     <div className="flex items-baseline gap-1.5 pt-1">
                         <span className="text-3xl font-medium text-white tabular-nums">
                             {daysSurvived}
                         </span>
-                        <span className="text-xs text-zinc-500 font-light">วันต่อเนื่อง</span>
+                        <span className="text-xs text-zinc-500 font-light">{t('stats_survived_unit')}</span>
                     </div>
                     <p className="text-[11px] text-zinc-400 font-light pt-0.5">
-                        รับฟรี 1 ตั๋วขยายเวลา ทุกสถิติ 7 วัน
+                        {t('stats_streak_reward')}
                     </p>
                 </div>
 
@@ -39,14 +42,14 @@ export const StatsBadge: React.FC<StatsBadgeProps> = ({
                 <div className="space-y-2 pt-4 md:pt-0 md:px-4">
                     <div className="flex items-center justify-between">
                         <span className="text-xs text-zinc-500 font-light">
-                            สถิติสไตรค์ชัตดาวน์
+                            {t('stats_strikes')}
                         </span>
                         <span
                             className={`text-xs font-medium tabular-nums ${
                                 shutdownStacks >= 4 ? 'text-rose-400' : 'text-zinc-300'
                             }`}
                         >
-                            {shutdownStacks} / 5 ครั้ง
+                            {shutdownStacks} / 5 {t('stats_strikes_unit')}
                         </span>
                     </div>
 
@@ -67,8 +70,8 @@ export const StatsBadge: React.FC<StatsBadgeProps> = ({
 
                     <p className="text-[11px] text-zinc-500 font-light">
                         {shutdownStacks >= 4
-                            ? 'เตือน: อีก 1 ครั้งบัญชีจะถูกระงับถาวร'
-                            : 'หากชัตดาวน์ครบ 5 ครั้ง บัญชีจะถูกระงับ'}
+                            ? t('stats_strikes_critical')
+                            : t('stats_strikes_warn')}
                     </p>
                 </div>
 
@@ -76,16 +79,16 @@ export const StatsBadge: React.FC<StatsBadgeProps> = ({
                 <div className="flex items-center justify-between pt-4 md:pt-0 md:pl-4">
                     <div className="space-y-0.5">
                         <span className="text-xs text-zinc-500 font-light">
-                            ตั๋วขยายเวลาฉุกเฉิน
+                            {t('stats_tickets')}
                         </span>
                         <div className="flex items-baseline gap-1.5">
                             <span className="text-3xl font-medium text-white tabular-nums">
                                 {ticketsCount}
                             </span>
-                            <span className="text-xs text-zinc-500 font-light">ใบพร้อมใช้</span>
+                            <span className="text-xs text-zinc-500 font-light">{t('stats_tickets_unit')}</span>
                         </div>
                         <p className="text-[11px] text-zinc-500 font-light">
-                            +30 นาที / ใบ
+                            {t('stats_tickets_desc')}
                         </p>
                     </div>
 
@@ -98,7 +101,7 @@ export const StatsBadge: React.FC<StatsBadgeProps> = ({
                                 : 'bg-[#18181b] text-zinc-600 cursor-not-allowed opacity-60'
                         }`}
                     >
-                        กดใช้ตั๋ว
+                        {t('stats_btn_ticket')}
                     </button>
                 </div>
             </div>
