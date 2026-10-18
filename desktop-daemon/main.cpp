@@ -127,30 +127,56 @@ void PlaySoundForStage(SleepStage stage) {
 }
 
 /**
- * Native Windows Toast / Message Alert
+ * Native Windows Toast / Message Alert (Async non-blocking popup)
  */
 void ShowWindowsAlert(const std::wstring& title, const std::wstring& message, UINT iconType) {
     std::wcout << L"[" << title << L"] " << message << std::endl;
-    // Show non-blocking popup or console print
     MessageBeep(iconType);
+
+    struct PopupArgs {
+        std::wstring title;
+        std::wstring message;
+        UINT iconType;
+    };
+    PopupArgs* args = new PopupArgs{ title, message, iconType };
+
+    HANDLE hThread = CreateThread(
+        NULL, 0,
+        [](LPVOID param) -> DWORD {
+            PopupArgs* p = (PopupArgs*)param;
+            MessageBoxW(NULL, p->message.c_str(), p->title.c_str(), p->iconType | MB_TOPMOST);
+            delete p;
+            return 0;
+        },
+        args, 0, NULL
+    );
+    if (hThread) {
+        CloseHandle(hThread);
+    }
 }
 
 /**
- * Disciplinary Enforcement (Lock Workstation or Shutdown PC)
+ * Disciplinary Enforcement (Shutdown - Test Mode uses MessageBox as requested)
  */
 void ExecuteEnforcement() {
-    std::wcout << L"\n>>> [ENFORCEMENT] EXECUTING DISCIPLINARY LOCK PROTOCOL <<<\n";
+    std::wcout << L"\n=======================================================\n";
+    std::wcout << L">>> [0% HP: SYSTEM SHUTDOWN ENFORCED (TEST MODE: MSGBOX)] <<<\n";
+    std::wcout << L"=======================================================\n";
     PlaySoundForStage(SleepStage::Shutdown);
 
-    if (config.lockOnShutdown) {
-        std::wcout << L"[SleepOrDie] Locking Windows Workstation immediately.\n";
-        LockWorkStation();
-    }
-
-    if (config.enforcePcPoweroff) {
-        std::wcout << L"[SleepOrDie] Initiating Windows System Shutdown (60s countdown)...\n";
-        system("shutdown /s /t 60 /c \"SleepOrDie: HP Reached 0%! System Shutting Down to Enforce Sleep Discipline.\"");
-    }
+    // Using Windows MessageBox for test mode as requested (instead of locking or turning off PC)
+    MessageBoxW(
+        NULL,
+        L"🚨 [SleepOrDie: HARDCORE DISCIPLINARY SHUTDOWN]\n\n"
+        L"พลังชีวิต (HP) ของคุณลดลงเหลือ 0% แล้ว!\n"
+        L"หมดเวลาช่วงฉุกเฉิน 30 วินาที และเลยเส้นตายเข้านอน\n\n"
+        L"⚠️ บันทึกสไตรค์ความผิด 1 ครั้ง (Strike Recorded)\n\n"
+        L"----------------------------------------------------\n"
+        L"[โหมดทดสอบ: แสดง MessageBox จำลองคำสั่ง Shutdown สำเร็จ]\n"
+        L"(ในระบบจริงเครื่องจะถูกสั่ง LockWorkStation หรือปิดระบบทันที)",
+        L"SleepOrDie — SYSTEM SHUTDOWN (0% HP)",
+        MB_OK | MB_ICONERROR | MB_SYSTEMMODAL
+    );
 }
 
 /**

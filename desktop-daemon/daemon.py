@@ -138,12 +138,19 @@ def run_simulation(config: dict):
     print("=" * 65)
     play_stage_sound("shutdown")
 
-    if config.get("lock_workstation_on_breach", True):
-        lock_workstation()
-
-    if config.get("enforce_system_shutdown", False):
-        print("[SleepOrDie] Calling Windows shutdown command...")
-        os.system('shutdown /s /t 60 /c "SleepOrDie: HP Reached 0%! System Shutting Down to Enforce Sleep Discipline."')
+    # Using Windows MessageBox for test mode as requested (instead of locking or turning off PC)
+    user32.MessageBoxW(
+        0,
+        "🚨 [SleepOrDie: HARDCORE DISCIPLINARY SHUTDOWN]\n\n"
+        "พลังชีวิต (HP) ของคุณลดลงเหลือ 0% แล้ว!\n"
+        "หมดเวลาช่วงฉุกเฉิน 30 วินาที และเลยเส้นตายเข้านอน\n\n"
+        "⚠️ บันทึกสไตรค์ความผิด 1 ครั้ง (Strike Recorded)\n\n"
+        "----------------------------------------------------\n"
+        "[โหมดทดสอบ: แสดง MessageBox จำลองคำสั่ง Shutdown สำเร็จ]\n"
+        "(ในระบบจริงเครื่องจะถูกสั่ง LockWorkStation หรือปิดระบบทันที)",
+        "SleepOrDie — SYSTEM SHUTDOWN (0% HP)",
+        0x10 | 0x1000
+    )
 
 def main():
     config = load_config()
@@ -206,10 +213,18 @@ def main():
                 if emergency_seconds_left <= 0 or current_hp <= 0:
                     print("\n[CRITICAL] 30s EXPIRED! HP DROPPED TO 0%! EXECUTING ENFORCEMENT PROTOCOL.")
                     play_stage_sound("shutdown")
-                    if config.get("lock_workstation_on_breach", True):
-                        lock_workstation()
-                    if config.get("enforce_system_shutdown", False):
-                        os.system('shutdown /s /t 60 /c "SleepOrDie: HP Reached 0%! System Shutting Down to Enforce Sleep Discipline."')
+                    user32.MessageBoxW(
+                        0,
+                        "🚨 [SleepOrDie: HARDCORE DISCIPLINARY SHUTDOWN]\n\n"
+                        "พลังชีวิต (HP) ของคุณลดลงเหลือ 0% แล้ว!\n"
+                        "หมดเวลาช่วงฉุกเฉิน 30 วินาที และเลยเส้นตายเข้านอน\n\n"
+                        "⚠️ บันทึกสไตรค์ความผิด 1 ครั้ง (Strike Recorded)\n\n"
+                        "----------------------------------------------------\n"
+                        "[โหมดทดสอบ: แสดง MessageBox จำลองคำสั่ง Shutdown สำเร็จ]\n"
+                        "(ในระบบจริงเครื่องจะถูกสั่ง LockWorkStation หรือปิดระบบทันที)",
+                        "SleepOrDie — SYSTEM SHUTDOWN (0% HP)",
+                        0x10 | 0x1000
+                    )
                     break
 
             time.sleep(1)
