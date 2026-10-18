@@ -1,6 +1,6 @@
 import React from 'react';
 import { SleepStage } from '@/stores/useSleepStore';
-import { Moon, Loader2 } from 'lucide-react';
+import { Moon, Loader2, Zap, RotateCcw } from 'lucide-react';
 
 interface CountdownDisplayProps {
     hours: number;
@@ -12,6 +12,9 @@ interface CountdownDisplayProps {
     wakeUpTime: string | null;
     onConfirmSleep: () => void;
     lastConfirmedAt: string | null;
+    simulationActive?: boolean;
+    onStartSimulation?: () => void;
+    onResetSimulation?: () => void;
 }
 
 export const CountdownDisplay: React.FC<CountdownDisplayProps> = ({
@@ -24,6 +27,9 @@ export const CountdownDisplay: React.FC<CountdownDisplayProps> = ({
     wakeUpTime,
     onConfirmSleep,
     lastConfirmedAt,
+    simulationActive = false,
+    onStartSimulation,
+    onResetSimulation,
 }) => {
     const pad = (n: number) => n.toString().padStart(2, '0');
 
@@ -32,7 +38,12 @@ export const CountdownDisplay: React.FC<CountdownDisplayProps> = ({
     let stageTextColor = 'text-zinc-400';
     let digitsColor = 'text-white';
 
-    if (stage === 'alert') {
+    if (simulationActive && !isPastDeadline) {
+        stageText = `โหมดจำลอง: นับถอยหลังสู่เวลานอน (${seconds} วิ)`;
+        dotColor = 'bg-amber-400 animate-ping';
+        stageTextColor = 'text-amber-400';
+        digitsColor = 'text-amber-400';
+    } else if (stage === 'alert') {
         stageText = 'ระยะเตือน: เหลือเวลาอีก 30 นาทีก่อนนอน';
         dotColor = 'bg-amber-400';
         stageTextColor = 'text-amber-400';
@@ -107,8 +118,8 @@ export const CountdownDisplay: React.FC<CountdownDisplayProps> = ({
                 </span>
             </div>
 
-            {/* Action Trigger (Ergonomic, Perfect Radius, No AI Gimmicks) */}
-            <div className="max-w-xs mx-auto pt-2">
+            {/* Action Trigger & Test Simulation Controls */}
+            <div className="max-w-xs mx-auto space-y-2 pt-2">
                 {isVerifying ? (
                     <div className="p-3.5 rounded-lg bg-[#18181b] text-amber-300 text-xs font-normal flex items-center justify-center gap-2.5">
                         <Loader2 className="size-4 animate-spin text-amber-400" />
@@ -130,6 +141,31 @@ export const CountdownDisplay: React.FC<CountdownDisplayProps> = ({
                         <span>ยืนยันการเข้านอน</span>
                     </button>
                 )}
+
+                {/* Simulation 3 2 1 Test Button */}
+                <div className="flex items-center justify-center pt-1">
+                    {!simulationActive ? (
+                        <button
+                            type="button"
+                            onClick={onStartSimulation}
+                            className="h-8 px-3.5 rounded-lg bg-[#18181b] hover:bg-[#27272a] text-zinc-400 hover:text-white text-xs font-normal transition-colors flex items-center gap-1.5 active:scale-[0.98]"
+                            title="ทดสอบนับถอยหลัง 3 2 1 สู่เวลานอนและดูเอฟเฟกต์การลดเลือด"
+                        >
+                            <Zap className="size-3.5 text-amber-400" />
+                            <span>ทดสอบตอนถึงเวลานอน 3 2 1</span>
+                        </button>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={onResetSimulation}
+                            className="h-8 px-3.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-normal transition-colors flex items-center gap-1.5 active:scale-[0.98]"
+                            title="รีเซ็ตคืนค่าเวลาและพลังชีวิตปกติ"
+                        >
+                            <RotateCcw className="size-3.5 text-zinc-400" />
+                            <span>คืนค่าปกติ (Reset)</span>
+                        </button>
+                    )}
+                </div>
             </div>
         </section>
     );

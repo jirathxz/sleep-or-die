@@ -57,6 +57,9 @@ export default function Dashboard() {
         confirmSleep,
         useTicket,
         fetchStatus,
+        simulationActive,
+        startSimulation321,
+        resetSimulation,
     } = useSleepStore();
 
     useEffect(() => {
@@ -165,6 +168,9 @@ export default function Dashboard() {
                         wakeUpTime={wake_up_time}
                         onConfirmSleep={confirmSleep}
                         lastConfirmedAt={last_sleep_confirmed_at}
+                        simulationActive={simulationActive}
+                        onStartSimulation={startSimulation321}
+                        onResetSimulation={resetSimulation}
                     />
 
                     {/* Unified Stats & Extension Module (No duplicate cards, No badges) */}

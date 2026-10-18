@@ -22,11 +22,15 @@ export interface SleepState {
     secondsRemaining: number;
     isPastDeadline: boolean;
     audioEnabled: boolean;
+    simulationActive: boolean;
+    simulationElapsedPast: number;
 
     // Actions
     syncUser: (data: Partial<SleepState>) => void;
     tick: () => void;
     toggleAudio: (enabled?: boolean) => void;
+    startSimulation321: () => void;
+    resetSimulation: () => void;
     saveSettings: (wakeUpTime: string, discordUserId?: string) => Promise<boolean>;
     confirmSleep: () => Promise<boolean>;
     useTicket: () => Promise<boolean>;
@@ -131,6 +135,8 @@ export const useSleepStore = create<SleepState>((set, get) => ({
     secondsRemaining: 0,
     isPastDeadline: false,
     audioEnabled: true,
+    simulationActive: false,
+    simulationElapsedPast: 0,
 
     syncUser: (data) => {
         set((state) => {
@@ -153,8 +159,108 @@ export const useSleepStore = create<SleepState>((set, get) => ({
         });
     },
 
+    startSimulation321: () => {
+        audioManager.stopAllAudio();
+        if (get().audioEnabled) {
+            audioManager.playAlertChime();
+        }
+        set({
+            simulationActive: true,
+            simulationElapsedPast: 0,
+            totalSecondsRemaining: 3,
+            hoursRemaining: 0,
+            minutesRemaining: 0,
+            secondsRemaining: 3,
+            isPastDeadline: false,
+            stage: 'lockdown',
+        });
+    },
+
+    resetSimulation: () => {
+        audioManager.stopAllAudio();
+        const { sleep_target_time } = get();
+        const timer = calculateTimeRemaining(sleep_target_time);
+        const newStage = determineStage(100, false, timer.totalSeconds);
+        set({
+            simulationActive: false,
+            simulationElapsedPast: 0,
+            current_hp: 100,
+            stage: newStage,
+            totalSecondsRemaining: timer.totalSeconds,
+            hoursRemaining: timer.hours,
+            minutesRemaining: timer.minutes,
+            secondsRemaining: timer.seconds,
+            isPastDeadline: timer.isPast,
+        });
+    },
+
     tick: () => {
-        const { sleep_target_time, current_hp, is_disabled, stage: oldStage, audioEnabled } = get();
+        const {
+            simulationActive,
+            simulationElapsedPast,
+            sleep_target_time,
+            current_hp,
+            is_disabled,
+            totalSecondsRemaining,
+            stage: oldStage,
+            audioEnabled,
+        } = get();
+
+        if (simulationActive) {
+            if (totalSecondsRemaining > 1) {
+                const nextSec = totalSecondsRemaining - 1;
+                if (audioEnabled) {
+                    audioManager.playAlertChime();
+                }
+                set({
+                    totalSecondsRemaining: nextSec,
+                    secondsRemaining: nextSec,
+                    hoursRemaining: 0,
+                    minutesRemaining: 0,
+                    isPastDeadline: false,
+                    stage: 'lockdown',
+                });
+                return;
+            } else if (totalSecondsRemaining === 1) {
+                if (audioEnabled) {
+                    audioManager.startEmergencyAlarm();
+                }
+                set({
+                    totalSecondsRemaining: 0,
+                    secondsRemaining: 0,
+                    hoursRemaining: 0,
+                    minutesRemaining: 0,
+                    isPastDeadline: true,
+                    stage: 'sleep',
+                    simulationElapsedPast: 1,
+                });
+                return;
+            } else {
+                // Past deadline during simulation: HP drains visibly by 4% per second
+                const newElapsed = (simulationElapsedPast || 0) + 1;
+                const newHp = Math.max(0, current_hp - 4);
+                const newStage = determineStage(newHp, is_disabled, 0);
+
+                if (newStage === 'shutdown' && oldStage !== 'shutdown') {
+                    if (audioEnabled) {
+                        audioManager.playShutdownSound();
+                    }
+                }
+
+                set({
+                    current_hp: newHp,
+                    stage: newStage,
+                    isPastDeadline: true,
+                    simulationElapsedPast: newElapsed,
+                    totalSecondsRemaining: -newElapsed,
+                    secondsRemaining: newElapsed % 60,
+                    minutesRemaining: Math.floor(newElapsed / 60),
+                    hoursRemaining: 0,
+                });
+                return;
+            }
+        }
+
         const timer = calculateTimeRemaining(sleep_target_time);
         const newStage = determineStage(current_hp, is_disabled, timer.totalSeconds);
 
