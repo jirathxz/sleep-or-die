@@ -32,7 +32,7 @@ class SecurityTest extends TestCase
             ->get(route('security.edit'))
             ->assertInertia(fn (Assert $page) => $page
                 ->component('settings/security')
-                ->where('canManagePasskeys', true)
+                ->where('canManagePasskeys', Features::canManagePasskeys())
                 ->where('passkeys', [])
                 ->where('canManageTwoFactor', true)
                 ->where('twoFactorEnabled', false),

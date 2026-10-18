@@ -20,7 +20,7 @@ Route::inertia('analytics', 'analytics')->name('analytics');
 Route::inertia('settings', 'settings')->name('settings');
 Route::inertia('help', 'help')->name('help');
 
-Route::middleware(['auth', 'verified'])->group(function () {
+Route::middleware(['auth'])->group(function () {
     Route::inertia('dashboard', 'dashboard')->name('dashboard');
 
     Route::prefix('sleep')->name('sleep.')->group(function () {
