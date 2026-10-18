@@ -23,6 +23,7 @@ interface PageProps {
             days_survived?: number;
             level?: number;
             exp?: number;
+            points?: number;
             tickets_count?: number;
             is_disabled?: boolean;
             discord_user_id?: string | null;
@@ -44,6 +45,7 @@ export default function Dashboard() {
         days_survived,
         level,
         exp,
+        points,
         tickets_count,
         is_disabled,
         last_sleep_confirmed_at,
@@ -58,6 +60,7 @@ export default function Dashboard() {
         toggleAudio,
         confirmSleep,
         useTicket,
+        redeemTicket,
         fetchStatus,
         simulationActive,
         startSimulation321,
@@ -74,6 +77,7 @@ export default function Dashboard() {
                 days_survived: auth.user.days_survived ?? 0,
                 level: auth.user.level ?? 1,
                 exp: auth.user.exp ?? 0,
+                points: auth.user.points ?? 100,
                 tickets_count: auth.user.tickets_count ?? 0,
                 is_disabled: auth.user.is_disabled ?? false,
                 discord_user_id: auth.user.discord_user_id ?? null,
@@ -172,7 +176,9 @@ export default function Dashboard() {
                     daysSurvived={days_survived}
                     shutdownStacks={shutdown_stacks}
                     ticketsCount={tickets_count}
+                    points={points}
                     onUseTicket={useTicket}
+                    onRedeemTicket={redeemTicket}
                     stage={stage}
                 />
             </div>

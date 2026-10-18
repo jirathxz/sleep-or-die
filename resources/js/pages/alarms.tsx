@@ -50,31 +50,40 @@ export default function BedtimeAlerts() {
         }
     }, [sleep_target_time, wake_up_time]);
 
-    // Built-in Discipline Protocols
+    // Built-in Discipline Protocols (Enforced by C++ Daemon & Web)
     const [alertRules, setAlertRules] = useState<BedtimeAlertRule[]>([
         {
             id: 'rule-1',
-            title: 'แจ้งเตือนผ่อนคลายก่อนนอน • 30 นาทีก่อนเส้นตาย',
-            timeBeforeMinutes: 30,
-            description: 'ส่งสัญญาณกระตุ้นให้เริ่มวางงาน สรุปกิจกรรมประจำวัน และเตรียมตัวเข้านอน',
+            title: 'แจ้งเตือนเตรียมตัวนอน • 10 นาทีก่อนเวลานอน (C++ Alert)',
+            timeBeforeMinutes: 10,
+            description: 'ส่งเสียง Chime และแสดง Tray Balloon แจ้งเตือนให้เตรียมวางงานและเตรียมตัวเข้านอน',
             sound: 'Chime Melodic Pulse',
             enabled: true,
             stage: 'alert',
         },
         {
             id: 'rule-2',
-            title: 'แจ้งเตือนล็อคดาวน์หน้าจอ • 15 นาทีก่อนเส้นตาย',
-            timeBeforeMinutes: 15,
-            description: 'เร่งจังหวะเตือนขั้นสูง บังคับปิดแสงสีฟ้า ปิดหน้าจอคอม และหยุดใช้งานโซเชียลมีเดีย',
+            title: 'เตือนโหมด Lockdown • 5 นาทีก่อนเวลานอน (C++ Mock)',
+            timeBeforeMinutes: 5,
+            description: 'แสดงหน้าต่าง MessageBox จำลองระบบ Lockdown เตือนขั้นวิกฤต',
             sound: 'Heartbeat Rhythm',
             enabled: true,
             stage: 'lockdown',
         },
         {
             id: 'rule-3',
-            title: 'สัญญาณไซเรนเส้นตายเข้านอน',
+            title: 'เตือนโหมด Sleep • 2 นาทีก่อนเวลานอน (C++ Mock)',
+            timeBeforeMinutes: 2,
+            description: 'แสดงหน้าต่าง MessageBox จำลอง Windows Sleep Mode เตือนก่อนเส้นตาย',
+            sound: 'Heartbeat Fast',
+            enabled: true,
+            stage: 'lockdown',
+        },
+        {
+            id: 'rule-4',
+            title: 'เตือนชัตดาวน์เมื่อถึงเวลานอน • 0 นาที (C++ Mock)',
             timeBeforeMinutes: 0,
-            description: 'ส่งเสียงไซเรนฉุกเฉินและแจ้งเตือน Discord เมื่อถึงเวลา หากไม่เข้านอน HP จะเริ่มลดลงทันที',
+            description: 'แสดงหน้าต่าง MessageBox จำลอง Shutdown เตือนครั้งสุดท้ายเมื่อถึงเวลานอนที่ตั้งไว้',
             sound: 'Emergency Alarm',
             enabled: true,
             stage: 'deadline',
@@ -120,8 +129,8 @@ export default function BedtimeAlerts() {
         setIsSaving(true);
         setSaveSuccess(false);
 
-        // Save settings to backend with wake up time and sleep target
-        const ok = await saveSettings(activeWake);
+        // Save settings to backend with target bedtime
+        const ok = await saveSettings(null, undefined, undefined, undefined, activeTarget);
         setIsSaving(false);
         if (ok) {
             setSaveSuccess(true);
@@ -169,7 +178,7 @@ export default function BedtimeAlerts() {
                             ระบบตั้งเวลาแจ้งเวลานอน
                         </h1>
                         <p className="text-xs text-zinc-500 font-light mt-0.5">
-                            กำหนดเวลาเข้านอน ระบบจะคำนวณและแจ้งเตือนตามลำดับขั้นตอนก่อนถึงเส้นตาย
+                            กำหนดเวลาเข้านอนเพียงเวลาเดียว ระบบ C++ และ Web จะเฝ้าระวังและแจ้งเตือนตามลำดับขั้นตอน
                         </p>
                     </div>
 
@@ -200,13 +209,21 @@ export default function BedtimeAlerts() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
                         <div className="space-y-1.5">
                             <label className="text-xs text-zinc-400 font-light flex items-center justify-between">
-                                <span>เวลาตื่นนอนเป้าหมาย</span>
-                                <span className="text-[11px] text-zinc-500">(คำนวณ 5 Sleep Cycles)</span>
+                                <span>เวลาเข้านอนเป้าหมาย</span>
+                                <span className="text-[11px] text-emerald-400 font-medium">ตั้งเพียงเวลาเดียว</span>
                             </label>
                             <input
                                 type="time"
-                                value={activeWake}
-                                onChange={(e) => setActiveWake(e.target.value)}
+                                value={activeTarget}
+                                onChange={(e) => {
+                                    const newBedtime = e.target.value;
+                                    setActiveTarget(newBedtime);
+                                    const [h, m] = newBedtime.split(':').map(Number);
+                                    const d = new Date();
+                                    d.setHours(h || 23, m || 0, 0, 0);
+                                    d.setMinutes(d.getMinutes() + (5 * 90) + 15);
+                                    setActiveWake(`${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`);
+                                }}
                                 required
                                 className="w-full h-11 px-3 bg-[#18181b] text-white rounded-lg border-0 text-lg tabular-nums focus:outline-none focus:ring-1 focus:ring-white/20"
                             />
@@ -214,18 +231,18 @@ export default function BedtimeAlerts() {
 
                         <div className="space-y-1.5">
                             <label className="text-xs text-zinc-400 font-light flex items-center justify-between">
-                                <span>เวลาเข้านอนเป้าหมาย</span>
-                                <span className="text-[11px] text-emerald-400 font-medium">เส้นตายเข้านอน</span>
+                                <span>เวลาตื่นนอนที่แนะนำ</span>
+                                <span className="text-[11px] text-zinc-500">(5 รอบการนอน)</span>
                             </label>
                             <div className="w-full h-11 px-3 bg-[#18181b] text-white rounded-lg flex items-center text-lg tabular-nums">
-                                {activeTarget} น.
+                                {activeWake} น.
                             </div>
                         </div>
                     </div>
 
                     <div className="flex items-center justify-between pt-2">
                         <span className="text-[11px] text-zinc-500 font-light">
-                            คำนวณถอยหลัง 7 ชั่วโมง 45 นาที (90 นาที × 5 รอบ + 15 นาทีเพื่อผล็อยหลับ)
+                            ระบบ C++ เฝ้าระวังจะแจ้งเตือนที่ T-10m, T-5m (Lockdown), T-2m (Sleep) และ T-0m (Shutdown)
                         </span>
                         <button
                             type="submit"

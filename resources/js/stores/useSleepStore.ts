@@ -16,6 +16,7 @@ export interface SleepState {
     last_sleep_confirmed_at: string | null;
     level: number;
     exp: number;
+    points: number;
     emergency_countdown_seconds: number;
 
     // Derived timer values
@@ -37,9 +38,16 @@ export interface SleepState {
     toggleAudio: (enabled?: boolean) => void;
     startSimulation321: () => void;
     resetSimulation: () => void;
-    saveSettings: (wakeUpTime: string, discordUserId?: string, discordBotToken?: string, emergencyCountdownSeconds?: number) => Promise<boolean>;
+    saveSettings: (
+        wakeUpTime?: string | null,
+        discordUserId?: string,
+        discordBotToken?: string,
+        emergencyCountdownSeconds?: number,
+        sleepTargetTime?: string | null
+    ) => Promise<boolean>;
     confirmSleep: () => Promise<boolean>;
     useTicket: () => Promise<boolean>;
+    redeemTicket: () => Promise<boolean>;
     fetchStatus: () => Promise<void>;
     testDiscordConnection: (token?: string, userId?: string) => Promise<{
         success: boolean;
@@ -154,6 +162,7 @@ export const useSleepStore = create<SleepState>((set, get) => ({
     last_sleep_confirmed_at: null,
     level: 1,
     exp: 150,
+    points: 100,
     emergency_countdown_seconds: 60,
 
     stage: 'normal',
@@ -375,9 +384,27 @@ export const useSleepStore = create<SleepState>((set, get) => ({
         set({ audioEnabled: next });
     },
 
-    saveSettings: async (wakeUpTime: string, discordUserId?: string, discordBotToken?: string, emergencyCountdownSeconds?: number) => {
+    saveSettings: async (
+        wakeUpTime?: string | null,
+        discordUserId?: string,
+        discordBotToken?: string,
+        emergencyCountdownSeconds?: number,
+        sleepTargetTime?: string | null
+    ) => {
         try {
-            const calculatedTarget = calculateSleepTargetLocal(wakeUpTime);
+            let calculatedTarget = sleepTargetTime || null;
+            let finalWakeUp = wakeUpTime || null;
+
+            if (finalWakeUp && !calculatedTarget) {
+                calculatedTarget = calculateSleepTargetLocal(finalWakeUp);
+            } else if (calculatedTarget && !finalWakeUp) {
+                const [h, m] = calculatedTarget.split(':').map(Number);
+                const d = new Date();
+                d.setHours(h || 23, m || 0, 0, 0);
+                d.setMinutes(d.getMinutes() + (5 * 90) + 15);
+                finalWakeUp = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+            }
+
             const csrfToken = getCsrfToken();
 
             // Attempt server save if authenticated
@@ -390,7 +417,8 @@ export const useSleepStore = create<SleepState>((set, get) => ({
                         'X-CSRF-TOKEN': csrfToken,
                     },
                     body: JSON.stringify({
-                        wake_up_time: wakeUpTime,
+                        wake_up_time: finalWakeUp,
+                        sleep_target_time: calculatedTarget,
                         discord_user_id: discordUserId,
                         discord_bot_token: discordBotToken,
                         emergency_countdown_seconds: emergencyCountdownSeconds,
@@ -406,8 +434,8 @@ export const useSleepStore = create<SleepState>((set, get) => ({
 
             // Local fallback for guest
             get().syncUser({
-                wake_up_time: wakeUpTime,
-                sleep_target_time: calculatedTarget,
+                wake_up_time: finalWakeUp || defaultWakeUp,
+                sleep_target_time: calculatedTarget || defaultSleepTarget,
                 discord_user_id: discordUserId || null,
                 discord_bot_token: discordBotToken || null,
                 emergency_countdown_seconds: emergencyCountdownSeconds || 60,
@@ -441,7 +469,7 @@ export const useSleepStore = create<SleepState>((set, get) => ({
             }
 
             // Local fallback for guest
-            const { level, exp } = get();
+            const { level, exp, points } = get();
             let newExp = (exp || 0) + 150;
             let currentLvl = level || 1;
             let threshold = currentLvl * 500;
@@ -455,6 +483,7 @@ export const useSleepStore = create<SleepState>((set, get) => ({
                 last_sleep_confirmed_at: new Date().toISOString(),
                 level: currentLvl,
                 exp: newExp,
+                points: (points || 0) + 50,
             });
             return true;
         } catch {
@@ -501,6 +530,48 @@ export const useSleepStore = create<SleepState>((set, get) => ({
                     tickets_count: tickets_count - 1,
                 });
                 get().tick();
+                return true;
+            }
+
+            return false;
+        } catch {
+            return false;
+        }
+    },
+
+    redeemTicket: async () => {
+        try {
+            const csrfToken = getCsrfToken();
+
+            if (csrfToken) {
+                const res = await fetch('/sleep/redeem-ticket', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                    },
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.success) {
+                        set({
+                            points: data.points,
+                            tickets_count: data.tickets_count,
+                        });
+                        return true;
+                    }
+                }
+            }
+
+            // Local fallback for guest
+            const { points, tickets_count } = get();
+            if ((points ?? 0) >= 100) {
+                set({
+                    points: (points ?? 0) - 100,
+                    tickets_count: (tickets_count ?? 0) + 1,
+                });
                 return true;
             }
 

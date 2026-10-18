@@ -9,6 +9,7 @@ export default function SettingsPage() {
 
     const {
         wake_up_time,
+        sleep_target_time,
         discord_user_id,
         discord_bot_token,
         emergency_countdown_seconds,
@@ -18,6 +19,7 @@ export default function SettingsPage() {
         testDiscordConnection,
     } = useSleepStore();
 
+    const [bedtime, setBedtime] = useState(sleep_target_time || user?.sleep_target_time || '23:00');
     const [wakeTime, setWakeTime] = useState(wake_up_time || user?.wake_up_time || '07:00');
     const [discordId, setDiscordId] = useState(discord_user_id || user?.discord_user_id || '');
     const [discordToken, setDiscordToken] = useState(discord_bot_token || user?.discord_bot_token || '');
@@ -39,19 +41,24 @@ export default function SettingsPage() {
 
     // Sync from user if auth loads or updates
     useEffect(() => {
+        if (user?.sleep_target_time) {
+            setBedtime(user.sleep_target_time);
+        } else if (sleep_target_time) {
+            setBedtime(sleep_target_time);
+        }
         if (user?.discord_bot_token && !discordToken) {
             setDiscordToken(user.discord_bot_token);
         }
         if (user?.discord_user_id && !discordId) {
             setDiscordId(user.discord_user_id);
         }
-        if (user?.wake_up_time && wakeTime === '07:00') {
+        if (user?.wake_up_time) {
             setWakeTime(user.wake_up_time);
         }
-        if (user?.emergency_countdown_seconds && countdownSeconds === 60) {
+        if (user?.emergency_countdown_seconds) {
             setCountdownSeconds(user.emergency_countdown_seconds);
         }
-    }, [user?.discord_bot_token, user?.discord_user_id, user?.wake_up_time, user?.emergency_countdown_seconds]);
+    }, [user?.sleep_target_time, user?.discord_bot_token, user?.discord_user_id, user?.wake_up_time, user?.emergency_countdown_seconds, sleep_target_time]);
 
     const handleTestDiscord = async () => {
         if (!discordToken) {
@@ -73,7 +80,7 @@ export default function SettingsPage() {
     const handleSaveSleep = async (e: React.FormEvent) => {
         e.preventDefault();
         setSaving(true);
-        const ok = await saveSettings(wakeTime, discordId, discordToken, Number(countdownSeconds));
+        const ok = await saveSettings(null, discordId, discordToken, Number(countdownSeconds), bedtime);
         setSaving(false);
         if (ok) {
             setSavedSuccess(true);
@@ -112,16 +119,19 @@ export default function SettingsPage() {
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
                         <div className="space-y-1.5">
-                            <label className="text-xs text-zinc-400 font-light">เวลาตื่นเป้าหมาย</label>
+                            <label className="text-xs text-zinc-400 font-light flex items-center justify-between">
+                                <span>เวลานอนที่ต้องการ (Target Bedtime)</span>
+                                <span className="text-[11px] text-emerald-400 font-normal">ตั้งเพียงเวลาเดียว</span>
+                            </label>
                             <input
                                 type="time"
-                                value={wakeTime}
-                                onChange={(e) => setWakeTime(e.target.value)}
+                                value={bedtime}
+                                onChange={(e) => setBedtime(e.target.value)}
                                 required
                                 className="w-full h-11 px-3 bg-[#18181b] text-white rounded-lg border-0 text-base tabular-nums focus:outline-none focus:ring-1 focus:ring-white/20"
                             />
                             <p className="text-[11px] text-zinc-500 font-light">
-                                คำนวณเวลานอนอัตโนมัติ 5 รอบการนอน เผื่อเวลาหลับ 15 นาที
+                                กำหนดเวลานอนเพียงเวลาเดียว ระบบเฝ้าระวัง C++ และแจ้งเตือนจะเริ่มนับถอยหลังสู่นาทีเข้านอนนี้
                             </p>
                         </div>
 
