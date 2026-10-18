@@ -12,12 +12,32 @@ import { store } from '@/routes/login';
 import { request } from '@/routes/password';
 import PasskeyVerify from '@/components/passkey-verify';
 
+import { isSupabaseConfigured, signInWithSupabase } from '@/lib/supabase';
+import { useState } from 'react';
+
 type Props = {
     status?: string;
     canResetPassword: boolean;
 };
 
 export default function Login({ status, canResetPassword }: Props) {
+    const [supabaseStatus, setSupabaseStatus] = useState<string | null>(null);
+
+    const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+        const formData = new FormData(e.currentTarget);
+        const email = formData.get('email') as string;
+        const password = formData.get('password') as string;
+
+        if (isSupabaseConfigured() && email && password) {
+            try {
+                await signInWithSupabase(email, password);
+                setSupabaseStatus('Supabase Authenticated');
+            } catch (err: unknown) {
+                const message = err instanceof Error ? err.message : 'Auth error';
+                console.warn('Supabase sign-in sync notice:', message);
+            }
+        }
+    };
     return (
         <>
             <Head title="Log in" />
@@ -26,6 +46,7 @@ export default function Login({ status, canResetPassword }: Props) {
 
             <Form
                 {...store.form()}
+                onSubmit={handleFormSubmit}
                 resetOnSuccess={['password']}
                 className="flex flex-col gap-6"
             >
@@ -92,19 +113,38 @@ export default function Login({ status, canResetPassword }: Props) {
                             </Button>
                         </div>
 
-                        <div className="text-center text-sm text-muted-foreground">
+                        <div className="text-center text-sm text-neutral-400">
                             Don't have an account?{' '}
                             <TextLink href={register()} tabIndex={5}>
                                 Sign up
                             </TextLink>
+                        </div>
+
+                        {/* Supabase Realtime Sync Status Indicator */}
+                        <div className="rounded-xl bg-neutral-900/60 p-3 text-center text-xs text-neutral-400">
+                            {isSupabaseConfigured() ? (
+                                <span className="flex items-center justify-center gap-2 text-emerald-400">
+                                    <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                                    Supabase Realtime Sync พร้อมใช้งาน
+                                </span>
+                            ) : (
+                                <span className="text-neutral-500">
+                                    Supabase Realtime: กำหนดค่า URL และ Anon Key ใน .env เพื่อเปิดใช้งาน
+                                </span>
+                            )}
                         </div>
                     </>
                 )}
             </Form>
 
             {status && (
-                <div className="mb-4 text-center text-sm font-medium text-green-600">
+                <div className="mb-4 text-center text-sm font-medium text-emerald-400">
                     {status}
+                </div>
+            )}
+            {supabaseStatus && (
+                <div className="mb-4 text-center text-xs text-emerald-400">
+                    {supabaseStatus}
                 </div>
             )}
         </>

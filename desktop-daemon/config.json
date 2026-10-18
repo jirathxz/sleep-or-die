@@ -5,5 +5,8 @@
   "lock_workstation_on_breach": true,
   "enforce_system_shutdown": false,
   "idle_threshold_seconds": 30,
-  "check_interval_seconds": 2
+  "check_interval_seconds": 2,
+  "supabase_url": "",
+  "supabase_anon_key": "",
+  "supabase_user_id": ""
 }

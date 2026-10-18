@@ -9,16 +9,39 @@ import { Spinner } from '@/components/ui/spinner';
 import { login } from '@/routes';
 import { store } from '@/routes/register';
 
+import { isSupabaseConfigured, signUpWithSupabase } from '@/lib/supabase';
+import { useState } from 'react';
+
 type Props = {
     passwordRules: string;
 };
 
 export default function Register({ passwordRules }: Props) {
+    const [supabaseStatus, setSupabaseStatus] = useState<string | null>(null);
+
+    const handleRegisterSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+        const formData = new FormData(e.currentTarget);
+        const name = formData.get('name') as string;
+        const email = formData.get('email') as string;
+        const password = formData.get('password') as string;
+
+        if (isSupabaseConfigured() && email && password) {
+            try {
+                await signUpWithSupabase(email, password, name);
+                setSupabaseStatus('Supabase Account Created');
+            } catch (err: unknown) {
+                const message = err instanceof Error ? err.message : 'Register error';
+                console.warn('Supabase register sync notice:', message);
+            }
+        }
+    };
+
     return (
         <>
             <Head title="Register" />
             <Form
                 {...store.form()}
+                onSubmit={handleRegisterSubmit}
                 resetOnSuccess={['password', 'password_confirmation']}
                 disableWhileProcessing
                 className="flex flex-col gap-6"
@@ -101,15 +124,35 @@ export default function Register({ passwordRules }: Props) {
                             </Button>
                         </div>
 
-                        <div className="text-center text-sm text-muted-foreground">
+                        <div className="text-center text-sm text-neutral-400">
                             Already have an account?{' '}
                             <TextLink href={login()} tabIndex={6}>
                                 Log in
                             </TextLink>
                         </div>
+
+                        {/* Supabase Realtime Sync Status Indicator */}
+                        <div className="rounded-xl bg-neutral-900/60 p-3 text-center text-xs text-neutral-400">
+                            {isSupabaseConfigured() ? (
+                                <span className="flex items-center justify-center gap-2 text-emerald-400">
+                                    <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                                    Supabase Realtime Sync พร้อมใช้งาน
+                                </span>
+                            ) : (
+                                <span className="text-neutral-500">
+                                    Supabase Realtime: กำหนดค่า URL และ Anon Key ใน .env เพื่อเปิดใช้งาน
+                                </span>
+                            )}
+                        </div>
                     </>
                 )}
             </Form>
+
+            {supabaseStatus && (
+                <div className="mb-4 text-center text-xs text-emerald-400">
+                    {supabaseStatus}
+                </div>
+            )}
         </>
     );
 }

@@ -123,7 +123,7 @@ export default function SettingsPage() {
 
                         <button
                             type="button"
-                            onClick={toggleAudio}
+                            onClick={() => toggleAudio()}
                             className={`h-9 px-4 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 ${
                                 audioEnabled
                                     ? 'bg-emerald-500/20 text-emerald-400'
