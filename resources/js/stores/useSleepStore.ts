@@ -16,6 +16,7 @@ export interface SleepState {
     last_sleep_confirmed_at: string | null;
     level: number;
     exp: number;
+    emergency_countdown_seconds: number;
 
     // Derived timer values
     stage: SleepStage;
@@ -36,7 +37,7 @@ export interface SleepState {
     toggleAudio: (enabled?: boolean) => void;
     startSimulation321: () => void;
     resetSimulation: () => void;
-    saveSettings: (wakeUpTime: string, discordUserId?: string, discordBotToken?: string) => Promise<boolean>;
+    saveSettings: (wakeUpTime: string, discordUserId?: string, discordBotToken?: string, emergencyCountdownSeconds?: number) => Promise<boolean>;
     confirmSleep: () => Promise<boolean>;
     useTicket: () => Promise<boolean>;
     fetchStatus: () => Promise<void>;
@@ -153,6 +154,7 @@ export const useSleepStore = create<SleepState>((set, get) => ({
     last_sleep_confirmed_at: null,
     level: 1,
     exp: 150,
+    emergency_countdown_seconds: 60,
 
     stage: 'normal',
     totalSecondsRemaining: 86400,
@@ -270,14 +272,15 @@ export const useSleepStore = create<SleepState>((set, get) => ({
                     });
                     return;
                 } else {
-                    // Reached deadline (0): transition into 30s emergency window
+                    // Reached deadline (0): transition into emergency window
+                    const countdownSec = get().emergency_countdown_seconds || 60;
                     if (audioEnabled) {
                         audioManager.startEmergencyAlarm();
                     }
                     set({
                         simulationPhase: 'grace_30s',
-                        simulationRemaining: 30,
-                        secondsRemaining: 30,
+                        simulationRemaining: countdownSec,
+                        secondsRemaining: countdownSec,
                         totalSecondsRemaining: 0,
                         hoursRemaining: 0,
                         minutesRemaining: 0,
@@ -288,9 +291,10 @@ export const useSleepStore = create<SleepState>((set, get) => ({
                     return;
                 }
             } else if (simulationPhase === 'grace_30s') {
+                const countdownSec = get().emergency_countdown_seconds || 60;
                 const next = simulationRemaining - 1;
                 const safeSeconds = Math.max(0, next);
-                const newHp = Math.max(0, Math.round((safeSeconds / 30) * 100));
+                const newHp = Math.max(0, Math.round((safeSeconds / countdownSec) * 100));
                 const newStage = safeSeconds <= 0 || newHp <= 0 ? 'shutdown' : 'sleep';
 
                 if (newStage === 'shutdown' && oldStage !== 'shutdown') {
@@ -303,7 +307,7 @@ export const useSleepStore = create<SleepState>((set, get) => ({
                     simulationPhase: newStage === 'shutdown' ? 'shutdown' : 'grace_30s',
                     simulationRemaining: safeSeconds,
                     secondsRemaining: safeSeconds,
-                    totalSecondsRemaining: -(30 - safeSeconds),
+                    totalSecondsRemaining: -(countdownSec - safeSeconds),
                     hoursRemaining: 0,
                     minutesRemaining: 0,
                     current_hp: newHp,
@@ -324,10 +328,11 @@ export const useSleepStore = create<SleepState>((set, get) => ({
         let displayHours = timer.hours;
 
         if (timer.isPast && !last_sleep_confirmed_at) {
-            // Bedtime breached: exactly 30 seconds emergency countdown before HP hits 0
+            // Bedtime breached: dynamic emergency countdown before HP hits 0
+            const countdownSec = get().emergency_countdown_seconds || 60;
             const elapsed = Math.abs(timer.totalSeconds);
-            const emergencySecondsLeft = Math.max(0, 30 - elapsed);
-            activeHp = Math.max(0, Math.round((emergencySecondsLeft / 30) * 100));
+            const emergencySecondsLeft = Math.max(0, countdownSec - elapsed);
+            activeHp = Math.max(0, Math.round((emergencySecondsLeft / countdownSec) * 100));
             displaySeconds = emergencySecondsLeft;
             displayMinutes = 0;
             displayHours = 0;
@@ -370,7 +375,7 @@ export const useSleepStore = create<SleepState>((set, get) => ({
         set({ audioEnabled: next });
     },
 
-    saveSettings: async (wakeUpTime: string, discordUserId?: string, discordBotToken?: string) => {
+    saveSettings: async (wakeUpTime: string, discordUserId?: string, discordBotToken?: string, emergencyCountdownSeconds?: number) => {
         try {
             const calculatedTarget = calculateSleepTargetLocal(wakeUpTime);
             const csrfToken = getCsrfToken();
@@ -388,6 +393,7 @@ export const useSleepStore = create<SleepState>((set, get) => ({
                         wake_up_time: wakeUpTime,
                         discord_user_id: discordUserId,
                         discord_bot_token: discordBotToken,
+                        emergency_countdown_seconds: emergencyCountdownSeconds,
                     }),
                 });
 
@@ -404,6 +410,7 @@ export const useSleepStore = create<SleepState>((set, get) => ({
                 sleep_target_time: calculatedTarget,
                 discord_user_id: discordUserId || null,
                 discord_bot_token: discordBotToken || null,
+                emergency_countdown_seconds: emergencyCountdownSeconds || 60,
             });
             return true;
         } catch {

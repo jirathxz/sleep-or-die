@@ -11,6 +11,7 @@ export default function SettingsPage() {
         wake_up_time,
         discord_user_id,
         discord_bot_token,
+        emergency_countdown_seconds,
         audioEnabled,
         toggleAudio,
         saveSettings,
@@ -20,6 +21,9 @@ export default function SettingsPage() {
     const [wakeTime, setWakeTime] = useState(wake_up_time || user?.wake_up_time || '07:00');
     const [discordId, setDiscordId] = useState(discord_user_id || user?.discord_user_id || '');
     const [discordToken, setDiscordToken] = useState(discord_bot_token || user?.discord_bot_token || '');
+    const [countdownSeconds, setCountdownSeconds] = useState(
+        emergency_countdown_seconds || user?.emergency_countdown_seconds || 60
+    );
     const [showToken, setShowToken] = useState(false);
     const [savedSuccess, setSavedSuccess] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -44,7 +48,10 @@ export default function SettingsPage() {
         if (user?.wake_up_time && wakeTime === '07:00') {
             setWakeTime(user.wake_up_time);
         }
-    }, [user?.discord_bot_token, user?.discord_user_id, user?.wake_up_time]);
+        if (user?.emergency_countdown_seconds && countdownSeconds === 60) {
+            setCountdownSeconds(user.emergency_countdown_seconds);
+        }
+    }, [user?.discord_bot_token, user?.discord_user_id, user?.wake_up_time, user?.emergency_countdown_seconds]);
 
     const handleTestDiscord = async () => {
         if (!discordToken) {
@@ -66,7 +73,7 @@ export default function SettingsPage() {
     const handleSaveSleep = async (e: React.FormEvent) => {
         e.preventDefault();
         setSaving(true);
-        const ok = await saveSettings(wakeTime, discordId, discordToken);
+        const ok = await saveSettings(wakeTime, discordId, discordToken, Number(countdownSeconds));
         setSaving(false);
         if (ok) {
             setSavedSuccess(true);
@@ -129,6 +136,25 @@ export default function SettingsPage() {
                             />
                             <p className="text-[11px] text-zinc-500 font-light">
                                 บอท Discord จะตรวจจับสถานะออฟไลน์ในช่วงเวลานอน
+                            </p>
+                        </div>
+
+                        <div className="space-y-1.5 sm:col-span-2">
+                            <label className="text-xs text-zinc-400 font-light flex items-center justify-between">
+                                <span>เวลานับถอยหลังฉุกเฉิน (วินาที)</span>
+                                <span className="text-xs text-amber-400 font-mono font-medium">{countdownSeconds} วินาที</span>
+                            </label>
+                            <input
+                                type="number"
+                                min={10}
+                                max={300}
+                                value={countdownSeconds}
+                                onChange={(e) => setCountdownSeconds(Math.max(10, Math.min(300, parseInt(e.target.value) || 60)))}
+                                required
+                                className="w-full h-11 px-3 bg-[#18181b] text-white rounded-lg border-0 text-base tabular-nums focus:outline-none focus:ring-1 focus:ring-white/20"
+                            />
+                            <p className="text-[11px] text-zinc-500 font-light">
+                                ระยะเวลาผ่อนผันก่อนเครื่องสลีป/ชัตดาวน์ (10 - 300 วินาที, ค่าเริ่มต้น 60 วินาที มีผลต่อโปรแกรม C++ และ Dashboard)
                             </p>
                         </div>
 
