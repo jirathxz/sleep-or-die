@@ -201,6 +201,7 @@ export const useSleepStore = create<SleepState>((set, get) => ({
             sleep_target_time,
             current_hp,
             is_disabled,
+            last_sleep_confirmed_at,
             totalSecondsRemaining,
             stage: oldStage,
             audioEnabled,
@@ -227,18 +228,19 @@ export const useSleepStore = create<SleepState>((set, get) => ({
                 }
                 set({
                     totalSecondsRemaining: 0,
-                    secondsRemaining: 0,
+                    secondsRemaining: 30,
                     hoursRemaining: 0,
                     minutesRemaining: 0,
                     isPastDeadline: true,
                     stage: 'sleep',
-                    simulationElapsedPast: 1,
+                    simulationElapsedPast: 0,
                 });
                 return;
             } else {
-                // Past deadline during simulation: HP drains visibly by 4% per second
+                // Past deadline: Exactly 30 seconds before HP runs out (100% -> 0%)
                 const newElapsed = (simulationElapsedPast || 0) + 1;
-                const newHp = Math.max(0, current_hp - 4);
+                const emergencySecondsLeft = Math.max(0, 30 - newElapsed);
+                const newHp = Math.max(0, Math.round((emergencySecondsLeft / 30) * 100));
                 const newStage = determineStage(newHp, is_disabled, 0);
 
                 if (newStage === 'shutdown' && oldStage !== 'shutdown') {
@@ -253,8 +255,8 @@ export const useSleepStore = create<SleepState>((set, get) => ({
                     isPastDeadline: true,
                     simulationElapsedPast: newElapsed,
                     totalSecondsRemaining: -newElapsed,
-                    secondsRemaining: newElapsed % 60,
-                    minutesRemaining: Math.floor(newElapsed / 60),
+                    secondsRemaining: emergencySecondsLeft,
+                    minutesRemaining: 0,
                     hoursRemaining: 0,
                 });
                 return;
@@ -262,7 +264,22 @@ export const useSleepStore = create<SleepState>((set, get) => ({
         }
 
         const timer = calculateTimeRemaining(sleep_target_time);
-        const newStage = determineStage(current_hp, is_disabled, timer.totalSeconds);
+        let activeHp = current_hp;
+        let displaySeconds = timer.seconds;
+        let displayMinutes = timer.minutes;
+        let displayHours = timer.hours;
+
+        if (timer.isPast && !last_sleep_confirmed_at) {
+            // Bedtime breached: exactly 30 seconds emergency countdown before HP hits 0
+            const elapsed = Math.abs(timer.totalSeconds);
+            const emergencySecondsLeft = Math.max(0, 30 - elapsed);
+            activeHp = Math.max(0, Math.round((emergencySecondsLeft / 30) * 100));
+            displaySeconds = emergencySecondsLeft;
+            displayMinutes = 0;
+            displayHours = 0;
+        }
+
+        const newStage = determineStage(activeHp, is_disabled, timer.totalSeconds);
 
         if (newStage !== oldStage) {
             if (audioEnabled) {
@@ -281,11 +298,12 @@ export const useSleepStore = create<SleepState>((set, get) => ({
         }
 
         set({
+            current_hp: activeHp,
             stage: newStage,
             totalSecondsRemaining: timer.totalSeconds,
-            hoursRemaining: timer.hours,
-            minutesRemaining: timer.minutes,
-            secondsRemaining: timer.seconds,
+            hoursRemaining: displayHours,
+            minutesRemaining: displayMinutes,
+            secondsRemaining: displaySeconds,
             isPastDeadline: timer.isPast,
         });
     },

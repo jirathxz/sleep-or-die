@@ -119,17 +119,16 @@ def run_simulation(config: dict):
 
     print("\n" + "!" * 65)
     print(" >>> [DEADLINE REACHED: 00:00:00] BEDTIME CURFEW BREACHED! <<<")
+    print(" >>> EMERGENCY! 30 seconds remaining before HP reaches 0%!")
     print("!" * 65)
     play_stage_sound("sleep")
 
-    hp = 100
-    print("\nUser is still active at computer! Draining HP rapidly...\n")
-    while hp > 0:
-        hp -= 20
-        print(f"  [HP DRAIN] Current HP: {hp}%  (Violation Penalty -20 HP)")
+    for sec in range(30, 0, -1):
+        hp = int(round((sec / 30.0) * 100))
+        print(f"  >>> [EMERGENCY 30s COUNTDOWN] {sec}s remaining before HP 0%! Current HP: {hp}%")
         try:
             import winsound
-            winsound.Beep(1175, 150)
+            winsound.Beep(1175, 120)
         except Exception:
             pass
         time.sleep(1)
@@ -158,6 +157,7 @@ def main():
     print("  Hardcore Biological Discipline & Night Curfew Enforcer")
     print("=" * 65)
     print(f" Target Bedtime     : {config['bedtime_hour']:02d}:{config['bedtime_minute']:02d}")
+    print(" Emergency Window   : 30 seconds before HP runs out (100% -> 0%)")
     print(f" Audio Alerts       : {'Enabled' if config['enable_audio'] else 'Disabled'}")
     print(f" Lock Screen Action : {'Enabled' if config['lock_workstation_on_breach'] else 'Disabled'}")
     print(f" Shutdown on 0% HP  : {'Enabled' if config['enforce_system_shutdown'] else 'Disabled'}")
@@ -192,25 +192,27 @@ def main():
                 elif current_stage == "lockdown":
                     print("[LOCKDOWN - T-15m] เหลือเวลา 15 นาที! บันทึกงานและปิดเครื่องทันที")
                 elif current_stage == "sleep":
-                    print("[SLEEP - DEADLINE] เลยเวลานอนแล้ว! หากตรวจพบการขยับเมาส์/คีย์บอร์ด เลือดจะลดลงทันที")
+                    print("[SLEEP - DEADLINE] เลยเวลานอนแล้ว! มีเวลา 30 วินาทีก่อน HP หมดและเครื่องจะถูกล็อค")
 
-            # Active curfew check:
+            # Bedtime curfew breached: 30 seconds emergency countdown before HP hits 0%
             if current_stage == "sleep":
-                if idle_seconds < config.get("idle_threshold_seconds", 30):
-                    current_hp = max(0, current_hp - 5)
-                    print(f"[{datetime.now().strftime('%H:%M:%S')}] [VIOLATION] Active typing/mouse detected! (Idle: {idle_seconds:.1f}s) -> HP: {current_hp}%")
-                    play_stage_sound("sleep")
+                seconds_past_deadline = abs(remaining)
+                emergency_seconds_left = max(0, 30 - int(seconds_past_deadline))
+                current_hp = max(0, int(round((emergency_seconds_left / 30.0) * 100)))
 
-                    if current_hp <= 0:
-                        print("\n[CRITICAL] HP DROPPED TO 0%! EXECUTING ENFORCEMENT PROTOCOL.")
-                        play_stage_sound("shutdown")
-                        if config.get("lock_workstation_on_breach", True):
-                            lock_workstation()
-                        if config.get("enforce_system_shutdown", False):
-                            os.system('shutdown /s /t 60 /c "SleepOrDie: HP Reached 0%! System Shutting Down to Enforce Sleep Discipline."')
-                        break
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] [EMERGENCY 30s COUNTDOWN] {emergency_seconds_left}s remaining before HP 0%! Current HP: {current_hp}%")
+                play_stage_sound("sleep")
 
-            time.sleep(config.get("check_interval_seconds", 2))
+                if emergency_seconds_left <= 0 or current_hp <= 0:
+                    print("\n[CRITICAL] 30s EXPIRED! HP DROPPED TO 0%! EXECUTING ENFORCEMENT PROTOCOL.")
+                    play_stage_sound("shutdown")
+                    if config.get("lock_workstation_on_breach", True):
+                        lock_workstation()
+                    if config.get("enforce_system_shutdown", False):
+                        os.system('shutdown /s /t 60 /c "SleepOrDie: HP Reached 0%! System Shutting Down to Enforce Sleep Discipline."')
+                    break
+
+            time.sleep(1)
 
     except KeyboardInterrupt:
         print("\n[SleepOrDie Guard] Daemon stopped by user.")

@@ -52,9 +52,9 @@ export const CountdownDisplay: React.FC<CountdownDisplayProps> = ({
         dotColor = 'bg-amber-500';
         stageTextColor = 'text-amber-400';
     } else if (stage === 'sleep') {
-        stageText = 'เลยเวลานอนแล้ว: กำลังสูญเสียพลังชีวิต';
+        stageText = `ฉุกเฉิน! มีเวลาอีก ${seconds} วินาทีก่อน HP หมด`;
         dotColor = 'bg-rose-500 animate-pulse';
-        stageTextColor = 'text-rose-400';
+        stageTextColor = 'text-rose-400 font-medium';
         digitsColor = 'text-rose-400';
     } else if (stage === 'shutdown') {
         stageText = 'เข้าสู่สภาวะชัตดาวน์ (ปิดระบบ)';
@@ -120,6 +120,11 @@ export const CountdownDisplay: React.FC<CountdownDisplayProps> = ({
 
             {/* Action Trigger & Test Simulation Controls */}
             <div className="max-w-xs mx-auto space-y-2 pt-2">
+                {stage === 'sleep' && !isVerifying && (
+                    <div className="text-xs text-rose-400 font-normal animate-pulse pb-0.5">
+                        ⚠️ มีเวลาอีก {seconds} วิก่อน HP หมด! รีบกดเข้านอนทันที
+                    </div>
+                )}
                 {isVerifying ? (
                     <div className="p-3.5 rounded-lg bg-[#18181b] text-amber-300 text-xs font-normal flex items-center justify-center gap-2.5">
                         <Loader2 className="size-4 animate-spin text-amber-400" />
@@ -131,7 +136,7 @@ export const CountdownDisplay: React.FC<CountdownDisplayProps> = ({
                         disabled={stage === 'shutdown'}
                         className={`w-full h-11 px-6 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 shadow-sm ${
                             stage === 'sleep'
-                                ? 'bg-rose-500 text-white hover:bg-rose-600'
+                                ? 'bg-rose-500 text-white hover:bg-rose-600 animate-pulse'
                                 : stage === 'shutdown'
                                   ? 'bg-[#18181b] text-zinc-600 cursor-not-allowed'
                                   : 'bg-white text-zinc-950 hover:bg-zinc-200 active:scale-[0.99]'

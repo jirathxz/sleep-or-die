@@ -154,7 +154,7 @@ void ExecuteEnforcement() {
 }
 
 /**
- * Simulates the 3-2-1 Bedtime Countdown locally
+ * Simulates the 3-2-1 Bedtime Countdown locally with 30s emergency window before HP hits 0%
  */
 void RunSimulation321() {
     std::cout << "\n=======================================================\n";
@@ -168,14 +168,13 @@ void RunSimulation321() {
     }
 
     std::cout << "\n>>> [DEADLINE REACHED: 00:00:00] BEDTIME PROTOCOL BREACHED! <<<\n";
-    std::cout << ">>> Alarm sounding! HP is now draining rapidly...\n";
+    std::cout << ">>> EMERGENCY! 30 seconds remaining before HP reaches 0%!\n";
     PlaySoundForStage(SleepStage::Sleep);
 
-    int testHp = 100;
-    while (testHp > 0) {
-        testHp -= 20;
-        std::cout << "[HP DRAIN] Current HP: " << testHp << "%\n";
-        Beep(1175, 150);
+    for (int sec = 30; sec >= 1; --sec) {
+        int hp = (sec * 100) / 30;
+        std::cout << ">>> [EMERGENCY 30s COUNTDOWN] " << sec << "s remaining before HP 0%! Current HP: " << hp << "%\n";
+        Beep(1175, 120);
         Sleep(1000);
     }
 
@@ -192,8 +191,9 @@ int main(int argc, char* argv[]) {
     std::cout << "    Hardcore Biological Discipline & Night Curfew Enforcer  \n";
     std::cout << "============================================================\n";
     std::cout << " Target Bedtime: " << config.bedtimeHour << ":" << (config.bedtimeMinute < 10 ? "0" : "") << config.bedtimeMinute << "\n";
+    std::cout << " Emergency Window: 30 seconds before HP runs out (100% -> 0%)\n";
     std::cout << " Monitoring active user presence via Win32 API...\n";
-    std::cout << " Type 'test' to simulate 3-2-1 bedtime deadline.\n";
+    std::cout << " Type 'SleepOrDieGuard.exe --test' to simulate 3-2-1 bedtime deadline.\n";
     std::cout << "------------------------------------------------------------\n\n";
 
     if (argc > 1 && std::string(argv[1]) == "--test") {
@@ -227,30 +227,28 @@ int main(int argc, char* argv[]) {
             } else if (currentStage == SleepStage::Lockdown) {
                 ShowWindowsAlert(L"SleepOrDie ล็อคดาวน์", L"เหลือเวลา 15 นาทีสุดท้าย! ปิดหน้าจอคอมพิวเตอร์ทันที", MB_ICONWARNING);
             } else if (currentStage == SleepStage::Sleep) {
-                ShowWindowsAlert(L"SleepOrDie เลยเวลานอน", L"เลยเส้นตายแล้ว! เลือดกำลังลด หากไม่นอนเครื่องจะถูกล็อค", MB_ICONERROR);
+                ShowWindowsAlert(L"SleepOrDie เลยเวลานอน", L"เลยเส้นตายแล้ว! มีเวลา 30 วินาทีก่อน HP หมดและเครื่องจะถูกล็อค", MB_ICONERROR);
             }
         }
 
-        // Active evasion check past deadline:
+        // Bedtime curfew breached: 30 seconds emergency countdown before HP hits 0%
         if (currentStage == SleepStage::Sleep) {
-            if (idleSeconds < 30) {
-                // User is actively moving mouse or typing past deadline!
-                std::cout << "[VIOLATION] Active keyboard/mouse detected past bedtime deadline! (Idle: " << idleSeconds << "s)\n";
-                PlaySoundForStage(SleepStage::Sleep);
+            long secondsPastDeadline = -secondsRemaining;
+            long emergencySecondsLeft = max(0L, 30L - secondsPastDeadline);
+            config.currentHp = max(0, (int)((emergencySecondsLeft * 100) / 30));
 
-                config.currentHp = max(0, config.currentHp - 5);
-                std::cout << "[VITALITY] HP drained to " << config.currentHp << "%\n";
+            std::cout << "[EMERGENCY 30s COUNTDOWN] " << emergencySecondsLeft << "s remaining before HP 0%! Current HP: " << config.currentHp << "%\n";
+            PlaySoundForStage(SleepStage::Sleep);
 
-                if (config.currentHp <= 0) {
-                    currentStage = SleepStage::Shutdown;
-                    ExecuteEnforcement();
-                    break;
-                }
+            if (emergencySecondsLeft <= 0 || config.currentHp <= 0) {
+                currentStage = SleepStage::Shutdown;
+                ExecuteEnforcement();
+                break;
             }
         }
 
-        // Sleep for 2 seconds before next tick
-        Sleep(2000);
+        // Sleep for 1 second before next tick
+        Sleep(1000);
     }
 
     return 0;

@@ -4,15 +4,16 @@ import { AlertTriangle, AlertCircle } from 'lucide-react';
 
 interface StageOverlayProps {
     stage: SleepStage;
+    secondsRemaining?: number;
 }
 
-export const StageOverlay: React.FC<StageOverlayProps> = ({ stage }) => {
+export const StageOverlay: React.FC<StageOverlayProps> = ({ stage, secondsRemaining }) => {
     if (stage === 'normal') return null;
 
     if (stage === 'alert') {
         return (
             <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-full max-w-lg px-4 pointer-events-auto">
-                <div className="bg-[#18181b] text-white rounded-xl shadow-2xl p-4 flex items-center gap-3">
+                <div className="bg-[#18181b] text-white rounded-xl shadow-2xl p-4 flex items-center gap-3 border border-zinc-800">
                     <span className="size-2 rounded-full bg-amber-400 shrink-0" />
                     <div>
                         <h3 className="text-xs font-medium text-amber-400">
@@ -30,7 +31,7 @@ export const StageOverlay: React.FC<StageOverlayProps> = ({ stage }) => {
     if (stage === 'lockdown') {
         return (
             <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-full max-w-lg px-4 pointer-events-auto">
-                <div className="bg-[#18181b] text-white rounded-xl shadow-2xl p-4 flex items-center gap-3">
+                <div className="bg-[#18181b] text-white rounded-xl shadow-2xl p-4 flex items-center gap-3 border border-zinc-800">
                     <span className="size-2 rounded-full bg-amber-500 animate-ping shrink-0" />
                     <div>
                         <h3 className="text-xs font-medium text-amber-400">
@@ -46,16 +47,17 @@ export const StageOverlay: React.FC<StageOverlayProps> = ({ stage }) => {
     }
 
     if (stage === 'sleep') {
+        const secText = typeof secondsRemaining === 'number' ? `เหลือเวลาอีก ${secondsRemaining} วินาที` : 'มีเวลา 30 วินาที';
         return (
             <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-full max-w-lg px-4 pointer-events-auto">
-                <div className="bg-[#18181b] text-white rounded-xl shadow-2xl p-4 flex items-center gap-3">
+                <div className="bg-[#18181b] text-white rounded-xl shadow-2xl p-4 flex items-center gap-3 border border-rose-500/30">
                     <span className="size-2 rounded-full bg-rose-500 animate-ping shrink-0" />
                     <div>
                         <h3 className="text-xs font-medium text-rose-400">
-                            เลยเวลานอนแล้ว (DRAINING HP)
+                            เลยเวลานอนแล้ว (ฉุกเฉิน: {secText}ก่อน HP หมด!)
                         </h3>
                         <p className="text-[11px] text-zinc-400 font-light mt-0.5">
-                            พลังชีวิตลดลงต่อเนื่อง หากลดจนถึง 0% จะถูกบันทึก 1 สไตรค์
+                            พลังชีวิตลดลงต่อเนื่อง รีบกดยืนยันการนอนเพื่อหลีกเลี่ยงการชัตดาวน์
                         </p>
                     </div>
                 </div>

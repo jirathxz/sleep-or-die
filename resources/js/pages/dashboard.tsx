@@ -91,7 +91,7 @@ export default function Dashboard() {
             <Head title="แดชบอร์ด - SleepOrDie" />
 
             {/* Emergency Alerts & Vignette Overlays */}
-            <StageOverlay stage={stage} />
+            <StageOverlay stage={stage} secondsRemaining={secondsRemaining} />
 
             <div className="max-w-3xl w-full mx-auto p-4 md:p-6 space-y-5 select-none">
                 {/* Header: Pure focus on Dashboard role & Quick audio toggle */}
