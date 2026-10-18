@@ -30,6 +30,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
     'password',
     'wake_up_time',
     'sleep_target_time',
+    'emergency_countdown_seconds',
     'current_hp',
     'shutdown_stacks',
     'days_survived',
@@ -53,6 +54,7 @@ class User extends Authenticatable
      * @var array<string, mixed>
      */
     protected $attributes = [
+        'emergency_countdown_seconds' => 60,
         'current_hp' => 100,
         'shutdown_stacks' => 0,
         'days_survived' => 0,
@@ -73,6 +75,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'two_factor_confirmed_at' => 'datetime',
+            'emergency_countdown_seconds' => 'integer',
             'current_hp' => 'integer',
             'shutdown_stacks' => 'integer',
             'days_survived' => 'integer',
