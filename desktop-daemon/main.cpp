@@ -38,6 +38,7 @@
 #define WM_TRAYICON (WM_USER + 101)
 #define ID_TRAY_STATUS 2001
 #define ID_TRAY_SIMULATE 2002
+#define ID_TRAY_TEST_SLEEP 2005
 #define ID_TRAY_LOGIN 2003
 #define ID_TRAY_EXIT 2004
 
@@ -76,6 +77,9 @@ struct DaemonConfig {
     int idleThresholdSeconds = 60;
     int checkIntervalSeconds = 2;
     int currentHp = 100;
+    bool enableDiscordDetection = true;
+    bool enableCppDetection = true;
+    bool isSystemActive = true;
 };
 
 // Global daemon state
@@ -84,6 +88,7 @@ SleepStage currentStage = SleepStage::Normal;
 NOTIFYICONDATAW g_nid = {};
 HWND g_hWnd = NULL;
 std::atomic<bool> g_simulationRunning(false);
+std::atomic<bool> g_simulatedSleeping(false);
 
 void SaveConfigJson() {
     std::ofstream file("config.json");
@@ -356,6 +361,29 @@ void ShowTrayBalloon(const std::wstring& title, const std::wstring& message, DWO
     wcsncpy_s(g_nid.szInfo, message.c_str(), _TRUNCATE);
     g_nid.dwInfoFlags = infoFlags;
     Shell_NotifyIconW(NIM_MODIFY, &g_nid);
+}
+
+void ReportPresenceTestSleep(bool sleeping) {
+    std::string json = "{\"source\":\"desktop_daemon\",\"status\":\"" + std::string(sleeping ? "offline" : "online") + "\",\"idle_seconds\":" + (sleeping ? "3600" : "0") + ",\"screen_locked\":" + (sleeping ? "true" : "false") + ",\"simulate_sleep\":" + (sleeping ? "true" : "false") + ",\"wake_up_simulation\":" + (sleeping ? "false" : "true");
+    if (!config.discordUserId.empty()) {
+        json += ",\"discord_user_id\":\"" + config.discordUserId + "\"";
+    }
+    if (config.userId > 0) {
+        json += ",\"user_id\":" + std::to_string(config.userId);
+    }
+    json += "}";
+
+    std::thread([json, sleeping]() {
+        std::string resp;
+        DWORD code = 0;
+        if (SendHttpJson(config.apiHost, config.apiPort, config.apiPath, json, resp, code)) {
+            if (sleeping) {
+                ShowTrayBalloon(L"SleepOrDie ทดสอบเข้านอน", L"ส่งสัญญาณจำลองสถานะนอนแล้ว (Sleep) เรียบร้อย", NIIF_INFO);
+            } else {
+                ShowTrayBalloon(L"SleepOrDie ทดสอบตื่นนอน", L"ส่งสัญญาณจำลองสถานะตื่น (Awake) เรียบร้อย", NIIF_INFO);
+            }
+        }
+    }).detach();
 }
 
 void ExecuteFinalEnforcement() {
@@ -662,6 +690,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
                 AppendMenuW(hMenu, MF_STRING | MF_GRAYED, 0, timeText.c_str());
                 AppendMenuW(hMenu, MF_SEPARATOR, 0, NULL);
                 AppendMenuW(hMenu, MF_STRING, ID_TRAY_STATUS, L"📊 ดูข้อมูลสถานะการนอน");
+
+                std::wstring testSleepText = g_simulatedSleeping.load()
+                    ? L"☀️ ทดสอบ: ยกเลิกโหมดจำลองนอน (Wake Up)"
+                    : L"🌙 ทดสอบ: จำลองสถานะนอนแล้ว (Test Sleep)";
+                AppendMenuW(hMenu, MF_STRING, ID_TRAY_TEST_SLEEP, testSleepText.c_str());
+
                 AppendMenuW(hMenu, MF_STRING, ID_TRAY_SIMULATE, L"🧪 ทดสอบจำลองเส้นตาย 3-2-1");
                 AppendMenuW(hMenu, MF_STRING, ID_TRAY_LOGIN, L"🔑 เข้าสู่ระบบใหม่ (Switch User)");
                 AppendMenuW(hMenu, MF_SEPARATOR, 0, NULL);
@@ -684,8 +718,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
                                         L"• เวลาตื่นนอน: " + std::to_wstring(config.wakeUpHour) + L":" + (config.wakeUpMinute < 10 ? L"0" : L"") + std::to_wstring(config.wakeUpMinute) + L" น.\n"
                                         L"• เวลานับถอยหลังฉุกเฉิน: " + std::to_wstring(config.emergencyCountdownSeconds) + L" วินาที\n"
                                         L"• พลังชีวิต (HP): " + std::to_wstring(config.currentHp) + L"%\n"
+                                        L"• โหมดทดสอบจำลองนอน: " + (g_simulatedSleeping.load() ? L"เปิดใช้งานอยู่ (Simulated Sleeping)" : L"ไม่ได้เปิด") + L"\n"
                                         L"• สถานะเคอร์ฟิว: " + (IsWithinCurfewHours() ? L"กำลังอยู่ในช่วงเคอร์ฟิวเข้านอน" : L"ช่วงเวลาปกติ");
                     MessageBoxW(hWnd, info.c_str(), L"สถานะระบบ SleepOrDie", MB_OK | MB_ICONINFORMATION);
+                } else if (cmd == ID_TRAY_TEST_SLEEP) {
+                    bool sleeping = !g_simulatedSleeping.load();
+                    g_simulatedSleeping.store(sleeping);
+                    ReportPresenceTestSleep(sleeping);
                 } else if (cmd == ID_TRAY_SIMULATE) {
                     RunSimulation321();
                 } else if (cmd == ID_TRAY_LOGIN) {
@@ -720,6 +759,13 @@ void DaemonLoop() {
     while (true) {
         if (g_simulationRunning) {
             Sleep(1000);
+            continue;
+        }
+
+        if (g_simulatedSleeping.load()) {
+            std::wstring tip = L"SleepOrDie: โหมดจำลองว่านอนแล้ว (Test Sleeping) | HP: " + std::to_wstring(config.currentHp) + L"%";
+            UpdateTrayTooltip(tip);
+            Sleep(2000);
             continue;
         }
 

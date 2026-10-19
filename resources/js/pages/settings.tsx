@@ -13,6 +13,9 @@ export default function SettingsPage() {
         discord_user_id,
         discord_bot_token,
         emergency_countdown_seconds,
+        enable_discord_detection,
+        enable_cpp_detection,
+        is_system_active,
         audioEnabled,
         toggleAudio,
         saveSettings,
@@ -27,6 +30,12 @@ export default function SettingsPage() {
     const [discordToken, setDiscordToken] = useState(discord_bot_token || user?.discord_bot_token || '');
     const [countdownSeconds, setCountdownSeconds] = useState(
         emergency_countdown_seconds || user?.emergency_countdown_seconds || 60
+    );
+    const [enableDiscord, setEnableDiscord] = useState(
+        enable_discord_detection !== undefined ? enable_discord_detection : (user?.enable_discord_detection ?? true)
+    );
+    const [enableCpp, setEnableCpp] = useState(
+        enable_cpp_detection !== undefined ? enable_cpp_detection : (user?.enable_cpp_detection ?? true)
     );
     const [showToken, setShowToken] = useState(false);
     const [savedSuccess, setSavedSuccess] = useState(false);
@@ -84,7 +93,19 @@ export default function SettingsPage() {
         } else if (user?.emergency_countdown_seconds) {
             setCountdownSeconds(user.emergency_countdown_seconds);
         }
-    }, [sleep_target_time, discord_bot_token, discord_user_id, wake_up_time, emergency_countdown_seconds, user]);
+
+        if (enable_discord_detection !== undefined) {
+            setEnableDiscord(enable_discord_detection);
+        } else if (user?.enable_discord_detection !== undefined) {
+            setEnableDiscord(user.enable_discord_detection);
+        }
+
+        if (enable_cpp_detection !== undefined) {
+            setEnableCpp(enable_cpp_detection);
+        } else if (user?.enable_cpp_detection !== undefined) {
+            setEnableCpp(user.enable_cpp_detection);
+        }
+    }, [sleep_target_time, discord_bot_token, discord_user_id, wake_up_time, emergency_countdown_seconds, enable_discord_detection, enable_cpp_detection, user]);
 
     const handleTestDiscord = async () => {
         if (!discordToken) {
@@ -123,7 +144,15 @@ export default function SettingsPage() {
     const handleSaveSleep = async (e: React.FormEvent) => {
         e.preventDefault();
         setSaving(true);
-        const ok = await saveSettings(wakeTime, discordId, discordToken, Number(countdownSeconds), bedtime);
+        const ok = await saveSettings(
+            wakeTime,
+            discordId,
+            discordToken,
+            Number(countdownSeconds),
+            bedtime,
+            enableDiscord,
+            enableCpp
+        );
         setSaving(false);
         if (ok) {
             setSavedSuccess(true);
@@ -212,6 +241,98 @@ export default function SettingsPage() {
                             <p className="text-[11px] text-zinc-500 font-light">
                                 ระยะเวลาผ่อนผันก่อนเครื่องสลีป/ชัตดาวน์ (10 - 300 วินาที, ค่าเริ่มต้น 60 วินาที มีผลต่อโปรแกรม C++ และ Dashboard)
                             </p>
+                        </div>
+
+                        {/* Detection Channels Toggles (Discord Bot & C++ Desktop Guard) */}
+                        <div className="space-y-3 sm:col-span-2 pt-2 border-t border-white/5">
+                            <div className="flex items-center justify-between">
+                                <label className="text-xs text-zinc-300 font-medium flex items-center gap-1.5">
+                                    <Shield className="size-3.5 text-emerald-400" />
+                                    <span>ช่องทางการตรวจจับการนอน (Detection Channels)</span>
+                                </label>
+                                <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${
+                                    (enableDiscord || enableCpp)
+                                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                        : 'bg-rose-500/10 text-rose-400 border border-rose-500/20 animate-pulse'
+                                }`}>
+                                    {(enableDiscord || enableCpp) ? '● ระบบทำงาน' : '● ระบบไม่ทำงาน (หยุดชั่วคราว)'}
+                                </span>
+                            </div>
+
+                            {/* Warning if both toggles are off */}
+                            {!enableDiscord && !enableCpp && (
+                                <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-xs text-rose-300 flex items-start gap-2">
+                                    <AlertCircle className="size-4 text-rose-400 shrink-0 mt-0.5" />
+                                    <div className="space-y-0.5">
+                                        <p className="font-medium text-rose-200">ระบบไม่ถือว่าทำงาน (Inactive)</p>
+                                        <p className="text-[11px] text-rose-300/80 font-light">
+                                            หากคุณปิดการตรวจจับทั้ง Discord และ C++ Guard ระบบจะไม่บังคับเวลานอน ไม่มีการนับถอยหลังฉุกเฉิน และไม่หักเลือด กรุณาเปิดใช้งานอย่างน้อย 1 ช่องทาง
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                {/* Toggle 1: Discord Bot */}
+                                <div className={`p-3.5 rounded-xl border transition-all ${
+                                    enableDiscord
+                                        ? 'bg-[#18181b] border-white/10'
+                                        : 'bg-[#141416] border-white/5 opacity-70'
+                                }`}>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <Bot className={`size-4 ${enableDiscord ? 'text-indigo-400' : 'text-zinc-500'}`} />
+                                            <span className="text-xs font-medium text-white">ตรวจจับผ่าน Discord Bot</span>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setEnableDiscord(!enableDiscord)}
+                                            className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                                                enableDiscord ? 'bg-indigo-600' : 'bg-zinc-700'
+                                            }`}
+                                        >
+                                            <span
+                                                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                                                    enableDiscord ? 'translate-x-4' : 'translate-x-0'
+                                                }`}
+                                            />
+                                        </button>
+                                    </div>
+                                    <p className="text-[11px] text-zinc-400 font-light mt-1.5 leading-relaxed">
+                                        ตรวจจับสถานะออฟไลน์ และเฝ้าระวังไม่ให้อยู่ในห้องคุยเสียง Discord ในช่วงเวลานอน
+                                    </p>
+                                </div>
+
+                                {/* Toggle 2: C++ Guard */}
+                                <div className={`p-3.5 rounded-xl border transition-all ${
+                                    enableCpp
+                                        ? 'bg-[#18181b] border-white/10'
+                                        : 'bg-[#141416] border-white/5 opacity-70'
+                                }`}>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <Shield className={`size-4 ${enableCpp ? 'text-emerald-400' : 'text-zinc-500'}`} />
+                                            <span className="text-xs font-medium text-white">ตรวจจับผ่าน C++ Guard</span>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setEnableCpp(!enableCpp)}
+                                            className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                                                enableCpp ? 'bg-emerald-600' : 'bg-zinc-700'
+                                            }`}
+                                        >
+                                            <span
+                                                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                                                    enableCpp ? 'translate-x-4' : 'translate-x-0'
+                                                }`}
+                                            />
+                                        </button>
+                                    </div>
+                                    <p className="text-[11px] text-zinc-400 font-light mt-1.5 leading-relaxed">
+                                        เฝ้าระวังการใช้งานเมาส์/คีย์บอร์ด, การล็อกหน้าจอ LockWorkStation และสั่งสลีปเครื่องผ่าน C++ Tray
+                                    </p>
+                                </div>
+                            </div>
                         </div>
 
                         <div className="space-y-2 sm:col-span-2">

@@ -20,6 +20,9 @@ export interface SleepState {
     emergency_countdown_seconds: number;
     is_in_voice: boolean;
     voice_channel: string | null;
+    enable_discord_detection: boolean;
+    enable_cpp_detection: boolean;
+    is_system_active: boolean;
 
     // Derived timer values
     stage: SleepStage;
@@ -45,7 +48,9 @@ export interface SleepState {
         discordUserId?: string,
         discordBotToken?: string,
         emergencyCountdownSeconds?: number,
-        sleepTargetTime?: string | null
+        sleepTargetTime?: string | null,
+        enableDiscordDetection?: boolean,
+        enableCppDetection?: boolean
     ) => Promise<boolean>;
     confirmSleep: () => Promise<boolean>;
     useTicket: () => Promise<boolean>;
@@ -167,6 +172,9 @@ export const useSleepStore = create<SleepState>((set, get) => ({
     emergency_countdown_seconds: 60,
     is_in_voice: false,
     voice_channel: null,
+    enable_discord_detection: true,
+    enable_cpp_detection: true,
+    is_system_active: true,
 
     stage: 'normal',
     totalSecondsRemaining: 86400,
@@ -187,19 +195,56 @@ export const useSleepStore = create<SleepState>((set, get) => ({
             const wakeUp = data.wake_up_time || state.wake_up_time || defaultWakeUp;
             const target = data.sleep_target_time || state.sleep_target_time || calculateSleepTargetLocal(wakeUp);
 
+            const enableDiscord = data.enable_discord_detection !== undefined
+                ? Boolean(data.enable_discord_detection)
+                : (state.enable_discord_detection ?? true);
+            const enableCpp = data.enable_cpp_detection !== undefined
+                ? Boolean(data.enable_cpp_detection)
+                : (state.enable_cpp_detection ?? true);
+            const isSystemActive = (data as any).is_system_active !== undefined
+                ? Boolean((data as any).is_system_active)
+                : (enableDiscord || enableCpp);
+
             const presence = (data as any).discord_presence;
-            const isInVoice = Boolean(presence?.is_in_voice ?? (data as any).is_in_voice ?? state.is_in_voice);
+            const isInVoice = Boolean(enableDiscord && (presence?.is_in_voice ?? (data as any).is_in_voice ?? state.is_in_voice));
             const voiceChannel = presence?.voice_channel ?? (data as any).voice_channel ?? state.voice_channel;
 
-            // Rule: หากอยู่ในห้องคุยไม่ถือว่านอน
-            const lastConfirmed = isInVoice
+            // Rule: หากอยู่ในห้องคุยไม่ถือว่านอน, หรือหากไม่ได้เปิดใช้งานระบบเลย
+            const lastConfirmed = (!isSystemActive || isInVoice)
                 ? null
                 : (data.last_sleep_confirmed_at !== undefined ? data.last_sleep_confirmed_at : state.last_sleep_confirmed_at);
+
+            // If system inactive, reset audio and maintain normal stage
+            if (!isSystemActive) {
+                audioManager.stopAllAudio();
+                const timer = calculateTimeRemaining(target);
+                return {
+                    ...data,
+                    enable_discord_detection: enableDiscord,
+                    enable_cpp_detection: enableCpp,
+                    is_system_active: false,
+                    is_in_voice: isInVoice,
+                    voice_channel: voiceChannel,
+                    last_sleep_confirmed_at: null,
+                    wake_up_time: wakeUp,
+                    sleep_target_time: target,
+                    current_hp: 100,
+                    stage: 'normal',
+                    totalSecondsRemaining: timer.totalSeconds,
+                    hoursRemaining: timer.hours,
+                    minutesRemaining: timer.minutes,
+                    secondsRemaining: timer.seconds,
+                    isPastDeadline: false,
+                };
+            }
 
             // If simulation is running, do NOT clobber running simulation countdown!
             if (state.simulationActive) {
                 return {
                     ...data,
+                    enable_discord_detection: enableDiscord,
+                    enable_cpp_detection: enableCpp,
+                    is_system_active: true,
                     is_in_voice: isInVoice,
                     voice_channel: voiceChannel,
                     last_sleep_confirmed_at: lastConfirmed,
@@ -215,6 +260,9 @@ export const useSleepStore = create<SleepState>((set, get) => ({
 
             return {
                 ...data,
+                enable_discord_detection: enableDiscord,
+                enable_cpp_detection: enableCpp,
+                is_system_active: isSystemActive,
                 is_in_voice: isInVoice,
                 voice_channel: voiceChannel,
                 last_sleep_confirmed_at: lastConfirmed,
@@ -349,6 +397,22 @@ export const useSleepStore = create<SleepState>((set, get) => ({
 
         const target = sleep_target_time || defaultSleepTarget;
         const timer = calculateTimeRemaining(target);
+
+        // If system is disabled (neither Discord nor C++ enabled), pause enforcement!
+        if (get().is_system_active === false) {
+            audioManager.stopAllAudio();
+            set({
+                stage: 'normal',
+                current_hp: 100,
+                totalSecondsRemaining: timer.totalSeconds,
+                hoursRemaining: timer.hours,
+                minutesRemaining: timer.minutes,
+                secondsRemaining: timer.seconds,
+                isPastDeadline: timer.isPast,
+            });
+            return;
+        }
+
         let activeHp = current_hp;
         let displaySeconds = timer.seconds;
         let displayMinutes = timer.minutes;
@@ -407,7 +471,9 @@ export const useSleepStore = create<SleepState>((set, get) => ({
         discordUserId?: string,
         discordBotToken?: string,
         emergencyCountdownSeconds?: number,
-        sleepTargetTime?: string | null
+        sleepTargetTime?: string | null,
+        enableDiscordDetection?: boolean,
+        enableCppDetection?: boolean
     ) => {
         try {
             let calculatedTarget = sleepTargetTime || null;
@@ -440,6 +506,8 @@ export const useSleepStore = create<SleepState>((set, get) => ({
                         discord_user_id: discordUserId,
                         discord_bot_token: discordBotToken,
                         emergency_countdown_seconds: emergencyCountdownSeconds,
+                        enable_discord_detection: enableDiscordDetection,
+                        enable_cpp_detection: enableCppDetection,
                     }),
                 });
 
@@ -459,6 +527,8 @@ export const useSleepStore = create<SleepState>((set, get) => ({
                 discord_user_id: discordUserId || null,
                 discord_bot_token: discordBotToken || null,
                 emergency_countdown_seconds: emergencyCountdownSeconds || 60,
+                enable_discord_detection: enableDiscordDetection ?? true,
+                enable_cpp_detection: enableCppDetection ?? true,
             });
             return true;
         } catch {

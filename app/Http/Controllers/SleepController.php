@@ -23,6 +23,8 @@ class SleepController extends Controller
             'emergency_countdown_seconds' => ['nullable', 'integer', 'min:10', 'max:300'],
             'discord_user_id' => ['nullable', 'max:50'],
             'discord_bot_token' => ['nullable', 'string', 'max:255'],
+            'enable_discord_detection' => ['nullable', 'boolean'],
+            'enable_cpp_detection' => ['nullable', 'boolean'],
         ]);
 
         $user = $request->user();
@@ -58,9 +60,18 @@ class SleepController extends Controller
         if (array_key_exists('discord_bot_token', $validated)) {
             $updateData['discord_bot_token'] = $validated['discord_bot_token'] !== null ? trim((string)$validated['discord_bot_token']) : null;
         }
+        if (array_key_exists('enable_discord_detection', $validated)) {
+            $updateData['enable_discord_detection'] = (bool)$validated['enable_discord_detection'];
+        }
+        if (array_key_exists('enable_cpp_detection', $validated)) {
+            $updateData['enable_cpp_detection'] = (bool)$validated['enable_cpp_detection'];
+        }
 
         $user->update($updateData);
         $user->refresh();
+
+        $enableDiscord = (bool)($user->enable_discord_detection ?? true);
+        $enableCpp = (bool)($user->enable_cpp_detection ?? true);
 
         return response()->json([
             'message' => 'Settings updated successfully',
@@ -69,6 +80,9 @@ class SleepController extends Controller
             'emergency_countdown_seconds' => $user->emergency_countdown_seconds,
             'discord_user_id' => $user->discord_user_id,
             'discord_bot_token' => $user->discord_bot_token,
+            'enable_discord_detection' => $enableDiscord,
+            'enable_cpp_detection' => $enableCpp,
+            'is_system_active' => $enableDiscord || $enableCpp,
         ]);
     }
 
@@ -214,22 +228,32 @@ class SleepController extends Controller
     {
         $user = $request->user();
 
-        // Check if user survived the night and award morning reward
-        $rewarded = $this->sleepEngine->checkMorningReward($user);
-        if ($rewarded) {
-            $user->refresh();
+        $enableDiscord = (bool)($user->enable_discord_detection ?? true);
+        $enableCpp = (bool)($user->enable_cpp_detection ?? true);
+        $isSystemActive = $enableDiscord || $enableCpp;
+
+        // Check if user survived the night and award morning reward (only if system active)
+        $rewarded = false;
+        if ($isSystemActive) {
+            $rewarded = $this->sleepEngine->checkMorningReward($user);
+            if ($rewarded) {
+                $user->refresh();
+            }
         }
 
         $inBedtimeHours = $this->sleepEngine->isWithinBedtimeHours($user);
 
-        // Rule: หากอยู่ในห้องคุยไม่ถือว่านอน
-        $voiceState = $this->sleepEngine->checkUserVoiceState($user);
-        if ($voiceState['in_voice'] && $user->last_sleep_confirmed_at) {
-            $user->update(['last_sleep_confirmed_at' => null]);
-            $user->refresh();
+        // Rule: หากอยู่ในห้องคุยไม่ถือว่านอน (เฉพาะเมื่อเปิดตรวจจับ Discord)
+        $voiceState = ['in_voice' => false, 'voice_channel' => null, 'guild_name' => null];
+        if ($enableDiscord) {
+            $voiceState = $this->sleepEngine->checkUserVoiceState($user);
+            if ($voiceState['in_voice'] && $user->last_sleep_confirmed_at) {
+                $user->update(['last_sleep_confirmed_at' => null]);
+                $user->refresh();
+            }
         }
 
-        $isSleeping = !empty($user->last_sleep_confirmed_at) && !$voiceState['in_voice'];
+        $isSleeping = $isSystemActive && !empty($user->last_sleep_confirmed_at) && (!$enableDiscord || !$voiceState['in_voice']);
 
         return response()->json([
             'current_hp' => $user->current_hp,
@@ -245,6 +269,9 @@ class SleepController extends Controller
             'last_sleep_confirmed_at' => $isSleeping ? $user->last_sleep_confirmed_at : null,
             'discord_user_id' => $user->discord_user_id,
             'discord_bot_token' => $user->discord_bot_token,
+            'enable_discord_detection' => $enableDiscord,
+            'enable_cpp_detection' => $enableCpp,
+            'is_system_active' => $isSystemActive,
             'discord_presence' => [
                 'is_in_voice' => $voiceState['in_voice'],
                 'voice_channel' => $voiceState['voice_channel'],
@@ -422,6 +449,8 @@ class SleepController extends Controller
             'idle_seconds' => ['nullable', 'numeric'],
             'screen_locked' => ['nullable', 'boolean'],
             'is_active' => ['nullable', 'boolean'],
+            'simulate_sleep' => ['nullable', 'boolean'],
+            'wake_up_simulation' => ['nullable', 'boolean'],
         ]);
 
         $user = null;
@@ -449,6 +478,8 @@ class SleepController extends Controller
             'is_in_voice' => (bool)($validated['is_in_voice'] ?? false),
             'voice_channel' => $validated['voice_channel'] ?? null,
             'guild_name' => $validated['guild_name'] ?? null,
+            'simulate_sleep' => (bool)($validated['simulate_sleep'] ?? false),
+            'wake_up_simulation' => (bool)($validated['wake_up_simulation'] ?? false),
         ];
 
         // Cache live presence for quick dashboard feedback
@@ -481,6 +512,9 @@ class SleepController extends Controller
             $wakeUpMinute = (int)($parts[1] ?? 0);
         }
 
+        $enableDiscord = (bool)($user->enable_discord_detection ?? true);
+        $enableCpp = (bool)($user->enable_cpp_detection ?? true);
+
         $result['daemon_config'] = [
             'emergency_countdown_seconds' => $user->emergency_countdown_seconds ?? 60,
             'bedtime_hour' => $bedtimeHour,
@@ -488,6 +522,9 @@ class SleepController extends Controller
             'wake_up_hour' => $wakeUpHour,
             'wake_up_minute' => $wakeUpMinute,
             'current_hp' => $user->current_hp ?? 100,
+            'enable_discord_detection' => $enableDiscord,
+            'enable_cpp_detection' => $enableCpp,
+            'is_system_active' => $enableDiscord || $enableCpp,
         ];
 
         return response()->json($result);
@@ -526,6 +563,8 @@ class SleepController extends Controller
         }
 
         $token = bin2hex(random_bytes(24));
+        $enableDiscord = (bool)($user->enable_discord_detection ?? true);
+        $enableCpp = (bool)($user->enable_cpp_detection ?? true);
 
         return response()->json([
             'success' => true,
@@ -539,6 +578,9 @@ class SleepController extends Controller
             'wake_up_minute' => $wakeUpMinute,
             'emergency_countdown_seconds' => $user->emergency_countdown_seconds ?? 60,
             'current_hp' => $user->current_hp ?? 100,
+            'enable_discord_detection' => $enableDiscord,
+            'enable_cpp_detection' => $enableCpp,
+            'is_system_active' => $enableDiscord || $enableCpp,
         ]);
     }
 }

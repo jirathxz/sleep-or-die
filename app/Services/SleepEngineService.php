@@ -138,8 +138,85 @@ class SleepEngineService
      */
     public function handlePresence(User $user, string $status, string $source = 'discord', array $meta = []): array
     {
+        $enableDiscord = (bool)($user->enable_discord_detection ?? true);
+        $enableCpp = (bool)($user->enable_cpp_detection ?? true);
+        $isSystemActive = $enableDiscord || $enableCpp;
+
+        // If neither is enabled, system is completely inactive
+        if (!$isSystemActive) {
+            return [
+                'penalized' => false,
+                'auto_confirmed' => false,
+                'is_sleeping' => false,
+                'is_system_active' => false,
+                'message' => 'ระบบไม่ได้ทำงาน: ปิดการตรวจจับทั้ง Discord และ C++',
+                'current_hp' => $user->current_hp,
+            ];
+        }
+
+        // Filter out signals from disabled sources
+        if ($source === 'discord' && !$enableDiscord) {
+            return [
+                'penalized' => false,
+                'auto_confirmed' => false,
+                'is_sleeping' => (bool)$user->last_sleep_confirmed_at,
+                'is_system_active' => true,
+                'message' => 'ปิดการตรวจจับผ่าน Discord Bot ตามการตั้งค่า',
+                'current_hp' => $user->current_hp,
+            ];
+        }
+
+        if ($source === 'desktop_daemon' && !$enableCpp) {
+            return [
+                'penalized' => false,
+                'auto_confirmed' => false,
+                'is_sleeping' => (bool)$user->last_sleep_confirmed_at,
+                'is_system_active' => true,
+                'message' => 'ปิดการตรวจจับผ่าน C++ Guard ตามการตั้งค่า',
+                'current_hp' => $user->current_hp,
+            ];
+        }
+
+        // C++ Tray Test Mode: Simulate Sleeping / Wake up
+        if ($source === 'desktop_daemon' && !empty($meta['simulate_sleep'])) {
+            $voiceState = $enableDiscord ? $this->checkUserVoiceState($user) : ['in_voice' => false];
+            if ($voiceState['in_voice']) {
+                $chName = $voiceState['voice_channel'] ?? 'ห้องคุยเสียง';
+                return [
+                    'penalized' => false,
+                    'auto_confirmed' => false,
+                    'is_sleeping' => false,
+                    'is_system_active' => true,
+                    'message' => "โหมดทดสอบ C++: ตรวจพบอยู่ในห้องคุยเสียง Discord (\"{$chName}\") ไม่ถือว่านอน",
+                    'current_hp' => $user->current_hp,
+                ];
+            }
+
+            $user->update(['last_sleep_confirmed_at' => now()]);
+            return [
+                'penalized' => false,
+                'auto_confirmed' => true,
+                'is_sleeping' => true,
+                'is_system_active' => true,
+                'message' => 'C++ Tray: เปิดใช้งานโหมดทดสอบเข้านอนสำเร็จ (บันทึกสถานะนอนแล้ว)',
+                'current_hp' => $user->current_hp,
+            ];
+        }
+
+        if ($source === 'desktop_daemon' && !empty($meta['wake_up_simulation'])) {
+            $user->update(['last_sleep_confirmed_at' => null]);
+            return [
+                'penalized' => false,
+                'auto_confirmed' => false,
+                'is_sleeping' => false,
+                'is_system_active' => true,
+                'message' => 'C++ Tray: ยกเลิกโหมดทดสอบเข้านอน กลับสู่สถานะตื่นปกติ',
+                'current_hp' => $user->current_hp,
+            ];
+        }
+
         $status = strtolower($status);
-        $isInVoice = !empty($meta['is_in_voice']);
+        $isInVoice = $enableDiscord && !empty($meta['is_in_voice']);
 
         $isOffline = in_array($status, ['offline', 'idle', 'invisible']) ||
             (!empty($meta['screen_locked'])) ||
@@ -166,6 +243,7 @@ class SleepEngineService
                         'penalized' => true,
                         'auto_confirmed' => false,
                         'is_sleeping' => false,
+                        'is_system_active' => true,
                         'message' => 'ตรวจพบผู้ใช้อยู่ในห้องคุยเสียง Discord ระหว่างเวลานอน! ไม่ถือว่านอน และหัก HP 25 แต้ม',
                         'current_hp' => $user->fresh()->current_hp,
                     ];
@@ -175,6 +253,7 @@ class SleepEngineService
                     'penalized' => false,
                     'auto_confirmed' => false,
                     'is_sleeping' => false,
+                    'is_system_active' => true,
                     'message' => 'ตรวจพบผู้ใช้อยู่ในห้องคุยเสียง Discord ไม่ถือว่านอน ยกเลิกสถานะการนอนทันที',
                     'current_hp' => $user->current_hp,
                 ];
@@ -192,6 +271,7 @@ class SleepEngineService
                     'penalized' => false,
                     'auto_confirmed' => true,
                     'is_sleeping' => true,
+                    'is_system_active' => true,
                     'message' => 'ตรวจพบผู้ใช้ออฟไลน์/ล็อคหน้าจอในช่วงเวลานอน ถือว่าเข้านอนเรียบร้อยแล้ว',
                     'current_hp' => $user->current_hp,
                 ];
@@ -201,6 +281,7 @@ class SleepEngineService
                 'penalized' => false,
                 'auto_confirmed' => false,
                 'is_sleeping' => true,
+                'is_system_active' => true,
                 'message' => 'ผู้ใช้ยังคงอยู่ในสถานะเข้านอนอย่างปลอดภัย',
                 'current_hp' => $user->current_hp,
             ];
@@ -215,6 +296,7 @@ class SleepEngineService
                 'penalized' => true,
                 'auto_confirmed' => false,
                 'is_sleeping' => false,
+                'is_system_active' => true,
                 'message' => 'ตรวจพบผู้ใช้กลับมาออนไลน์หรือใช้งานคอมพิวเตอร์ระหว่างเวลานอน! หัก HP 25 แต้ม',
                 'current_hp' => $user->fresh()->current_hp,
             ];
@@ -224,6 +306,7 @@ class SleepEngineService
             'penalized' => false,
             'auto_confirmed' => false,
             'is_sleeping' => !$isInVoice && (bool)$user->last_sleep_confirmed_at,
+            'is_system_active' => true,
             'message' => $isInVoice ? 'ตรวจพบผู้ใช้อยู่ในห้องคุยเสียง Discord ไม่ถือว่านอน' : 'อัปเดตสถานะ Presence เรียบร้อย',
             'current_hp' => $user->current_hp,
         ];

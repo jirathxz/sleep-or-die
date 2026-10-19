@@ -41,6 +41,8 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
     'is_disabled',
     'discord_user_id',
     'discord_bot_token',
+    'enable_discord_detection',
+    'enable_cpp_detection',
     'last_sleep_confirmed_at',
 ])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
@@ -56,6 +58,8 @@ class User extends Authenticatable
      */
     protected $attributes = [
         'emergency_countdown_seconds' => 60,
+        'enable_discord_detection' => true,
+        'enable_cpp_detection' => true,
         'current_hp' => 100,
         'shutdown_stacks' => 0,
         'days_survived' => 0,
@@ -78,6 +82,8 @@ class User extends Authenticatable
             'password' => 'hashed',
             'two_factor_confirmed_at' => 'datetime',
             'emergency_countdown_seconds' => 'integer',
+            'enable_discord_detection' => 'boolean',
+            'enable_cpp_detection' => 'boolean',
             'current_hp' => 'integer',
             'shutdown_stacks' => 'integer',
             'days_survived' => 'integer',

@@ -1,6 +1,6 @@
 import React from 'react';
 import { SleepStage } from '@/stores/useSleepStore';
-import { Moon, Loader2, Zap, RotateCcw, Volume2 } from 'lucide-react';
+import { Moon, Zap, RotateCcw, Volume2, Shield, Bot, AlertCircle } from 'lucide-react';
 
 interface CountdownDisplayProps {
     hours: number;
@@ -10,10 +10,12 @@ interface CountdownDisplayProps {
     stage: SleepStage;
     sleepTargetTime: string | null;
     wakeUpTime: string | null;
-    onConfirmSleep: () => void;
     lastConfirmedAt: string | null;
     isInVoice?: boolean;
     voiceChannel?: string | null;
+    isSystemActive?: boolean;
+    enableDiscord?: boolean;
+    enableCpp?: boolean;
     simulationActive?: boolean;
     onStartSimulation?: () => void;
     onResetSimulation?: () => void;
@@ -27,10 +29,12 @@ export const CountdownDisplay: React.FC<CountdownDisplayProps> = ({
     stage,
     sleepTargetTime,
     wakeUpTime,
-    onConfirmSleep,
     lastConfirmedAt,
     isInVoice = false,
     voiceChannel = null,
+    isSystemActive = true,
+    enableDiscord = true,
+    enableCpp = true,
     simulationActive = false,
     onStartSimulation,
     onResetSimulation,
@@ -42,9 +46,14 @@ export const CountdownDisplay: React.FC<CountdownDisplayProps> = ({
     let stageTextColor = 'text-zinc-400';
     let digitsColor = 'text-white';
 
-    const isVerifying = Boolean(lastConfirmedAt) && !isInVoice;
+    const isVerifying = Boolean(lastConfirmedAt) && !isInVoice && isSystemActive;
 
-    if (isInVoice) {
+    if (!isSystemActive) {
+        stageText = 'ระบบหยุดการทำงาน • ไม่ได้เปิดใช้งานการตรวจจับ Discord หรือ C++';
+        dotColor = 'bg-rose-500';
+        stageTextColor = 'text-rose-400 font-medium';
+        digitsColor = 'text-zinc-500';
+    } else if (isInVoice) {
         stageText = `ตรวจพบอยู่ในห้องคุยเสียง Discord ${voiceChannel ? `("${voiceChannel}")` : ''} • ไม่ถือว่านอน`;
         dotColor = 'bg-rose-500 animate-pulse';
         stageTextColor = 'text-rose-400 font-medium';
@@ -81,13 +90,13 @@ export const CountdownDisplay: React.FC<CountdownDisplayProps> = ({
 
     return (
         <section className="bg-[#121215] rounded-2xl p-6 md:p-8 text-center space-y-6 shadow-sm select-none">
-            {/* Status Indicator (Strictly No Badge) */}
+            {/* Status Indicator */}
             <div className="flex items-center justify-center gap-2 text-xs font-normal">
                 <span className={`size-2 rounded-full ${dotColor}`} />
                 <span className={stageTextColor}>{stageText}</span>
             </div>
 
-            {/* Countdown Digits (20% Crisp White & High Contrast) */}
+            {/* Countdown Digits */}
             <div className="flex items-center justify-center gap-3 md:gap-6 my-2">
                 <div className="flex flex-col items-center min-w-[70px] md:min-w-[90px]">
                     <span className={`text-5xl md:text-7xl font-medium tracking-tight tabular-nums ${digitsColor}`}>
@@ -121,7 +130,7 @@ export const CountdownDisplay: React.FC<CountdownDisplayProps> = ({
                 </div>
             </div>
 
-            {/* Target Schedule Details: Emphasize Bedtime Deadline */}
+            {/* Target Schedule Details */}
             <div className="flex items-center justify-center gap-3 text-xs text-zinc-400 font-light">
                 <span>
                     เส้นตายเข้านอนคืนนี้: <span className="text-white font-medium">{sleepTargetTime || '23:15'} น.</span>
@@ -132,37 +141,64 @@ export const CountdownDisplay: React.FC<CountdownDisplayProps> = ({
                 </span>
             </div>
 
-            {/* Action Trigger & Test Simulation Controls */}
-            <div className="max-w-xs mx-auto space-y-2 pt-2">
-                {stage === 'sleep' && !isVerifying && (
+            {/* Automated Detection Status & Test Simulation Controls */}
+            <div className="max-w-md mx-auto space-y-3 pt-1">
+                {stage === 'sleep' && !isVerifying && isSystemActive && (
                     <div className="text-xs text-rose-400 font-normal animate-pulse pb-0.5">
-                        ⚠️ มีเวลาอีก {seconds} วินาทีก่อนพลังชีวิตหมด! รีบกดเข้านอนทันที
+                        ⚠️ ถึงเวลาเข้านอนแล้ว! กรุณาปิดเครื่องคอมพิวเตอร์ หรือออฟไลน์ Discord ทันที
                     </div>
                 )}
-                {isVerifying ? (
-                    <div className="p-3.5 rounded-lg bg-[#18181b] text-emerald-300 text-xs font-normal flex items-center justify-center gap-2.5">
+
+                {/* Status Indicator Card (No Manual Button) */}
+                {!isSystemActive ? (
+                    <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs font-normal flex flex-col items-center justify-center gap-1 text-center">
+                        <span className="font-medium text-rose-200 flex items-center gap-1.5">
+                            <AlertCircle className="size-4 text-rose-400" />
+                            ระบบไม่ได้ทำงาน (ปิดการตรวจจับทั้งหมด)
+                        </span>
+                        <span className="text-[11px] text-rose-300/80 font-light">
+                            กรุณาเปิดการตรวจจับ Discord Bot หรือ C++ Guard ในหน้าตั้งค่าอย่างน้อยหนึ่งช่องทาง
+                        </span>
+                    </div>
+                ) : isInVoice ? (
+                    <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs font-normal flex items-center justify-center gap-2">
+                        <Volume2 className="size-4 text-rose-400 shrink-0" />
+                        <span>กำลังอยู่ในห้องคุยเสียง {voiceChannel ? `"${voiceChannel}"` : ''} • ไม่ถือว่านอน</span>
+                    </div>
+                ) : isVerifying ? (
+                    <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs font-normal flex items-center justify-center gap-2.5">
                         <Moon className="size-4 text-emerald-400" />
-                        <span>อยู่ในสถานะนอน • ตรวจจับออฟไลน์ผ่าน Discord และ C++ Guard</span>
+                        <span>อยู่ในสถานะนอนแล้ว • ตรวจจับผ่าน Discord และ C++ Guard</span>
                     </div>
                 ) : (
-                    <button
-                        onClick={onConfirmSleep}
-                        disabled={stage === 'shutdown'}
-                        className={`w-full h-11 px-6 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 shadow-sm ${
-                            stage === 'sleep'
-                                ? 'bg-rose-500 text-white hover:bg-rose-600 animate-pulse'
-                                : stage === 'shutdown'
-                                  ? 'bg-[#18181b] text-zinc-600 cursor-not-allowed'
-                                  : 'bg-white text-zinc-950 hover:bg-zinc-200 active:scale-[0.99]'
-                        }`}
-                    >
-                        <Moon className="size-4" />
-                        <span>ยืนยันการเข้านอน</span>
-                    </button>
+                    <div className="p-3.5 rounded-xl bg-[#18181b] border border-white/5 text-zinc-300 text-xs flex flex-col items-center justify-center gap-1.5 text-center shadow-sm">
+                        <div className="flex items-center gap-2 text-white font-medium">
+                            <Shield className="size-3.5 text-emerald-400" />
+                            <span>ตรวจจับการนอนอัตโนมัติผ่าน Discord และ C++</span>
+                        </div>
+                        <p className="text-[11px] text-zinc-400 font-light leading-relaxed">
+                            ระบบจะบันทึกสถานะนอนให้โดยอัตโนมัติเมื่อตรวจพบการออฟไลน์ ปิดคอมพิวเตอร์ หรือล็อกหน้าจอ
+                        </p>
+                        <div className="flex items-center gap-2.5 text-[10px] text-zinc-400 pt-0.5">
+                            <span className="flex items-center gap-1">
+                                <Bot className="size-3 text-indigo-400" />
+                                <span className={enableDiscord ? 'text-indigo-300 font-medium' : 'text-zinc-600 line-through'}>
+                                    Discord {enableDiscord ? 'เปิด' : 'ปิด'}
+                                </span>
+                            </span>
+                            <span>•</span>
+                            <span className="flex items-center gap-1">
+                                <Shield className="size-3 text-emerald-400" />
+                                <span className={enableCpp ? 'text-emerald-300 font-medium' : 'text-zinc-600 line-through'}>
+                                    C++ Guard {enableCpp ? 'เปิด' : 'ปิด'}
+                                </span>
+                            </span>
+                        </div>
+                    </div>
                 )}
 
                 {/* Simulation 3 2 1 Test Button */}
-                <div className="flex items-center justify-center pt-1">
+                <div className="flex items-center justify-center pt-0.5">
                     {!simulationActive ? (
                         <button
                             type="button"

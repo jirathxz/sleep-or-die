@@ -51,6 +51,9 @@ export default function Dashboard() {
         last_sleep_confirmed_at,
         is_in_voice,
         voice_channel,
+        enable_discord_detection,
+        enable_cpp_detection,
+        is_system_active,
         stage,
         hoursRemaining,
         minutesRemaining,
@@ -84,6 +87,9 @@ export default function Dashboard() {
                 is_disabled: auth.user.is_disabled ?? false,
                 discord_user_id: auth.user.discord_user_id ?? null,
                 discord_bot_token: auth.user.discord_bot_token ?? null,
+                enable_discord_detection: (auth.user as any).enable_discord_detection ?? true,
+                enable_cpp_detection: (auth.user as any).enable_cpp_detection ?? true,
+                is_system_active: (auth.user as any).is_system_active ?? true,
                 last_sleep_confirmed_at: auth.user.last_sleep_confirmed_at ?? null,
             });
         }
@@ -157,7 +163,7 @@ export default function Dashboard() {
                 {/* 2. Level & EXP Progression Progress Bar */}
                 <LevelExpBar level={level} exp={exp} />
 
-                {/* 3. Countdown Display & Primary Sleep Action + 3-2-1 Test Simulation */}
+                {/* 3. Countdown Display & Automated Presence Status + 3-2-1 Test Simulation */}
                 <CountdownDisplay
                     hours={hoursRemaining}
                     minutes={minutesRemaining}
@@ -166,10 +172,12 @@ export default function Dashboard() {
                     stage={stage}
                     sleepTargetTime={sleep_target_time}
                     wakeUpTime={wake_up_time}
-                    onConfirmSleep={confirmSleep}
                     lastConfirmedAt={last_sleep_confirmed_at}
                     isInVoice={is_in_voice}
                     voiceChannel={voice_channel}
+                    isSystemActive={is_system_active}
+                    enableDiscord={enable_discord_detection}
+                    enableCpp={enable_cpp_detection}
                     simulationActive={simulationActive}
                     onStartSimulation={startSimulation321}
                     onResetSimulation={resetSimulation}
