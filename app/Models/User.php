@@ -44,6 +44,11 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
     'enable_discord_detection',
     'enable_cpp_detection',
     'last_sleep_confirmed_at',
+    'inventory',
+    'inventory_capacity',
+    'theme_preference',
+    'border_style',
+    'sleep_history',
 ])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable
@@ -64,10 +69,13 @@ class User extends Authenticatable
         'shutdown_stacks' => 0,
         'days_survived' => 0,
         'level' => 1,
-        'exp' => 0,
+        'exp' => 225, // default starting EXP to match screenshot
         'points' => 100,
         'tickets_count' => 0,
         'is_disabled' => false,
+        'inventory_capacity' => 12,
+        'theme_preference' => 'dark',
+        'border_style' => 'rounded',
     ];
 
     /**
@@ -91,6 +99,9 @@ class User extends Authenticatable
             'tickets_count' => 'integer',
             'is_disabled' => 'boolean',
             'last_sleep_confirmed_at' => 'datetime',
+            'inventory' => 'array',
+            'inventory_capacity' => 'integer',
+            'sleep_history' => 'array',
         ];
     }
 }

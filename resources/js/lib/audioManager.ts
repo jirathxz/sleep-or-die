@@ -57,6 +57,22 @@ class AudioManager {
     }
 
     /**
+     * Level up or shop purchase fanfare
+     */
+    public playLevelUpChime() {
+        this.playSynthTone(523.25, 0.12, 'sine', 0.25); // C5
+        setTimeout(() => {
+            this.playSynthTone(659.25, 0.12, 'sine', 0.25); // E5
+            setTimeout(() => {
+                this.playSynthTone(783.99, 0.12, 'sine', 0.25); // G5
+                setTimeout(() => {
+                    this.playSynthTone(1046.50, 0.35, 'sine', 0.3); // C6
+                }, 100);
+            }, 100);
+        }, 100);
+    }
+
+    /**
      * Lockdown Stage: Pulsing urgent heartbeat tone
      */
     public startLockdownHeartbeat() {

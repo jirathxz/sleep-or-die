@@ -30,6 +30,7 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
+/.superpowers
 /.agents
 /.amp
 /.claude

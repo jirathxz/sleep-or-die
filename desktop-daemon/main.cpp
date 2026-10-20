@@ -183,18 +183,22 @@ long GetSecondsUntilBedtime(int targetHour, int targetMin) {
     std::tm localTm;
     localtime_s(&localTm, &nowTime);
 
-    int nowSeconds = localTm.tm_hour * 3600 + localTm.tm_min * 60 + localTm.tm_sec;
-    int targetSeconds = targetHour * 3600 + targetMin * 60;
+    std::tm targetTm = localTm;
+    targetTm.tm_hour = targetHour;
+    targetTm.tm_min = targetMin;
+    targetTm.tm_sec = 0;
 
-    long diff = targetSeconds - nowSeconds;
+    std::time_t targetTime = std::mktime(&targetTm);
+    double diff = std::difftime(targetTime, nowTime);
 
-    if (diff < -43200) {
-        diff += 86400;
-    } else if (diff > 43200) {
-        diff -= 86400;
+    // If target has passed by more than 30 minutes, it belongs to the next occurrence (tomorrow)
+    if (diff < -1800.0) {
+        targetTm.tm_mday += 1;
+        targetTime = std::mktime(&targetTm);
+        diff = std::difftime(targetTime, nowTime);
     }
 
-    return diff;
+    return (long)diff;
 }
 
 bool IsWithinCurfewHours() {
@@ -315,13 +319,107 @@ bool SendHttpJson(const std::wstring& host, int port, const std::wstring& path, 
     return bResults == TRUE;
 }
 
-void ReportPresence(const std::string& status, int idleSeconds, bool screenLocked) {
+std::atomic<bool> g_alertModalActive{false};
+std::string g_currentAlertPhase = "idle";
+
+void ShowTrayBalloon(const std::wstring& title, const std::wstring& message, DWORD infoFlags = NIIF_INFO);
+void ExecuteFinalEnforcement();
+void ReportPresence(const std::string& status, int idleSeconds, bool screenLocked, const std::string& alertAction = "");
+
+void HandleAlertStateResponse(const std::string& resp) {
+    size_t alertPos = resp.find("\"alert_state\"");
+    if (alertPos == std::string::npos) return;
+
+    auto extractString = [&](const std::string& key) -> std::string {
+        size_t kpos = resp.find("\"" + key + "\"", alertPos);
+        if (kpos == std::string::npos) return "";
+        size_t cpos = resp.find(":", kpos);
+        if (cpos == std::string::npos) return "";
+        size_t q1 = resp.find("\"", cpos);
+        if (q1 == std::string::npos) return "";
+        size_t q2 = resp.find("\"", q1 + 1);
+        if (q2 == std::string::npos) return "";
+        return resp.substr(q1 + 1, q2 - q1 - 1);
+    };
+
+    std::string phase = extractString("phase");
+    if (phase.empty() || phase == g_currentAlertPhase) return;
+
+    g_currentAlertPhase = phase;
+
+    if (phase == "alert" && !g_alertModalActive.exchange(true)) {
+        std::thread([]() {
+            PlaySoundForStage(SleepStage::Alert);
+            ShowTrayBalloon(L"🚨 แจ้งเตือนเวลาเข้านอน (Alert 60 วินาที)", L"เวลานับถอยหลังถูกหยุดชั่วคราวรอการตัดสินใจ กรุณากดเข้าใจแล้วและปิดเครื่องเพื่อเข้านอน", NIIF_WARNING);
+
+            MessageBoxW(
+                NULL,
+                L"🚨 [SleepOrDie: แจ้งเตือนเวลาเข้านอน (Alert 60 วินาที)]\n\n"
+                L"ถึงเวลาพักผ่อนและเข้านอนตามเป้าหมายแล้ว!\n\n"
+                L"⏸️ เวลานับถอยหลังถูกหยุดชั่วคราว (Pause) เพื่อรอการตัดสินใจของคุณ\n"
+                L"กรุณากด 'เข้าใจแล้ว' เพื่อเตรียมตัวเข้านอน\n\n"
+                L"⚠️ หมายเหตุ: หากกดเข้าใจแล้วแต่ยังไม่ยอมนอนและตรวจพบว่ายังใช้คอมพิวเตอร์อยู่ ระบบจะเข้าสู่โหมด Lockdown (จำลอง Sign Out Windows) ทันที!",
+                L"SleepOrDie Alert (หยุดรอการตัดสินใจ)",
+                MB_OK | MB_ICONWARNING | MB_SYSTEMMODAL
+            );
+
+            g_alertModalActive.store(false);
+            ReportPresence("online", (int)GetUserIdleSeconds(), false, "acknowledge");
+        }).detach();
+    } else if (phase == "lockdown" && !g_alertModalActive.exchange(true)) {
+        std::thread([]() {
+            PlaySoundForStage(SleepStage::Lockdown);
+            ShowTrayBalloon(L"🔒 เข้าสู่โหมด Lockdown (จำลอง Sign Out Windows)", L"เวลานับถอยหลังถูกหยุดชั่วคราวรอการตัดสินใจ กรุณาปิดเครื่องไปนอนจริง", NIIF_WARNING);
+
+            MessageBoxW(
+                NULL,
+                L"🔒 [SleepOrDie: โหมด LOCKDOWN — จำลอง Sign Out Windows]\n\n"
+                L"คุณกดรับทราบแล้ว แต่ระบบยังตรวจพบว่า PC ยังออนไลน์และมีการใช้งานอยู่!\n\n"
+                L"🖥️ ระบบจำลองการออกจากระบบ Windows (Sign Out) เพื่อบังคับวินัยการเข้านอน\n"
+                L"⏸️ เวลานับถอยหลังถูกหยุดชั่วคราว (Pause) เพื่อรอการตัดสินใจของคุณ\n\n"
+                L"⚠️ หากกด 'เข้าใจแล้ว' แต่ยังฝ่าฝืนกลับมาใช้งานคอมพิวเตอร์อีก ระบบจะหักพลังชีวิต (HP) 25 แต้มและจำลอง Sleep Mode ต่อไป\n\n"
+                L"กดปุ่ม OK เพื่อยืนยันว่าเข้าใจแล้ว และปิดหน้าจอไปนอนจริง",
+                L"SleepOrDie Lockdown (Sign Out Windows แบบจำลอง)",
+                MB_OK | MB_ICONWARNING | MB_SYSTEMMODAL
+            );
+
+            g_alertModalActive.store(false);
+            ReportPresence("offline", 300, true, "acknowledge_lockdown");
+        }).detach();
+    } else if (phase == "sleep_warning" && !g_alertModalActive.exchange(true)) {
+        std::thread([]() {
+            PlaySoundForStage(SleepStage::SleepWarning);
+            ShowTrayBalloon(L"⚠️ ตรวจพบกลับมาใช้งาน! หัก HP 25 แต้ม", L"ระบบจำลองเข้าสู่ Windows Sleep Mode หากยังฝ่าฝืนจะถูก Shutdown", NIIF_ERROR);
+
+            MessageBoxW(
+                NULL,
+                L"⚠️ [SleepOrDie: ตรวจพบกลับมาใช้งาน! หัก HP 25 แต้ม]\n\n"
+                L"ระบบตรวจพบว่าคุณกลับมาใช้งานคอมพิวเตอร์อีกครั้งหลังจาก Lockdown!\n"
+                L"💔 หักพลังชีวิต 25 HP\n\n"
+                L"💤 ระบบจำลองการเข้าสู่ Windows Sleep Mode\n"
+                L"หากยังฝ่าฝืนเปิดเครื่องใช้งานต่อ ระบบจะเข้าสู่ Shutdown และตัด HP เหลือ 0% ทันที!",
+                L"SleepOrDie Windows Sleep Mode (Mock)",
+                MB_OK | MB_ICONERROR | MB_SYSTEMMODAL
+            );
+
+            g_alertModalActive.store(false);
+            ReportPresence("offline", 300, true, "acknowledge_sleep_warning");
+        }).detach();
+    } else if (phase == "shutdown") {
+        ExecuteFinalEnforcement();
+    }
+}
+
+void ReportPresence(const std::string& status, int idleSeconds, bool screenLocked, const std::string& alertAction) {
     std::string json = "{\"source\":\"desktop_daemon\",\"status\":\"" + status + "\",\"idle_seconds\":" + std::to_string(idleSeconds) + ",\"screen_locked\":" + (screenLocked ? "true" : "false");
     if (!config.discordUserId.empty()) {
         json += ",\"discord_user_id\":\"" + config.discordUserId + "\"";
     }
     if (config.userId > 0) {
         json += ",\"user_id\":" + std::to_string(config.userId);
+    }
+    if (!alertAction.empty()) {
+        json += ",\"alert_action\":\"" + alertAction + "\"";
     }
     json += "}";
 
@@ -345,6 +443,9 @@ void ReportPresence(const std::string& status, int idleSeconds, bool screenLocke
                     }
                 }
             }
+
+            // Sync alert state from server
+            HandleAlertStateResponse(resp);
         }
     }).detach();
 }
@@ -355,7 +456,7 @@ void UpdateTrayTooltip(const std::wstring& tooltip) {
     Shell_NotifyIconW(NIM_MODIFY, &g_nid);
 }
 
-void ShowTrayBalloon(const std::wstring& title, const std::wstring& message, DWORD infoFlags = NIIF_INFO) {
+void ShowTrayBalloon(const std::wstring& title, const std::wstring& message, DWORD infoFlags) {
     g_nid.uFlags = NIF_INFO;
     wcsncpy_s(g_nid.szInfoTitle, title.c_str(), _TRUNCATE);
     wcsncpy_s(g_nid.szInfo, message.c_str(), _TRUNCATE);
@@ -853,14 +954,12 @@ void DaemonLoop() {
             }
         }
 
-        // Periodic presence sync
-        if (++tickCount % 5 == 0) {
-            if (currentStage != SleepStage::Normal) {
-                if (idleSeconds >= (DWORD)config.idleThresholdSeconds) {
-                    ReportPresence("offline", (int)idleSeconds, currentStage == SleepStage::Lockdown);
-                } else if (idleSeconds < 10) {
-                    ReportPresence("online", (int)idleSeconds, false);
-                }
+        // Periodic presence sync (every 3 seconds, all day long)
+        if (++tickCount % 3 == 0) {
+            if (idleSeconds >= (DWORD)config.idleThresholdSeconds) {
+                ReportPresence("offline", (int)idleSeconds, currentStage == SleepStage::Lockdown);
+            } else {
+                ReportPresence("online", (int)idleSeconds, false);
             }
         }
 

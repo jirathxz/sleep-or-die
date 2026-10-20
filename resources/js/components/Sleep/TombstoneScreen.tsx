@@ -5,9 +5,10 @@ import { Skull, LogOut } from 'lucide-react';
 interface TombstoneScreenProps {
     daysSurvived: number;
     userName: string;
+    onResetHp?: () => void;
 }
 
-export const TombstoneScreen: React.FC<TombstoneScreenProps> = ({ daysSurvived, userName }) => {
+export const TombstoneScreen: React.FC<TombstoneScreenProps> = ({ daysSurvived, userName, onResetHp }) => {
     const handleLogout = () => {
         router.post('/logout');
     };
@@ -58,13 +59,25 @@ export const TombstoneScreen: React.FC<TombstoneScreenProps> = ({ daysSurvived, 
                     วินัยการนอนคือความรับผิดชอบพื้นฐานของร่างกาย การพักผ่อนไม่เพียงพอส่งผลกระทบโดยตรงต่อชีวิตจริง
                 </p>
 
-                <button
-                    onClick={handleLogout}
-                    className="w-full h-10 rounded-lg bg-white text-zinc-950 font-medium text-xs hover:bg-zinc-200 transition-colors flex items-center justify-center gap-2"
-                >
-                    <LogOut className="size-4" />
-                    <span>ออกจากระบบ</span>
-                </button>
+                <div className="space-y-2">
+                    {onResetHp && (
+                        <button
+                            type="button"
+                            onClick={onResetHp}
+                            className="w-full h-11 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs transition-colors flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/25 active:scale-[0.98]"
+                        >
+                            <span>❤️ ชุบชีวิต / รีเซ็ต HP (100%)</span>
+                        </button>
+                    )}
+
+                    <button
+                        onClick={handleLogout}
+                        className="w-full h-10 rounded-lg bg-white/10 text-zinc-300 font-medium text-xs hover:bg-white/20 transition-colors flex items-center justify-center gap-2"
+                    >
+                        <LogOut className="size-4" />
+                        <span>ออกจากระบบ</span>
+                    </button>
+                </div>
             </div>
         </div>
     );

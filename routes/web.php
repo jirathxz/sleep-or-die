@@ -31,6 +31,11 @@ Route::middleware(['auth'])->group(function () {
         Route::get('status', [SleepController::class, 'status'])->name('status');
         Route::post('test-discord', [SleepController::class, 'testDiscord'])->name('test-discord');
         Route::post('test-alert', [SleepController::class, 'testAlert'])->name('test-alert');
+        Route::post('alert-action', [SleepController::class, 'handleAlertAction'])->name('alert-action');
+        Route::post('reset-hp', [SleepController::class, 'resetHp'])->name('reset-hp');
+        Route::post('buy-item', [SleepController::class, 'buyShopItem'])->name('buy-item');
+        Route::post('use-item', [SleepController::class, 'useInventoryItem'])->name('use-item');
+        Route::get('history-data', [SleepController::class, 'getSleepHistory'])->name('history-data');
     });
 });
 

@@ -3,6 +3,51 @@ import { audioManager } from '@/lib/audioManager';
 
 export type SleepStage = 'normal' | 'alert' | 'lockdown' | 'sleep' | 'shutdown';
 
+export interface AlertSyncState {
+    phase: 'idle' | 'alert' | 'acknowledged_alert' | 'lockdown' | 'acknowledged_lockdown' | 'sleep_warning' | 'shutdown';
+    seconds_remaining: number;
+    total_seconds: number;
+    is_paused: boolean;
+    step_index: number;
+    step_title: string;
+    step_message: string;
+    acknowledged: boolean;
+    updated_at?: string;
+}
+
+export interface CppPresenceState {
+    is_pc_online: boolean;
+    idle_seconds: number | null;
+    screen_locked: boolean;
+    status: string;
+    updated_at: string | null;
+}
+
+export interface InventoryItem {
+    id: string;
+    item_id: string;
+    label: string;
+    slots: number;
+    description: string;
+    acquired_at?: string;
+}
+
+export interface SleepHistoryItem {
+    id: string;
+    date: string;
+    date_display?: string;
+    target_time: string;
+    actual_time: string;
+    wake_time?: string;
+    duration: string;
+    duration_hours?: number;
+    status: 'ON_TIME' | 'LATE' | 'MISSED' | string;
+    status_label?: string;
+    status_color?: string;
+    reward: string;
+    life_change?: string;
+}
+
 export interface SleepState {
     current_hp: number;
     wake_up_time: string | null;
@@ -24,6 +69,22 @@ export interface SleepState {
     enable_cpp_detection: boolean;
     is_system_active: boolean;
 
+    // Theme & UI Preferences
+    theme_preference: 'dark' | 'special';
+    border_style: 'rounded' | 'sharp';
+
+    // Black Market Inventory & Capacity
+    inventory: InventoryItem[];
+    inventory_capacity: number;
+    used_slots: number;
+
+    // Sleep Mission History
+    sleep_history: SleepHistoryItem[];
+
+    // Real-time synchronization state
+    alert_state: AlertSyncState;
+    cpp_presence: CppPresenceState;
+
     // Derived timer values
     stage: SleepStage;
     totalSecondsRemaining: number;
@@ -43,6 +104,10 @@ export interface SleepState {
     toggleAudio: (enabled?: boolean) => void;
     startSimulation321: () => void;
     resetSimulation: () => void;
+    setThemePreference: (theme: 'dark' | 'special') => Promise<void>;
+    setBorderStyle: (style: 'rounded' | 'sharp') => Promise<void>;
+    buyShopItem: (itemId: string) => Promise<{ success: boolean; message: string }>;
+    useInventoryItem: (itemInstanceId: string) => Promise<{ success: boolean; message: string }>;
     saveSettings: (
         wakeUpTime?: string | null,
         discordUserId?: string,
@@ -50,17 +115,37 @@ export interface SleepState {
         emergencyCountdownSeconds?: number,
         sleepTargetTime?: string | null,
         enableDiscordDetection?: boolean,
-        enableCppDetection?: boolean
+        enableCppDetection?: boolean,
+        themePreference?: 'dark' | 'special',
+        borderStyle?: 'rounded' | 'sharp'
     ) => Promise<boolean>;
     confirmSleep: () => Promise<boolean>;
     useTicket: () => Promise<boolean>;
     redeemTicket: () => Promise<boolean>;
     fetchStatus: () => Promise<void>;
+    triggerAlertSequence: (seconds?: number) => Promise<boolean>;
+    acknowledgeAlert: () => Promise<boolean>;
+    acknowledgeLockdown: () => Promise<boolean>;
+    acknowledgeSleepWarning: () => Promise<boolean>;
+    resetAlertSequence: () => Promise<boolean>;
+    resetHp: () => Promise<boolean>;
+    toggleAlertPause: () => Promise<boolean>;
+    setQuickBedtime: (minutesFromNow: number) => Promise<boolean>;
     testDiscordConnection: (token?: string, userId?: string) => Promise<{
         success: boolean;
         message: string;
         bot?: { id: string; username: string };
-        target_user?: { found: boolean; username?: string; global_name?: string; message?: string } | null;
+        target_user?: {
+            found: boolean;
+            username?: string;
+            global_name?: string;
+            message?: string;
+            raw_status?: string;
+            is_in_voice?: boolean;
+            voice_channel?: string;
+            is_considered_online?: boolean;
+            reason?: string;
+        } | null;
     }>;
     testAlert: (stage?: string, token?: string, userId?: string) => Promise<{
         success: boolean;
@@ -155,6 +240,26 @@ function determineStage(
 const defaultWakeUp = '07:00';
 const defaultSleepTarget = calculateSleepTargetLocal(defaultWakeUp);
 
+function applyDomThemeAndCorners(theme?: 'dark' | 'special', border?: 'rounded' | 'sharp') {
+    if (typeof document === 'undefined') return;
+    const root = document.documentElement;
+    if (theme === 'special') {
+        root.classList.add('theme-special');
+        root.setAttribute('data-theme', 'special');
+    } else if (theme === 'dark') {
+        root.classList.remove('theme-special');
+        root.removeAttribute('data-theme');
+    }
+
+    if (border === 'sharp') {
+        root.classList.add('corners-sharp');
+        root.setAttribute('data-corners', 'sharp');
+    } else if (border === 'rounded') {
+        root.classList.remove('corners-sharp');
+        root.removeAttribute('data-corners');
+    }
+}
+
 export const useSleepStore = create<SleepState>((set, get) => ({
     current_hp: 100,
     wake_up_time: defaultWakeUp,
@@ -167,7 +272,7 @@ export const useSleepStore = create<SleepState>((set, get) => ({
     discord_bot_token: null,
     last_sleep_confirmed_at: null,
     level: 1,
-    exp: 150,
+    exp: 225, // default to 225 EXP to match tactical screenshot
     points: 100,
     emergency_countdown_seconds: 60,
     is_in_voice: false,
@@ -175,6 +280,53 @@ export const useSleepStore = create<SleepState>((set, get) => ({
     enable_discord_detection: true,
     enable_cpp_detection: true,
     is_system_active: true,
+
+    theme_preference: 'dark',
+    border_style: 'rounded',
+    inventory: [
+        {
+            id: 'item_ration_init_1',
+            item_id: 'ration_supply',
+            label: '[ RATION SUPPLY ]',
+            slots: 2,
+            description: 'ขนาด: 2 ช่อง | ฟื้นฟู LIFE +30% & ขยายเวลา +5 นาที',
+        },
+        {
+            id: 'item_spray_init_1',
+            item_id: 'first_aid_spray',
+            label: '[ FIRST AID SPRAY ]',
+            slots: 1,
+            description: 'ขนาด: 1 ช่อง | ฟื้นฟูพลังชีวิตฉุกเฉิน LIFE +50%',
+        },
+        {
+            id: 'item_spray_init_2',
+            item_id: 'first_aid_spray',
+            label: '[ FIRST AID SPRAY ]',
+            slots: 1,
+            description: 'ขนาด: 1 ช่อง | ฟื้นฟูพลังชีวิตฉุกเฉิน LIFE +50%',
+        },
+    ],
+    inventory_capacity: 12,
+    used_slots: 4,
+    sleep_history: [],
+
+    alert_state: {
+        phase: 'idle',
+        seconds_remaining: 60,
+        total_seconds: 60,
+        is_paused: false,
+        step_index: 0,
+        step_title: '',
+        step_message: '',
+        acknowledged: false,
+    },
+    cpp_presence: {
+        is_pc_online: false,
+        idle_seconds: null,
+        screen_locked: false,
+        status: 'offline',
+        updated_at: null,
+    },
 
     stage: 'normal',
     totalSecondsRemaining: 86400,
@@ -195,6 +347,15 @@ export const useSleepStore = create<SleepState>((set, get) => ({
             const wakeUp = data.wake_up_time || state.wake_up_time || defaultWakeUp;
             const target = data.sleep_target_time || state.sleep_target_time || calculateSleepTargetLocal(wakeUp);
 
+            const themePref = (data as any).theme_preference ?? state.theme_preference ?? 'dark';
+            const borderStyle = (data as any).border_style ?? state.border_style ?? 'rounded';
+            applyDomThemeAndCorners(themePref, borderStyle);
+
+            const inventory = (data as any).inventory ?? state.inventory ?? [];
+            const capacity = (data as any).inventory_capacity ?? state.inventory_capacity ?? 12;
+            const usedSlots = inventory.reduce((sum: number, it: any) => sum + (it.slots || 0), 0);
+            const history = (data as any).sleep_history ?? state.sleep_history ?? [];
+
             const enableDiscord = data.enable_discord_detection !== undefined
                 ? Boolean(data.enable_discord_detection)
                 : (state.enable_discord_detection ?? true);
@@ -209,8 +370,12 @@ export const useSleepStore = create<SleepState>((set, get) => ({
             const isInVoice = Boolean(enableDiscord && (presence?.is_in_voice ?? (data as any).is_in_voice ?? state.is_in_voice));
             const voiceChannel = presence?.voice_channel ?? (data as any).voice_channel ?? state.voice_channel;
 
-            // Rule: หากอยู่ในห้องคุยไม่ถือว่านอน, หรือหากไม่ได้เปิดใช้งานระบบเลย
-            const lastConfirmed = (!isSystemActive || isInVoice)
+            const cppPresence = (data as any).cpp_presence ?? state.cpp_presence;
+            const isPcOnline = Boolean(enableCpp && cppPresence?.is_pc_online);
+            const alertState = (data as any).alert_state ?? state.alert_state;
+
+            // Rule: หากอยู่ในห้องคุยไม่ถือว่านอน, หาก C++ ตรวจพบว่า PC ออนไลน์ไม่ถือว่านอน, หรือหากไม่ได้เปิดใช้งานระบบเลย
+            const lastConfirmed = (!isSystemActive || isInVoice || isPcOnline)
                 ? null
                 : (data.last_sleep_confirmed_at !== undefined ? data.last_sleep_confirmed_at : state.last_sleep_confirmed_at);
 
@@ -220,11 +385,19 @@ export const useSleepStore = create<SleepState>((set, get) => ({
                 const timer = calculateTimeRemaining(target);
                 return {
                     ...data,
+                    theme_preference: themePref,
+                    border_style: borderStyle,
+                    inventory,
+                    inventory_capacity: capacity,
+                    used_slots: usedSlots,
+                    sleep_history: history,
                     enable_discord_detection: enableDiscord,
                     enable_cpp_detection: enableCpp,
                     is_system_active: false,
                     is_in_voice: isInVoice,
                     voice_channel: voiceChannel,
+                    cpp_presence: cppPresence,
+                    alert_state: alertState,
                     last_sleep_confirmed_at: null,
                     wake_up_time: wakeUp,
                     sleep_target_time: target,
@@ -242,11 +415,19 @@ export const useSleepStore = create<SleepState>((set, get) => ({
             if (state.simulationActive) {
                 return {
                     ...data,
+                    theme_preference: themePref,
+                    border_style: borderStyle,
+                    inventory,
+                    inventory_capacity: capacity,
+                    used_slots: usedSlots,
+                    sleep_history: history,
                     enable_discord_detection: enableDiscord,
                     enable_cpp_detection: enableCpp,
                     is_system_active: true,
                     is_in_voice: isInVoice,
                     voice_channel: voiceChannel,
+                    cpp_presence: cppPresence,
+                    alert_state: alertState,
                     last_sleep_confirmed_at: lastConfirmed,
                     wake_up_time: wakeUp,
                     sleep_target_time: target,
@@ -260,11 +441,19 @@ export const useSleepStore = create<SleepState>((set, get) => ({
 
             return {
                 ...data,
+                theme_preference: themePref,
+                border_style: borderStyle,
+                inventory,
+                inventory_capacity: capacity,
+                used_slots: usedSlots,
+                sleep_history: history,
                 enable_discord_detection: enableDiscord,
                 enable_cpp_detection: enableCpp,
                 is_system_active: isSystemActive,
                 is_in_voice: isInVoice,
                 voice_channel: voiceChannel,
+                cpp_presence: cppPresence,
+                alert_state: alertState,
                 last_sleep_confirmed_at: lastConfirmed,
                 wake_up_time: wakeUp,
                 sleep_target_time: target,
@@ -395,6 +584,41 @@ export const useSleepStore = create<SleepState>((set, get) => ({
             }
         }
 
+        // 1. Alert sequence real countdown ticking
+        const { alert_state } = get();
+        if (alert_state && alert_state.phase !== 'idle' && !alert_state.is_paused) {
+            const currentSec = alert_state.seconds_remaining ?? 60;
+            const nextSec = currentSec - 1;
+            if (nextSec > 0) {
+                set({
+                    alert_state: {
+                        ...alert_state,
+                        seconds_remaining: nextSec,
+                    },
+                });
+            } else {
+                // Countdown reached 0: auto-escalate!
+                if (alert_state.phase === 'alert') {
+                    get().acknowledgeAlert();
+                } else if (alert_state.phase === 'lockdown' || alert_state.phase === 'acknowledged_alert') {
+                    get().acknowledgeSleepWarning();
+                } else if (alert_state.phase === 'sleep_warning' || alert_state.phase === 'acknowledged_lockdown') {
+                    const csrfToken = getCsrfToken();
+                    fetch('/sleep/alert-action', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            ...(csrfToken ? { 'X-CSRF-TOKEN': csrfToken } : {}),
+                        },
+                        body: JSON.stringify({ action: 'shutdown' }),
+                    }).then(res => res.json()).then(data => {
+                        if (data.alert_state) set({ alert_state: data.alert_state, current_hp: 0, stage: 'shutdown' });
+                    }).catch(() => {});
+                }
+            }
+        }
+
         const target = sleep_target_time || defaultSleepTarget;
         const timer = calculateTimeRemaining(target);
 
@@ -427,6 +651,21 @@ export const useSleepStore = create<SleepState>((set, get) => ({
             displaySeconds = emergencySecondsLeft;
             displayMinutes = 0;
             displayHours = 0;
+
+            if (emergencySecondsLeft <= 0 && activeHp <= 0 && current_hp > 0) {
+                const csrfToken = getCsrfToken();
+                fetch('/sleep/alert-action', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        ...(csrfToken ? { 'X-CSRF-TOKEN': csrfToken } : {}),
+                    },
+                    body: JSON.stringify({ action: 'shutdown' }),
+                }).then(res => res.json()).then(data => {
+                    if (data.alert_state) set({ alert_state: data.alert_state, current_hp: 0, stage: 'shutdown' });
+                }).catch(() => {});
+            }
         }
 
         const newStage = determineStage(activeHp, is_disabled, timer.totalSeconds);
@@ -473,7 +712,9 @@ export const useSleepStore = create<SleepState>((set, get) => ({
         emergencyCountdownSeconds?: number,
         sleepTargetTime?: string | null,
         enableDiscordDetection?: boolean,
-        enableCppDetection?: boolean
+        enableCppDetection?: boolean,
+        themePreference?: 'dark' | 'special',
+        borderStyle?: 'rounded' | 'sharp'
     ) => {
         try {
             let calculatedTarget = sleepTargetTime || null;
@@ -488,6 +729,10 @@ export const useSleepStore = create<SleepState>((set, get) => ({
                 d.setMinutes(d.getMinutes() + (5 * 90) + 15);
                 finalWakeUp = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
             }
+
+            const currentTheme = themePreference ?? get().theme_preference;
+            const currentBorder = borderStyle ?? get().border_style;
+            applyDomThemeAndCorners(currentTheme, currentBorder);
 
             const csrfToken = getCsrfToken();
 
@@ -508,6 +753,8 @@ export const useSleepStore = create<SleepState>((set, get) => ({
                         emergency_countdown_seconds: emergencyCountdownSeconds,
                         enable_discord_detection: enableDiscordDetection,
                         enable_cpp_detection: enableCppDetection,
+                        theme_preference: currentTheme,
+                        border_style: currentBorder,
                     }),
                 });
 
@@ -529,6 +776,8 @@ export const useSleepStore = create<SleepState>((set, get) => ({
                 emergency_countdown_seconds: emergencyCountdownSeconds || 60,
                 enable_discord_detection: enableDiscordDetection ?? true,
                 enable_cpp_detection: enableCppDetection ?? true,
+                theme_preference: currentTheme,
+                border_style: currentBorder,
             });
             return true;
         } catch {
@@ -694,6 +943,134 @@ export const useSleepStore = create<SleepState>((set, get) => ({
         }
     },
 
+    triggerAlertSequence: async (seconds = 60) => {
+        try {
+            const csrfToken = getCsrfToken();
+            const res = await fetch('/sleep/alert-action', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    ...(csrfToken ? { 'X-CSRF-TOKEN': csrfToken } : {}),
+                },
+                body: JSON.stringify({ action: 'trigger', seconds }),
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.alert_state) {
+                    set({ alert_state: data.alert_state });
+                }
+                return true;
+            }
+            return false;
+        } catch {
+            return false;
+        }
+    },
+
+    acknowledgeAlert: async () => {
+        try {
+            const csrfToken = getCsrfToken();
+            const res = await fetch('/sleep/alert-action', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    ...(csrfToken ? { 'X-CSRF-TOKEN': csrfToken } : {}),
+                },
+                body: JSON.stringify({ action: 'acknowledge' }),
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.alert_state) {
+                    set({ alert_state: data.alert_state });
+                }
+                return true;
+            }
+            return false;
+        } catch {
+            return false;
+        }
+    },
+
+    acknowledgeLockdown: async () => {
+        try {
+            const csrfToken = getCsrfToken();
+            const res = await fetch('/sleep/alert-action', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    ...(csrfToken ? { 'X-CSRF-TOKEN': csrfToken } : {}),
+                },
+                body: JSON.stringify({ action: 'acknowledge_lockdown' }),
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.alert_state) {
+                    set({ alert_state: data.alert_state });
+                }
+                return true;
+            }
+            return false;
+        } catch {
+            return false;
+        }
+    },
+
+    acknowledgeSleepWarning: async () => {
+        try {
+            const csrfToken = getCsrfToken();
+            const res = await fetch('/sleep/alert-action', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    ...(csrfToken ? { 'X-CSRF-TOKEN': csrfToken } : {}),
+                },
+                body: JSON.stringify({ action: 'acknowledge_sleep_warning' }),
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.alert_state) {
+                    set({ alert_state: data.alert_state });
+                }
+                if (data.current_hp !== undefined) {
+                    set({ current_hp: data.current_hp });
+                }
+                return true;
+            }
+            return false;
+        } catch {
+            return false;
+        }
+    },
+
+    resetAlertSequence: async () => {
+        try {
+            const csrfToken = getCsrfToken();
+            const res = await fetch('/sleep/alert-action', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    ...(csrfToken ? { 'X-CSRF-TOKEN': csrfToken } : {}),
+                },
+                body: JSON.stringify({ action: 'reset' }),
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.alert_state) {
+                    set({ alert_state: data.alert_state });
+                }
+                return true;
+            }
+            return false;
+        } catch {
+            return false;
+        }
+    },
+
     testDiscordConnection: async (token?: string, userId?: string) => {
         try {
             const csrfToken = getCsrfToken();
@@ -756,4 +1133,281 @@ export const useSleepStore = create<SleepState>((set, get) => ({
             };
         }
     },
+
+    resetHp: async () => {
+        try {
+            audioManager.stopAllAudio();
+            const csrfToken = getCsrfToken();
+            if (csrfToken) {
+                const res = await fetch('/sleep/reset-hp', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                    },
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    set({
+                        current_hp: 100,
+                        shutdown_stacks: 0,
+                        is_disabled: false,
+                        stage: 'normal',
+                        alert_state: data.alert_state || {
+                            phase: 'idle',
+                            seconds_remaining: 60,
+                            total_seconds: 60,
+                            is_paused: false,
+                            step_index: 0,
+                            step_title: '',
+                            step_message: '',
+                            acknowledged: false,
+                        },
+                    });
+                    if (get().audioEnabled) {
+                        audioManager.playLevelUpChime();
+                    }
+                    return true;
+                }
+            }
+
+            // Guest fallback
+            set({
+                current_hp: 100,
+                shutdown_stacks: 0,
+                is_disabled: false,
+                stage: 'normal',
+                alert_state: {
+                    phase: 'idle',
+                    seconds_remaining: 60,
+                    total_seconds: 60,
+                    is_paused: false,
+                    step_index: 0,
+                    step_title: '',
+                    step_message: '',
+                    acknowledged: false,
+                },
+            });
+            if (get().audioEnabled) {
+                audioManager.playLevelUpChime();
+            }
+            return true;
+        } catch {
+            return false;
+        }
+    },
+
+    toggleAlertPause: async () => {
+        try {
+            const { alert_state } = get();
+            if (!alert_state || alert_state.phase === 'idle') return false;
+
+            const nextPaused = !alert_state.is_paused;
+            set({
+                alert_state: {
+                    ...alert_state,
+                    is_paused: nextPaused,
+                },
+            });
+
+            const csrfToken = getCsrfToken();
+            if (csrfToken) {
+                fetch('/sleep/alert-action', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                    },
+                    body: JSON.stringify({ action: 'toggle_pause' }),
+                }).catch(() => {});
+            }
+            return true;
+        } catch {
+            return false;
+        }
+    },
+
+    setQuickBedtime: async (minutesFromNow: number) => {
+        try {
+            const now = new Date();
+            now.setMinutes(now.getMinutes() + minutesFromNow);
+            const h = now.getHours().toString().padStart(2, '0');
+            const m = now.getMinutes().toString().padStart(2, '0');
+            const newBedtime = `${h}:${m}`;
+
+            return await get().saveSettings(
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                newBedtime
+            );
+        } catch {
+            return false;
+        }
+    },
+
+    setThemePreference: async (theme: 'dark' | 'special') => {
+        applyDomThemeAndCorners(theme, get().border_style);
+        set({ theme_preference: theme });
+        await get().saveSettings(
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            theme,
+            get().border_style
+        );
+    },
+
+    setBorderStyle: async (style: 'rounded' | 'sharp') => {
+        applyDomThemeAndCorners(get().theme_preference, style);
+        set({ border_style: style });
+        await get().saveSettings(
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            get().theme_preference,
+            style
+        );
+    },
+
+    buyShopItem: async (itemId: string) => {
+        try {
+            const csrfToken = getCsrfToken();
+            if (csrfToken) {
+                const res = await fetch('/sleep/buy-item', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                    },
+                    body: JSON.stringify({ item_id: itemId }),
+                });
+
+                const data = await res.json();
+                if (res.ok && data.success) {
+                    get().syncUser(data);
+                    if (get().audioEnabled) {
+                        audioManager.playLevelUpChime();
+                    }
+                    return { success: true, message: data.message };
+                } else {
+                    return { success: false, message: data.message || 'ไม่สามารถสั่งซื้อไอเทมนี้ได้' };
+                }
+            }
+
+            // Local fallback for guest
+            const { exp, inventory, inventory_capacity } = get();
+            const costs: Record<string, number> = {
+                ration_supply: 30,
+                first_aid_spray: 60,
+                stealth_camo: 100,
+                case_m: 200,
+                case_l: 400,
+            };
+            const cost = costs[itemId] || 0;
+            if (exp < cost) {
+                return { success: false, message: `แต้ม EXP ไม่พอ (ขาดอีก ${cost - exp} EXP)` };
+            }
+
+            if (itemId === 'case_m') {
+                set({ exp: exp - cost, inventory_capacity: 16 });
+                return { success: true, message: 'อัปเกรดกระเป๋า Attaché Case (M) 16 ช่องสำเร็จ!' };
+            } else if (itemId === 'case_l') {
+                if (inventory_capacity < 16) {
+                    return { success: false, message: 'ต้องมีกระเป๋า Case (M) ก่อน จึงจะอัปเกรดเป็น Case (L) ได้' };
+                }
+                set({ exp: exp - cost, inventory_capacity: 20 });
+                return { success: true, message: 'อัปเกรดกระเป๋า Attaché Case (L) 20 ช่องสำเร็จ!' };
+            }
+
+            const slotsMap: Record<string, number> = { ration_supply: 2, first_aid_spray: 1, stealth_camo: 1 };
+            const labelMap: Record<string, string> = {
+                ration_supply: '[ RATION SUPPLY ]',
+                first_aid_spray: '[ FIRST AID SPRAY ]',
+                stealth_camo: '[ STEALTH CAMO ]',
+            };
+            const used = inventory.reduce((a, b) => a + (b.slots || 0), 0);
+            const reqSlots = slotsMap[itemId] || 1;
+            if (used + reqSlots > inventory_capacity) {
+                return { success: false, message: 'ช่องกระเป๋าไม่พอ!' };
+            }
+
+            const newItem: InventoryItem = {
+                id: 'guest_' + Date.now(),
+                item_id: itemId,
+                label: labelMap[itemId] || itemId,
+                slots: reqSlots,
+                description: 'ไอเทมยุทธภัณฑ์ตลาดมืด',
+            };
+            const nextInv = [...inventory, newItem];
+            set({
+                exp: exp - cost,
+                inventory: nextInv,
+                used_slots: used + reqSlots,
+            });
+            if (get().audioEnabled) {
+                audioManager.playLevelUpChime();
+            }
+            return { success: true, message: `ซื้อ ${newItem.label} สำเร็จ!` };
+        } catch {
+            return { success: false, message: 'เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์' };
+        }
+    },
+
+    useInventoryItem: async (itemInstanceId: string) => {
+        try {
+            const csrfToken = getCsrfToken();
+            if (csrfToken) {
+                const res = await fetch('/sleep/use-item', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                    },
+                    body: JSON.stringify({ item_instance_id: itemInstanceId }),
+                });
+
+                const data = await res.json();
+                if (res.ok && data.success) {
+                    get().syncUser(data);
+                    if (get().audioEnabled) {
+                        audioManager.playAlertChime();
+                    }
+                    return { success: true, message: data.message };
+                } else {
+                    return { success: false, message: data.message || 'ไม่สามารถใช้งานไอเทมนี้ได้' };
+                }
+            }
+
+            // Guest fallback
+            const { inventory, current_hp } = get();
+            const idx = inventory.findIndex(i => i.id === itemInstanceId);
+            if (idx === -1) return { success: false, message: 'ไม่พบไอเทม' };
+            const item = inventory[idx];
+            const nextInv = [...inventory];
+            nextInv.splice(idx, 1);
+            let nextHp = current_hp;
+            if (item.item_id === 'ration_supply') nextHp = Math.min(100, current_hp + 30);
+            if (item.item_id === 'first_aid_spray') nextHp = Math.min(100, current_hp + 50);
+            const used = nextInv.reduce((a, b) => a + (b.slots || 0), 0);
+            set({ inventory: nextInv, current_hp: nextHp, used_slots: used });
+            return { success: true, message: `ใช้งาน ${item.label} สำเร็จ!` };
+        } catch {
+            return { success: false, message: 'เกิดข้อผิดพลาดในการใช้งานไอเทม' };
+        }
+    },
 }));
+

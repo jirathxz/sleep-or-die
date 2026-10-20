@@ -1,11 +1,13 @@
 import React from 'react';
+import { Heart, RotateCcw } from 'lucide-react';
 
 interface HpBarProps {
     hp: number;
     stage: string;
+    onResetHp?: () => void;
 }
 
-export const HpBar: React.FC<HpBarProps> = ({ hp, stage }) => {
+export const HpBar: React.FC<HpBarProps> = ({ hp, stage, onResetHp }) => {
     const clampedHp = Math.max(0, Math.min(100, hp));
 
     // Determine status text, color, and indicator dot based on HP and stage
@@ -33,13 +35,24 @@ export const HpBar: React.FC<HpBarProps> = ({ hp, stage }) => {
 
     return (
         <section className="bg-[#121215] rounded-2xl p-5 md:p-6 space-y-4 shadow-sm select-none">
-            {/* Header: Title and Status Dot (Strictly No Badge) */}
+            {/* Header: Title, Reset Button, and Status Dot */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
                     <span className="size-2 rounded-full bg-white/40" />
                     <h2 className="text-sm font-medium text-zinc-300">
                         ระดับพลังชีวิต
                     </h2>
+                    {onResetHp && (
+                        <button
+                            type="button"
+                            onClick={onResetHp}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 text-[11px] font-normal transition-all active:scale-95 ml-1"
+                            title="รีเซ็ตพลังชีวิตกลับเป็น 100% เต็มกำลัง"
+                        >
+                            <Heart className="size-3 fill-emerald-500/30" />
+                            <span>รีเซ็ต HP</span>
+                        </button>
+                    )}
                 </div>
 
                 <div className="flex items-center gap-2 text-xs font-normal">

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Head, usePage, router } from '@inertiajs/react';
-import { Sliders, Volume2, VolumeX, Moon, Shield, User, Key, Bell, Check, Loader2, Bot, AlertCircle, CheckCircle2, Send, HelpCircle } from 'lucide-react';
+import { Sliders, Volume2, VolumeX, Moon, Shield, User, Key, Bell, Check, Loader2, Bot, AlertCircle, CheckCircle2, Send, HelpCircle, Palette, Square, Circle } from 'lucide-react';
 import { useSleepStore } from '@/stores/useSleepStore';
 
 export default function SettingsPage() {
@@ -16,6 +16,10 @@ export default function SettingsPage() {
         enable_discord_detection,
         enable_cpp_detection,
         is_system_active,
+        theme_preference,
+        border_style,
+        setThemePreference,
+        setBorderStyle,
         audioEnabled,
         toggleAudio,
         saveSettings,
@@ -47,7 +51,17 @@ export default function SettingsPage() {
         success: boolean;
         message: string;
         bot?: { id: string; username: string };
-        target_user?: { found: boolean; username?: string; global_name?: string; message?: string } | null;
+        target_user?: {
+            found: boolean;
+            username?: string;
+            global_name?: string;
+            message?: string;
+            raw_status?: string;
+            is_in_voice?: boolean;
+            voice_channel?: string;
+            is_considered_online?: boolean;
+            reason?: string;
+        } | null;
     } | null>(null);
 
     const [sendingTestDm, setSendingTestDm] = useState(false);
@@ -495,6 +509,135 @@ export default function SettingsPage() {
                         </button>
                     </div>
                 </form>
+
+                {/* Section: Theme & Interface Styling */}
+                <div className="bg-[#121215] rounded-2xl p-5 md:p-6 space-y-4 shadow-sm border border-white/5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                        <span className="text-sm font-medium text-white flex items-center gap-2">
+                            <Palette className="size-4 text-zinc-400" />
+                            ธีมสีและรูปแบบอินเตอร์เฟซ (Theme &amp; Corner Style)
+                        </span>
+                        <span className="text-[11px] text-zinc-500 font-light">
+                            ปรับเปลี่ยนโทนสีหน้าจอและรูปทรงขอบของระบบ
+                        </span>
+                    </div>
+
+                    {/* Color Theme Selector */}
+                    <div className="space-y-2">
+                        <label className="text-xs font-normal text-zinc-300">
+                            1. ธีมสีของระบบ (Color Theme)
+                        </label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                            {/* Dark Theme */}
+                            <button
+                                type="button"
+                                onClick={() => setThemePreference('dark')}
+                                className={`p-3.5 rounded-xl border text-left transition-all flex flex-col justify-between gap-2.5 ${
+                                    theme_preference === 'dark'
+                                        ? 'border-white bg-[#18181b] shadow-md ring-1 ring-white/20'
+                                        : 'border-white/5 bg-[#141417] hover:border-white/20 text-zinc-400'
+                                }`}
+                            >
+                                <div className="flex items-center justify-between">
+                                    <span className="font-medium text-white flex items-center gap-2">
+                                        <span>🌑 Dark Theme</span>
+                                        <span className="text-[10px] text-zinc-500 font-normal">(ค่าเริ่มต้น)</span>
+                                    </span>
+                                    {theme_preference === 'dark' && <Check className="size-4 text-emerald-400" />}
+                                </div>
+                                <p className="text-[11px] text-zinc-400 font-light leading-relaxed">
+                                    สไตล์ Minimal Dark UI โมเดิร์น โทนสี Zinc เทาเข้ม ดำ และมรกต Emerald
+                                </p>
+                                <div className="flex items-center gap-1.5 pt-1">
+                                    <div className="size-3.5 rounded-full bg-[#09090b] border border-white/20" />
+                                    <div className="size-3.5 rounded-full bg-[#18181b]" />
+                                    <div className="size-3.5 rounded-full bg-emerald-500" />
+                                    <div className="size-3.5 rounded-full bg-white" />
+                                </div>
+                            </button>
+
+                            {/* Special Theme */}
+                            <button
+                                type="button"
+                                onClick={() => setThemePreference('special')}
+                                className={`p-3.5 rounded-xl border text-left transition-all flex flex-col justify-between gap-2.5 ${
+                                    theme_preference === 'special'
+                                        ? 'border-[#8cf044] bg-[#071307] shadow-[0_0_15px_rgba(140,240,68,0.25)] ring-1 ring-[#8cf044]/50'
+                                        : 'border-[#8cf044]/20 bg-[#060c06] hover:border-[#8cf044]/50 text-zinc-400'
+                                }`}
+                            >
+                                <div className="flex items-center justify-between">
+                                    <span className="font-medium text-[#8cf044] flex items-center gap-2">
+                                        <span>📟 Special Theme</span>
+                                        <span className="text-[10px] text-[#ffb700] font-normal">[TACTICAL TERMINAL]</span>
+                                    </span>
+                                    {theme_preference === 'special' && <Check className="size-4 text-[#8cf044]" />}
+                                </div>
+                                <p className="text-[11px] text-zinc-300 font-light leading-relaxed">
+                                    สไตล์จอเขียวทหารเรดาร์ Phosphor CRT (#8cf044), สีอำพัน Amber (#ffb700) และเส้นสแกนไลน์เหมือนในตลาดมืด
+                                </p>
+                                <div className="flex items-center gap-1.5 pt-1">
+                                    <div className="size-3.5 rounded-full bg-[#050a05] border border-[#8cf044]/40" />
+                                    <div className="size-3.5 rounded-full bg-[#0f200f]" />
+                                    <div className="size-3.5 rounded-full bg-[#8cf044]" />
+                                    <div className="size-3.5 rounded-full bg-[#ffb700]" />
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Corner / Border Style Selector */}
+                    <div className="space-y-2 pt-2 border-t border-white/5">
+                        <label className="text-xs font-normal text-zinc-300">
+                            2. รูปแบบขอบหน้าจอ (Border &amp; Corner Style)
+                        </label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                            {/* Rounded Corners */}
+                            <button
+                                type="button"
+                                onClick={() => setBorderStyle('rounded')}
+                                className={`p-3.5 rounded-xl border text-left transition-all flex items-center justify-between ${
+                                    border_style === 'rounded'
+                                        ? 'border-white bg-[#18181b] shadow-md ring-1 ring-white/20'
+                                        : 'border-white/5 bg-[#141417] hover:border-white/20 text-zinc-400'
+                                }`}
+                            >
+                                <div className="space-y-0.5">
+                                    <span className="font-medium text-white flex items-center gap-1.5">
+                                        <Circle className="size-3.5 text-zinc-400" />
+                                        <span>ขอบมนปกติ (Rounded Corners)</span>
+                                    </span>
+                                    <p className="text-[11px] text-zinc-400 font-light">
+                                        รูปทรงขอบโค้งมนนุ่มนวล ดีไซน์โมเดิร์น
+                                    </p>
+                                </div>
+                                {border_style === 'rounded' && <Check className="size-4 text-emerald-400 shrink-0 ml-2" />}
+                            </button>
+
+                            {/* Sharp Corners */}
+                            <button
+                                type="button"
+                                onClick={() => setBorderStyle('sharp')}
+                                className={`p-3.5 border text-left transition-all flex items-center justify-between ${
+                                    border_style === 'sharp'
+                                        ? 'border-[#8cf044] bg-[#071307] shadow-[0_0_12px_rgba(140,240,68,0.2)] ring-1 ring-[#8cf044]/50'
+                                        : 'border-white/5 bg-[#141417] hover:border-white/20 text-zinc-400'
+                                }`}
+                            >
+                                <div className="space-y-0.5">
+                                    <span className="font-medium text-white flex items-center gap-1.5">
+                                        <Square className="size-3.5 text-[#8cf044]" />
+                                        <span>ขอบเหลี่ยม (Sharp Tactical Corners)</span>
+                                    </span>
+                                    <p className="text-[11px] text-zinc-400 font-light">
+                                        ขอบตัดเหลี่ยม 90 องศา ดุดันสไตล์อุปกรณ์ฮาร์ดแวร์ทหาร
+                                    </p>
+                                </div>
+                                {border_style === 'sharp' && <Check className="size-4 text-[#8cf044] shrink-0 ml-2" />}
+                            </button>
+                        </div>
+                    </div>
+                </div>
 
                 {/* Section 2: Audio & Alert Notifications */}
                 <div className="bg-[#121215] rounded-2xl p-5 md:p-6 space-y-4 shadow-sm">

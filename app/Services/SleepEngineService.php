@@ -218,16 +218,66 @@ class SleepEngineService
         $status = strtolower($status);
         $isInVoice = $enableDiscord && !empty($meta['is_in_voice']);
 
+        $isScreenLocked = !empty($meta['screen_locked']);
+        $idleSeconds = isset($meta['idle_seconds']) ? (int)$meta['idle_seconds'] : null;
+        $isPcActive = ($source === 'desktop_daemon') && empty($meta['simulate_sleep']) && !$isScreenLocked && ($idleSeconds === null || $idleSeconds < 60);
+
+        if ($source === 'desktop_daemon') {
+            \Illuminate\Support\Facades\Cache::put("cpp_presence_{$user->id}", [
+                'is_pc_online' => $isPcActive,
+                'idle_seconds' => $idleSeconds,
+                'screen_locked' => $isScreenLocked,
+                'status' => $status,
+                'updated_at' => now()->toIso8601String(),
+            ], now()->addMinutes(5));
+        }
+
+        // Process alert action if triggered from C++ or API
+        if (!empty($meta['alert_action'])) {
+            if ($meta['alert_action'] === 'acknowledge') {
+                $this->acknowledgeAlert($user);
+            } elseif ($meta['alert_action'] === 'acknowledge_lockdown') {
+                $this->acknowledgeLockdown($user);
+            } elseif ($meta['alert_action'] === 'acknowledge_sleep_warning') {
+                $this->escalateToShutdown($user);
+            } elseif ($meta['alert_action'] === 'trigger') {
+                $this->triggerAlertSequence($user, $user->emergency_countdown_seconds ?? 60);
+            } elseif ($meta['alert_action'] === 'reset') {
+                $this->resetAlertState($user);
+            }
+        }
+
+        // Check if user returned to PC after acknowledging alert or lockdown
+        $currentAlert = $this->getAlertState($user);
+        if ($enableCpp && $isPcActive) {
+            if ($currentAlert['phase'] === 'acknowledged_alert') {
+                $this->acknowledgeAlert($user, true); // Escalate to lockdown (Mock Sign Out)
+            } elseif ($currentAlert['phase'] === 'acknowledged_lockdown') {
+                $this->escalateToSleepWarning($user); // Escalate to sleep_warning (-25 HP)
+            }
+        }
+
         $isOffline = in_array($status, ['offline', 'idle', 'invisible']) ||
             (!empty($meta['screen_locked'])) ||
             (isset($meta['idle_seconds']) && $meta['idle_seconds'] >= 60);
 
         $isOnline = in_array($status, ['online', 'dnd']) ||
-            (!empty($meta['is_active']) && empty($meta['screen_locked']) && (!isset($meta['idle_seconds']) || $meta['idle_seconds'] < 60));
+            (!empty($meta['is_active']) && empty($meta['screen_locked']) && (!isset($meta['idle_seconds']) || $meta['idle_seconds'] < 60)) ||
+            ($enableCpp && $isPcActive);
 
         $inBedtimeHours = $this->isWithinBedtimeHours($user);
         $isInVerifyingWindow = $user->last_sleep_confirmed_at &&
             $user->last_sleep_confirmed_at->diffInMinutes(now()) <= 10;
+
+        // Rule 1: หาก C++ ยังตรวจเจอว่า PC ยัง online อยู่คือแสดงว่ายังไม่นอน
+        if ($enableCpp && $isPcActive) {
+            $isOnline = true;
+            $isOffline = false;
+
+            if ($user->last_sleep_confirmed_at) {
+                $user->update(['last_sleep_confirmed_at' => null]);
+            }
+        }
 
         // Rule 2: If user is currently in a voice channel, always considered online and NEVER sleeping
         if ($isInVoice) {
@@ -244,6 +294,7 @@ class SleepEngineService
                         'auto_confirmed' => false,
                         'is_sleeping' => false,
                         'is_system_active' => true,
+                        'alert_state' => $this->getAlertState($user),
                         'message' => 'ตรวจพบผู้ใช้อยู่ในห้องคุยเสียง Discord ระหว่างเวลานอน! ไม่ถือว่านอน และหัก HP 25 แต้ม',
                         'current_hp' => $user->fresh()->current_hp,
                     ];
@@ -254,6 +305,7 @@ class SleepEngineService
                     'auto_confirmed' => false,
                     'is_sleeping' => false,
                     'is_system_active' => true,
+                    'alert_state' => $this->getAlertState($user),
                     'message' => 'ตรวจพบผู้ใช้อยู่ในห้องคุยเสียง Discord ไม่ถือว่านอน ยกเลิกสถานะการนอนทันที',
                     'current_hp' => $user->current_hp,
                 ];
@@ -272,6 +324,7 @@ class SleepEngineService
                     'auto_confirmed' => true,
                     'is_sleeping' => true,
                     'is_system_active' => true,
+                    'alert_state' => $this->getAlertState($user),
                     'message' => 'ตรวจพบผู้ใช้ออฟไลน์/ล็อคหน้าจอในช่วงเวลานอน ถือว่าเข้านอนเรียบร้อยแล้ว',
                     'current_hp' => $user->current_hp,
                 ];
@@ -282,6 +335,7 @@ class SleepEngineService
                 'auto_confirmed' => false,
                 'is_sleeping' => true,
                 'is_system_active' => true,
+                'alert_state' => $this->getAlertState($user),
                 'message' => 'ผู้ใช้ยังคงอยู่ในสถานะเข้านอนอย่างปลอดภัย',
                 'current_hp' => $user->current_hp,
             ];
@@ -297,6 +351,7 @@ class SleepEngineService
                 'auto_confirmed' => false,
                 'is_sleeping' => false,
                 'is_system_active' => true,
+                'alert_state' => $this->getAlertState($user),
                 'message' => 'ตรวจพบผู้ใช้กลับมาออนไลน์หรือใช้งานคอมพิวเตอร์ระหว่างเวลานอน! หัก HP 25 แต้ม',
                 'current_hp' => $user->fresh()->current_hp,
             ];
@@ -307,6 +362,7 @@ class SleepEngineService
             'auto_confirmed' => false,
             'is_sleeping' => !$isInVoice && (bool)$user->last_sleep_confirmed_at,
             'is_system_active' => true,
+            'alert_state' => $this->getAlertState($user),
             'message' => $isInVoice ? 'ตรวจพบผู้ใช้อยู่ในห้องคุยเสียง Discord ไม่ถือว่านอน' : 'อัปเดตสถานะ Presence เรียบร้อย',
             'current_hp' => $user->current_hp,
         ];
@@ -566,5 +622,214 @@ class SleepEngineService
         }
 
         return $sentCount;
+    }
+
+    /**
+     * Get the active alert synchronization state for a user.
+     */
+    public function getAlertState(User $user): array
+    {
+        $cached = \Illuminate\Support\Facades\Cache::get("alert_state_{$user->id}");
+        if ($cached && is_array($cached)) {
+            return $cached;
+        }
+
+        $countdown = $user->emergency_countdown_seconds ?? 60;
+        return [
+            'phase' => 'idle', // 'idle' | 'alert' | 'lockdown' | 'sleep_warning' | 'shutdown'
+            'seconds_remaining' => $countdown,
+            'total_seconds' => $countdown,
+            'is_paused' => false,
+            'step_index' => 0,
+            'step_title' => '',
+            'step_message' => '',
+            'acknowledged' => false,
+            'updated_at' => now()->toIso8601String(),
+        ];
+    }
+
+    /**
+     * Trigger Phase 1 Alert (60 seconds, real countdown ticking, pauseable).
+     */
+    public function triggerAlertSequence(User $user, ?int $seconds = null, bool $paused = true): array
+    {
+        $total = $seconds ?? ($user->emergency_countdown_seconds ?? 60);
+        $state = [
+            'phase' => 'alert',
+            'seconds_remaining' => $total,
+            'total_seconds' => $total,
+            'is_paused' => $paused,
+            'step_index' => 1,
+            'step_title' => '🚨 แจ้งเตือนเวลาเข้านอน (Alert)',
+            'step_message' => 'ถึงเวลาพักผ่อนและเข้านอนแล้ว กรุณากดเข้าใจแล้วและปิดเครื่องเพื่อเข้านอน',
+            'acknowledged' => false,
+            'triggered_at' => now()->toIso8601String(),
+            'updated_at' => now()->toIso8601String(),
+        ];
+
+        \Illuminate\Support\Facades\Cache::put("alert_state_{$user->id}", $state, now()->addHours(2));
+        return $state;
+    }
+
+    /**
+     * User clicked "เข้าใจแล้ว" on Alert:
+     * If user does NOT sleep / PC is still online, escalate to Lockdown (Mock Sign Out).
+     */
+    public function acknowledgeAlert(User $user, bool $forceEscalate = true): array
+    {
+        $total = $user->emergency_countdown_seconds ?? 60;
+
+        if ($forceEscalate) {
+            $state = [
+                'phase' => 'lockdown',
+                'seconds_remaining' => $total,
+                'total_seconds' => $total,
+                'is_paused' => true,
+                'step_index' => 2,
+                'step_title' => '🔒 เข้าสู่โหมด Lockdown (จำลอง Sign Out Windows)',
+                'step_message' => 'ระบบจำลองการออกจากระบบ Windows (Sign Out) เพื่อบังคับวินัยการเข้านอน หากยังฝ่าฝืนกลับมาใช้งานอีกจะถูกตัด HP 25 แต้ม',
+                'acknowledged' => false,
+                'triggered_at' => now()->toIso8601String(),
+                'updated_at' => now()->toIso8601String(),
+            ];
+        } else {
+            $state = [
+                'phase' => 'acknowledged_alert',
+                'seconds_remaining' => $total,
+                'total_seconds' => $total,
+                'is_paused' => true,
+                'step_index' => 1,
+                'step_title' => 'รับทราบการแจ้งเตือนแล้ว',
+                'step_message' => 'กรุณาปิดเครื่องคอมพิวเตอร์และเข้านอนทันที',
+                'acknowledged' => true,
+                'acknowledged_at' => now()->toIso8601String(),
+                'updated_at' => now()->toIso8601String(),
+            ];
+        }
+
+        \Illuminate\Support\Facades\Cache::put("alert_state_{$user->id}", $state, now()->addHours(2));
+        return $state;
+    }
+
+    /**
+     * User clicked "เข้าใจแล้ว" on Lockdown:
+     * Next step if they return to PC is sleep_warning (-25 HP).
+     */
+    public function acknowledgeLockdown(User $user): array
+    {
+        $total = $user->emergency_countdown_seconds ?? 60;
+        $state = [
+            'phase' => 'acknowledged_lockdown',
+            'seconds_remaining' => $total,
+            'total_seconds' => $total,
+            'is_paused' => false,
+            'step_index' => 2,
+            'step_title' => 'รับทราบโหมด Lockdown แล้ว',
+            'step_message' => 'หากตรวจพบการกลับมาใช้งานคอมพิวเตอร์ ระบบจะตัด HP 25 แต้มและจำลอง Sleep Mode',
+            'acknowledged' => true,
+            'acknowledged_at' => now()->toIso8601String(),
+            'updated_at' => now()->toIso8601String(),
+        ];
+
+        \Illuminate\Support\Facades\Cache::put("alert_state_{$user->id}", $state, now()->addHours(2));
+        return $state;
+    }
+
+    /**
+     * Escalate to Sleep Warning (-25 HP) when user returns after lockdown.
+     */
+    public function escalateToSleepWarning(User $user): array
+    {
+        $this->drainHp($user, 25);
+        $total = $user->emergency_countdown_seconds ?? 60;
+
+        $state = [
+            'phase' => 'sleep_warning',
+            'seconds_remaining' => $total,
+            'total_seconds' => $total,
+            'is_paused' => false,
+            'step_index' => 3,
+            'step_title' => '⚠️ ตรวจพบกลับมาใช้งาน! หัก HP 25 แต้ม (จำลอง Sleep Mode)',
+            'step_message' => 'ตรวจพบการกลับมาใช้งานคอมพิวเตอร์! ระบบทำการหัก HP 25 แต้ม และจำลอง Windows Sleep Mode หากยังฝ่าฝืนจะถูก Shutdown',
+            'acknowledged' => false,
+            'updated_at' => now()->toIso8601String(),
+        ];
+
+        \Illuminate\Support\Facades\Cache::put("alert_state_{$user->id}", $state, now()->addHours(2));
+        return $state;
+    }
+
+    /**
+     * Escalate to Shutdown (0% HP).
+     */
+    public function escalateToShutdown(User $user): array
+    {
+        $user->update(['current_hp' => 0]);
+        $state = [
+            'phase' => 'shutdown',
+            'seconds_remaining' => 0,
+            'total_seconds' => $user->emergency_countdown_seconds ?? 60,
+            'is_paused' => true,
+            'step_index' => 4,
+            'step_title' => '🚨 เข้าสู่สถานะ Shutdown (จำลองปิดระบบ 0% HP)',
+            'step_message' => 'พลังชีวิตหมดลง! ระบบจำลองการปิดเครื่อง Shutdown สมบูรณ์แบบเพื่อรักษาวินัย',
+            'acknowledged' => true,
+            'updated_at' => now()->toIso8601String(),
+        ];
+
+        \Illuminate\Support\Facades\Cache::put("alert_state_{$user->id}", $state, now()->addHours(2));
+        return $state;
+    }
+
+    /**
+     * Toggle pause / resume on alert countdown.
+     */
+    public function toggleAlertPause(User $user): array
+    {
+        $state = $this->getAlertState($user);
+        if ($state['phase'] !== 'idle') {
+            $state['is_paused'] = !($state['is_paused'] ?? false);
+            $state['updated_at'] = now()->toIso8601String();
+            \Illuminate\Support\Facades\Cache::put("alert_state_{$user->id}", $state, now()->addHours(2));
+        }
+        return $state;
+    }
+
+    /**
+     * Update remaining seconds for alert countdown from client sync.
+     */
+    public function updateAlertSeconds(User $user, int $secondsRemaining): array
+    {
+        $state = $this->getAlertState($user);
+        if ($state['phase'] !== 'idle') {
+            $state['seconds_remaining'] = max(0, $secondsRemaining);
+            $state['updated_at'] = now()->toIso8601String();
+            \Illuminate\Support\Facades\Cache::put("alert_state_{$user->id}", $state, now()->addHours(2));
+        }
+        return $state;
+    }
+
+    /**
+     * Reset alert state back to idle.
+     */
+    public function resetAlertState(User $user): array
+    {
+        \Illuminate\Support\Facades\Cache::forget("alert_state_{$user->id}");
+        return $this->getAlertState($user);
+    }
+
+    /**
+     * Reset user HP back to 100%, clear penalties, and reset alert state.
+     */
+    public function resetHp(User $user): void
+    {
+        $user->update([
+            'current_hp' => 100,
+            'shutdown_stacks' => 0,
+            'is_disabled' => false,
+            'last_sleep_confirmed_at' => null,
+        ]);
+
+        $this->resetAlertState($user);
     }
 }

@@ -147,3 +147,70 @@
         color-scheme: dark;
     }
 }
+
+/* =========================================================================
+   SPECIAL THEME: Tactical Terminal / MGS Pip-Boy Green Phosphor
+   ========================================================================= */
+.theme-special,
+[data-theme="special"] {
+    color-scheme: dark;
+    --background: #050a05;
+    --foreground: #8cf044;
+    --card: #091309;
+    --card-foreground: #8cf044;
+    --popover: #091309;
+    --popover-foreground: #8cf044;
+    --primary: #8cf044;
+    --primary-foreground: #050a05;
+    --secondary: #0f200f;
+    --secondary-foreground: #8cf044;
+    --muted: #0c180c;
+    --muted-foreground: #5a8a40;
+    --accent: #152d15;
+    --accent-foreground: #8cf044;
+    --destructive: #ff3333;
+    --destructive-foreground: #ffffff;
+    --border: rgba(140, 240, 68, 0.25);
+    --input: #0f200f;
+    --ring: rgba(140, 240, 68, 0.45);
+    --sidebar: #091309;
+    --sidebar-foreground: #8cf044;
+    --sidebar-primary: #8cf044;
+    --sidebar-primary-foreground: #050a05;
+    --sidebar-accent: #0f200f;
+    --sidebar-accent-foreground: #8cf044;
+    --sidebar-border: rgba(140, 240, 68, 0.25);
+    --sidebar-ring: rgba(140, 240, 68, 0.45);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+}
+
+.theme-special body,
+[data-theme="special"] body {
+    background-color: #050a05 !important;
+    color: #8cf044 !important;
+}
+
+/* Subtle CRT scanline effect on tactical theme */
+.theme-special::before,
+[data-theme="special"]::before {
+    content: " ";
+    display: block;
+    position: fixed;
+    top: 0; left: 0; bottom: 0; right: 0;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.22) 50%), linear-gradient(90deg, rgba(140, 240, 68, 0.02), rgba(0, 255, 0, 0.01), rgba(140, 240, 68, 0.02));
+    z-index: 9999;
+    background-size: 100% 3px, 6px 100%;
+    pointer-events: none;
+    opacity: 0.55;
+}
+
+/* =========================================================================
+   CORNER STYLE: Sharp Tactical Corners
+   ========================================================================= */
+.corners-sharp,
+.corners-sharp *,
+[data-corners="sharp"],
+[data-corners="sharp"] * {
+    border-radius: 0px !important;
+}
+

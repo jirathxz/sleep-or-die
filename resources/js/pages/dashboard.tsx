@@ -6,6 +6,10 @@ import { LevelExpBar } from '@/components/Sleep/LevelExpBar';
 import { StageOverlay } from '@/components/Sleep/StageOverlay';
 import { StatsBadge } from '@/components/Sleep/StatsBadge';
 import { TombstoneScreen } from '@/components/Sleep/TombstoneScreen';
+import { SyncAlertModal } from '@/components/Sleep/SyncAlertModal';
+import { InventoryView } from '@/components/Sleep/InventoryView';
+import { BlackMarketView } from '@/components/Sleep/BlackMarketView';
+import { MissionHistoryView } from '@/components/Sleep/MissionHistoryView';
 import { dashboard } from '@/routes';
 import { useSleepStore } from '@/stores/useSleepStore';
 import { Volume2, VolumeX } from 'lucide-react';
@@ -54,6 +58,8 @@ export default function Dashboard() {
         enable_discord_detection,
         enable_cpp_detection,
         is_system_active,
+        alert_state,
+        cpp_presence,
         stage,
         hoursRemaining,
         minutesRemaining,
@@ -70,6 +76,15 @@ export default function Dashboard() {
         simulationActive,
         startSimulation321,
         resetSimulation,
+        triggerAlertSequence,
+        acknowledgeAlert,
+        acknowledgeLockdown,
+        acknowledgeSleepWarning,
+        resetAlertSequence,
+        resetHp,
+        toggleAlertPause,
+        setQuickBedtime,
+        saveSettings,
     } = useSleepStore();
 
     useEffect(() => {
@@ -102,7 +117,7 @@ export default function Dashboard() {
 
         const pollTimer = setInterval(() => {
             fetchStatus();
-        }, 15000);
+        }, (alert_state && alert_state.phase !== 'idle') ? 2000 : 3000);
 
         window.addEventListener('focus', handleFocus);
 
@@ -110,7 +125,7 @@ export default function Dashboard() {
             window.removeEventListener('focus', handleFocus);
             clearInterval(pollTimer);
         };
-    }, [auth?.user?.id]);
+    }, [auth?.user?.id, alert_state?.phase]);
 
     useEffect(() => {
         const timer = setInterval(() => {
@@ -120,8 +135,10 @@ export default function Dashboard() {
         return () => clearInterval(timer);
     }, [tick]);
 
+    const [activeTab, setActiveTab] = React.useState<number>(1);
+
     if (is_disabled) {
-        return <TombstoneScreen daysSurvived={days_survived} userName={auth?.user?.name || 'ผู้ใช้งาน'} />;
+        return <TombstoneScreen daysSurvived={days_survived} userName={auth?.user?.name || 'ผู้ใช้งาน'} onResetHp={resetHp} />;
     }
 
     return (
@@ -131,22 +148,60 @@ export default function Dashboard() {
             {/* Emergency Alerts & Vignette Overlays */}
             <StageOverlay stage={stage} secondsRemaining={secondsRemaining} />
 
-            <div className="max-w-3xl w-full mx-auto p-4 md:p-6 space-y-5 select-none">
-                {/* Header: Pure focus on Dashboard role & Quick audio toggle */}
-                <div className="flex items-center justify-between pb-1">
-                    <div>
-                        <h1 className="text-xl font-medium tracking-tight text-white">
-                            แผงควบคุม
-                        </h1>
-                        <p className="text-xs text-zinc-500 font-light mt-0.5">
-                            ระดับพลังชีวิตและเวลานับถอยหลังสู่เส้นตายเข้านอนคืนนี้
-                        </p>
+            <div className="max-w-4xl w-full mx-auto p-4 md:p-6 space-y-5 select-none">
+                {/* Tactical Header Tabs matching user screenshot */}
+                <div className="flex flex-wrap items-center justify-between gap-2.5 pb-1">
+                    <div className="flex flex-wrap items-center gap-2 font-mono text-xs sm:text-sm">
+                        <button
+                            type="button"
+                            onClick={() => setActiveTab(1)}
+                            className={`px-3 sm:px-4 py-2 border transition-all rounded ${
+                                activeTab === 1
+                                    ? 'bg-[#8cf044] text-black font-bold border-[#8cf044] shadow-[0_0_12px_rgba(140,240,68,0.35)]'
+                                    : 'bg-[#060c06] text-[#8cf044] border-[#8cf044]/30 hover:border-[#8cf044]/70 hover:bg-[#0c180c]'
+                            }`}
+                        >
+                            [ 1. เรดาร์ &amp; พลังชีวิต ]
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setActiveTab(2)}
+                            className={`px-3 sm:px-4 py-2 border transition-all rounded ${
+                                activeTab === 2
+                                    ? 'bg-[#8cf044] text-black font-bold border-[#8cf044] shadow-[0_0_12px_rgba(140,240,68,0.35)]'
+                                    : 'bg-[#060c06] text-[#8cf044] border-[#8cf044]/30 hover:border-[#8cf044]/70 hover:bg-[#0c180c]'
+                            }`}
+                        >
+                            [ 2. กระเป๋าเก็บของ ]
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setActiveTab(3)}
+                            className={`px-3 sm:px-4 py-2 border transition-all rounded ${
+                                activeTab === 3
+                                    ? 'bg-[#8cf044] text-black font-bold border-[#8cf044] shadow-[0_0_12px_rgba(140,240,68,0.35)]'
+                                    : 'bg-[#060c06] text-[#8cf044] border-[#8cf044]/30 hover:border-[#8cf044]/70 hover:bg-[#0c180c]'
+                            }`}
+                        >
+                            [ 3. ตลาดมืด ]
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setActiveTab(4)}
+                            className={`px-3 sm:px-4 py-2 border transition-all rounded ${
+                                activeTab === 4
+                                    ? 'bg-[#8cf044] text-black font-bold border-[#8cf044] shadow-[0_0_12px_rgba(140,240,68,0.35)]'
+                                    : 'bg-[#060c06] text-[#8cf044] border-[#8cf044]/30 hover:border-[#8cf044]/70 hover:bg-[#0c180c]'
+                            }`}
+                        >
+                            [ 4. ประวัติภารกิจ ]
+                        </button>
                     </div>
 
                     <button
                         type="button"
                         onClick={() => toggleAudio()}
-                        className="size-8 rounded-lg bg-[#121215] hover:bg-[#18181b] text-zinc-400 hover:text-white flex items-center justify-center transition-colors"
+                        className="size-8 rounded-lg bg-[#121215] hover:bg-[#18181b] text-zinc-400 hover:text-white flex items-center justify-center transition-colors border border-white/5"
                         title={audioEnabled ? 'ปิดเสียงแจ้งเตือน' : 'เปิดเสียงแจ้งเตือน'}
                     >
                         {audioEnabled ? (
@@ -157,41 +212,77 @@ export default function Dashboard() {
                     </button>
                 </div>
 
-                {/* 1. Vitality Matrix HP Bar (100% Health Status) */}
-                <HpBar hp={current_hp} stage={stage} />
+                {/* TAB 1: RADAR & VITALITY */}
+                {activeTab === 1 && (
+                    <div className="space-y-5">
+                        {/* 1. Vitality Matrix HP Bar (100% Health Status) */}
+                        <HpBar hp={current_hp} stage={stage} onResetHp={resetHp} />
 
-                {/* 2. Level & EXP Progression Progress Bar */}
-                <LevelExpBar level={level} exp={exp} />
+                        {/* 2. Level & EXP Progression Progress Bar */}
+                        <LevelExpBar level={level} exp={exp} />
 
-                {/* 3. Countdown Display & Automated Presence Status + 3-2-1 Test Simulation */}
-                <CountdownDisplay
-                    hours={hoursRemaining}
-                    minutes={minutesRemaining}
-                    seconds={secondsRemaining}
-                    isPastDeadline={isPastDeadline}
-                    stage={stage}
-                    sleepTargetTime={sleep_target_time}
-                    wakeUpTime={wake_up_time}
-                    lastConfirmedAt={last_sleep_confirmed_at}
-                    isInVoice={is_in_voice}
-                    voiceChannel={voice_channel}
-                    isSystemActive={is_system_active}
-                    enableDiscord={enable_discord_detection}
-                    enableCpp={enable_cpp_detection}
-                    simulationActive={simulationActive}
-                    onStartSimulation={startSimulation321}
-                    onResetSimulation={resetSimulation}
-                />
+                        {/* 3. Countdown Display & Automated Presence Status + 3-2-1 Test Simulation */}
+                        <CountdownDisplay
+                            hours={hoursRemaining}
+                            minutes={minutesRemaining}
+                            seconds={secondsRemaining}
+                            isPastDeadline={isPastDeadline}
+                            stage={stage}
+                            sleepTargetTime={sleep_target_time}
+                            wakeUpTime={wake_up_time}
+                            lastConfirmedAt={last_sleep_confirmed_at}
+                            isInVoice={is_in_voice}
+                            voiceChannel={voice_channel}
+                            isPcOnline={cpp_presence?.is_pc_online}
+                            isSystemActive={is_system_active}
+                            enableDiscord={enable_discord_detection}
+                            enableCpp={enable_cpp_detection}
+                            simulationActive={simulationActive}
+                            onStartSimulation={startSimulation321}
+                            onResetSimulation={resetSimulation}
+                            onTriggerAlertSync={() => triggerAlertSequence(60)}
+                            onSetQuickBedtime={setQuickBedtime}
+                            onResetBedtimeDefault={() => saveSettings(undefined, undefined, undefined, undefined, '23:15')}
+                            onResetHp={resetHp}
+                        />
 
-                {/* 3. Daily Summary & Streak Progression Module */}
-                <StatsBadge
-                    daysSurvived={days_survived}
-                    shutdownStacks={shutdown_stacks}
-                    ticketsCount={tickets_count}
-                    points={points}
-                    onUseTicket={useTicket}
-                    onRedeemTicket={redeemTicket}
-                    stage={stage}
+                        {/* 4. Daily Summary & Streak Progression Module */}
+                        <StatsBadge
+                            daysSurvived={days_survived}
+                            shutdownStacks={shutdown_stacks}
+                            ticketsCount={tickets_count}
+                            points={points}
+                            onUseTicket={useTicket}
+                            onRedeemTicket={redeemTicket}
+                            stage={stage}
+                        />
+                    </div>
+                )}
+
+                {/* TAB 2: INVENTORY */}
+                {activeTab === 2 && (
+                    <InventoryView onSwitchTab={setActiveTab} />
+                )}
+
+                {/* TAB 3: BLACK MARKET */}
+                {activeTab === 3 && (
+                    <BlackMarketView onSwitchTab={setActiveTab} />
+                )}
+
+                {/* TAB 4: MISSION LOGS & SLEEP HISTORY */}
+                {activeTab === 4 && (
+                    <MissionHistoryView />
+                )}
+
+                {/* Synchronized Alert & Lockdown Modals across Web and C++ */}
+                <SyncAlertModal
+                    alertState={alert_state}
+                    onAcknowledgeAlert={acknowledgeAlert}
+                    onAcknowledgeLockdown={acknowledgeLockdown}
+                    onAcknowledgeSleepWarning={acknowledgeSleepWarning}
+                    onReset={resetAlertSequence}
+                    onTogglePause={toggleAlertPause}
+                    onResetHp={resetHp}
                 />
             </div>
         </>
