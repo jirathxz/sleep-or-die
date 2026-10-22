@@ -243,6 +243,14 @@ const defaultSleepTarget = calculateSleepTargetLocal(defaultWakeUp);
 function applyDomThemeAndCorners(theme?: 'dark' | 'special', border?: 'rounded' | 'sharp') {
     if (typeof document === 'undefined') return;
     const root = document.documentElement;
+
+    if (theme) {
+        try { localStorage.setItem('sleep_theme_preference', theme); } catch (e) {}
+    }
+    if (border) {
+        try { localStorage.setItem('sleep_border_style', border); } catch (e) {}
+    }
+
     if (theme === 'special') {
         root.classList.add('theme-special');
         root.setAttribute('data-theme', 'special');
@@ -259,6 +267,24 @@ function applyDomThemeAndCorners(theme?: 'dark' | 'special', border?: 'rounded' 
         root.removeAttribute('data-corners');
     }
 }
+
+const getInitialTheme = (): 'dark' | 'special' => {
+    if (typeof window === 'undefined') return 'dark';
+    try {
+        const stored = localStorage.getItem('sleep_theme_preference');
+        if (stored === 'special') return 'special';
+    } catch (e) {}
+    return 'dark';
+};
+
+const getInitialBorder = (): 'rounded' | 'sharp' => {
+    if (typeof window === 'undefined') return 'rounded';
+    try {
+        const stored = localStorage.getItem('sleep_border_style');
+        if (stored === 'sharp') return 'sharp';
+    } catch (e) {}
+    return 'rounded';
+};
 
 export const useSleepStore = create<SleepState>((set, get) => ({
     current_hp: 100,
@@ -281,8 +307,8 @@ export const useSleepStore = create<SleepState>((set, get) => ({
     enable_cpp_detection: true,
     is_system_active: true,
 
-    theme_preference: 'dark',
-    border_style: 'rounded',
+    theme_preference: getInitialTheme(),
+    border_style: getInitialBorder(),
     inventory: [
         {
             id: 'item_ration_init_1',

@@ -5,11 +5,32 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="csrf-token" content="{{ csrf_token() }}">
 
-        {{-- SleepOrDie Pure Dark Theme Enforcement --}}
+        {{-- SleepOrDie Pure Dark Theme & Tactical Special Theme Hydration --}}
         <script>
             document.documentElement.classList.add('dark');
             try {
                 localStorage.setItem('appearance', 'dark');
+                var serverTheme = "{{ Auth::user()?->theme_preference ?? '' }}";
+                var localTheme = localStorage.getItem('sleep_theme_preference');
+                var finalTheme = localTheme || serverTheme || 'dark';
+                if (finalTheme === 'special') {
+                    document.documentElement.classList.add('theme-special');
+                    document.documentElement.setAttribute('data-theme', 'special');
+                } else {
+                    document.documentElement.classList.remove('theme-special');
+                    document.documentElement.removeAttribute('data-theme');
+                }
+
+                var serverBorder = "{{ Auth::user()?->border_style ?? '' }}";
+                var localBorder = localStorage.getItem('sleep_border_style');
+                var finalBorder = localBorder || serverBorder || 'rounded';
+                if (finalBorder === 'sharp') {
+                    document.documentElement.classList.add('corners-sharp');
+                    document.documentElement.setAttribute('data-corners', 'sharp');
+                } else {
+                    document.documentElement.classList.remove('corners-sharp');
+                    document.documentElement.removeAttribute('data-corners');
+                }
             } catch (e) {}
         </script>
 

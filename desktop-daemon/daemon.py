@@ -61,6 +61,8 @@ def report_presence(status: str, idle_seconds: float, screen_locked: bool, confi
         payload["discord_user_id"] = config["discord_user_id"]
     if config.get("user_id"):
         payload["user_id"] = config["user_id"]
+    if config.get("auth_token"):
+        payload["auth_token"] = config["auth_token"]
 
     def _send():
         try:

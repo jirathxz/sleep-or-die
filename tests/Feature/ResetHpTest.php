@@ -106,3 +106,32 @@ test('alert-action supports toggle_pause and update_seconds', function () {
             ],
         ]);
 });
+
+test('api reset-hp rejects unauthorized requests with invalid token', function () {
+    $user = User::factory()->create(['current_hp' => 10]);
+
+    $response = $this->postJson('/api/sleep/reset-hp', [
+        'user_id' => $user->id,
+        'auth_token' => 'invalid_fake_token',
+    ]);
+
+    $response->assertStatus(401)
+        ->assertJson(['message' => 'Unauthorized: Invalid daemon token']);
+});
+
+test('api reset-hp accepts authorized requests with valid daemon token', function () {
+    $user = User::factory()->create(['current_hp' => 10]);
+    $token = 'valid_daemon_token_12345';
+    \Illuminate\Support\Facades\Cache::put("daemon_token_{$user->id}", $token, now()->addHour());
+
+    $response = $this->postJson('/api/sleep/reset-hp', [
+        'user_id' => $user->id,
+        'auth_token' => $token,
+    ]);
+
+    $response->assertOk()
+        ->assertJson([
+            'success' => true,
+            'current_hp' => 100,
+        ]);
+});

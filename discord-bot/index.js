@@ -58,15 +58,22 @@ function evaluateUserStatus(member) {
     return state;
 }
 
+const DISCORD_WEBHOOK_SECRET = process.env.DISCORD_WEBHOOK_SECRET;
+
 async function forwardPresenceToLaravel(state) {
     if (!state) return;
     try {
+        const headers = {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+        };
+        if (DISCORD_WEBHOOK_SECRET) {
+            headers['X-Webhook-Secret'] = DISCORD_WEBHOOK_SECRET;
+        }
+
         const { statusCode, body } = await request(API_WEBHOOK_URL, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                Accept: 'application/json',
-            },
+            headers,
             body: JSON.stringify({
                 discord_user_id: state.userId,
                 status: state.effectiveStatus,

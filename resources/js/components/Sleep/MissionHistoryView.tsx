@@ -8,7 +8,15 @@ export function MissionHistoryView() {
         sleep_history,
         level,
         exp,
+        theme_preference,
+        border_style,
     } = useSleepStore();
+
+    const isSpecial = theme_preference === 'special';
+    const isSharp = border_style === 'sharp';
+
+    const cornerRadius = isSharp ? 'rounded-none' : 'rounded-xl';
+    const subCornerRadius = isSharp ? 'rounded-none' : 'rounded-lg';
 
     // Default sample fallback if no records yet
     const displayLogs: SleepHistoryItem[] = sleep_history && sleep_history.length > 0 ? sleep_history : [
@@ -71,46 +79,54 @@ export function MissionHistoryView() {
     ];
 
     return (
-        <div className="space-y-4 select-none font-mono text-zinc-100">
+        <div className={`space-y-4 select-none ${isSpecial ? 'font-mono text-zinc-100' : 'font-sans text-zinc-100'}`}>
             {/* Header metrics */}
-            <div className="bg-[#070e07] border border-[#8cf044]/30 rounded-xl p-3 sm:p-4 grid grid-cols-2 sm:grid-cols-4 gap-4 shadow-inner">
+            <div className={`${isSpecial ? 'bg-[#070e07] border border-[#8cf044]/30' : 'bg-[#121215] border border-white/5'} ${cornerRadius} p-3 sm:p-4 grid grid-cols-2 sm:grid-cols-4 gap-4 shadow-inner`}>
                 <div className="flex flex-col">
-                    <span className="text-[11px] text-[#5a8a40] tracking-wide">// วันรอดชีวิตสะสม</span>
-                    <span className="text-xl sm:text-2xl font-bold text-[#8cf044] tracking-wider">
+                    <span className={`text-[11px] ${isSpecial ? 'text-[#5a8a40]' : 'text-zinc-400'} tracking-wide`}>
+                        {isSpecial ? '// วันรอดชีวิตสะสม' : 'วันรอดชีวิตสะสม'}
+                    </span>
+                    <span className={`text-xl sm:text-2xl font-bold ${isSpecial ? 'text-[#8cf044]' : 'text-white'} tracking-wider`}>
                         {days_survived} วัน
                     </span>
                 </div>
 
-                <div className="flex flex-col border-l border-[#8cf044]/20 pl-4">
-                    <span className="text-[11px] text-[#5a8a40] tracking-wide">// ความตรงต่อเวลา</span>
+                <div className={`flex flex-col border-l ${isSpecial ? 'border-[#8cf044]/20' : 'border-white/10'} pl-4`}>
+                    <span className={`text-[11px] ${isSpecial ? 'text-[#5a8a40]' : 'text-zinc-400'} tracking-wide`}>
+                        {isSpecial ? '// ความตรงต่อเวลา' : 'ความตรงต่อเวลา'}
+                    </span>
                     <span className="text-xl sm:text-2xl font-bold text-[#ffb700] tracking-wider">
                         95%
                     </span>
                 </div>
 
-                <div className="flex flex-col border-l border-[#8cf044]/20 pl-4">
-                    <span className="text-[11px] text-[#5a8a40] tracking-wide">// เวลานอนเฉลี่ย</span>
+                <div className={`flex flex-col border-l ${isSpecial ? 'border-[#8cf044]/20' : 'border-white/10'} pl-4`}>
+                    <span className={`text-[11px] ${isSpecial ? 'text-[#5a8a40]' : 'text-zinc-400'} tracking-wide`}>
+                        {isSpecial ? '// เวลานอนเฉลี่ย' : 'เวลานอนเฉลี่ย'}
+                    </span>
                     <span className="text-lg sm:text-xl font-bold text-zinc-200 tracking-wider">
                         7h 46m
                     </span>
                 </div>
 
-                <div className="flex flex-col border-l border-[#8cf044]/20 pl-4">
-                    <span className="text-[11px] text-[#5a8a40] tracking-wide">// ระดับยศ OPERATIVE</span>
-                    <span className="text-lg sm:text-xl font-bold text-[#8cf044] tracking-wider">
+                <div className={`flex flex-col border-l ${isSpecial ? 'border-[#8cf044]/20' : 'border-white/10'} pl-4`}>
+                    <span className={`text-[11px] ${isSpecial ? 'text-[#5a8a40]' : 'text-zinc-400'} tracking-wide`}>
+                        {isSpecial ? '// ระดับยศ OPERATIVE' : 'ระดับผู้ใช้'}
+                    </span>
+                    <span className={`text-lg sm:text-xl font-bold ${isSpecial ? 'text-[#8cf044]' : 'text-white'} tracking-wider`}>
                         LV.{level} ({exp} EXP)
                     </span>
                 </div>
             </div>
 
             {/* Main History Table Box */}
-            <div className="bg-[#050b05] border border-[#8cf044]/30 rounded-xl p-4 sm:p-5 space-y-4">
-                <div className="border-b border-[#8cf044]/20 pb-3 flex items-center justify-between">
-                    <h2 className="text-base sm:text-lg font-bold text-[#8cf044] tracking-wider flex items-center gap-2">
-                        <span>[MISSION LOGS]</span>
-                        <span className="text-zinc-200">ประวัติการเข้านอนและบันทึกภารกิจ</span>
+            <div className={`${isSpecial ? 'bg-[#050b05] border border-[#8cf044]/30' : 'bg-[#121215] border border-white/5'} ${cornerRadius} p-4 sm:p-5 space-y-4`}>
+                <div className={`border-b ${isSpecial ? 'border-[#8cf044]/20' : 'border-white/10'} pb-3 flex items-center justify-between`}>
+                    <h2 className={`text-base sm:text-lg font-bold ${isSpecial ? 'text-[#8cf044]' : 'text-white'} tracking-wider flex items-center gap-2`}>
+                        {isSpecial && <span>[MISSION LOGS]</span>}
+                        <span>ประวัติการเข้านอนและบันทึกภารกิจ</span>
                     </h2>
-                    <span className="text-xs text-[#5a8a40]">
+                    <span className={`text-xs ${isSpecial ? 'text-[#5a8a40]' : 'text-zinc-500'}`}>
                         บันทึก {displayLogs.length} รายการ
                     </span>
                 </div>
@@ -122,11 +138,11 @@ export function MissionHistoryView() {
                         return (
                             <div
                                 key={log.id}
-                                className="bg-[#071007] border border-[#8cf044]/25 hover:border-[#8cf044]/60 p-3.5 sm:p-4 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors"
+                                className={`${isSpecial ? 'bg-[#071007] border border-[#8cf044]/25 hover:border-[#8cf044]/60' : 'bg-[#18181c] border border-white/5 hover:border-white/20'} p-3.5 sm:p-4 ${subCornerRadius} flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors`}
                             >
                                 <div className="space-y-1">
                                     <div className="flex items-center gap-2">
-                                        <span className="font-bold text-[#8cf044] text-xs sm:text-sm">
+                                        <span className={`font-bold ${isSpecial ? 'text-[#8cf044]' : 'text-white'} text-xs sm:text-sm`}>
                                             {log.date_display || log.date}
                                         </span>
                                         <span className="text-zinc-600">•</span>
@@ -135,7 +151,7 @@ export function MissionHistoryView() {
                                         </span>
                                     </div>
 
-                                    <div className="flex flex-wrap items-center gap-3 text-xs text-[#5a8a40]">
+                                    <div className={`flex flex-wrap items-center gap-3 text-xs ${isSpecial ? 'text-[#5a8a40]' : 'text-zinc-400'}`}>
                                         <span>
                                             เป้าหมาย: <span className="text-zinc-200">{log.target_time}</span>
                                         </span>
@@ -154,9 +170,9 @@ export function MissionHistoryView() {
                                     </div>
                                 </div>
 
-                                <div className="flex sm:flex-col items-start sm:items-end justify-between sm:justify-center border-t sm:border-t-0 border-[#8cf044]/15 pt-2 sm:pt-0">
-                                    <span className={`text-xs font-bold tracking-wide ${isOnTime ? 'text-[#8cf044]' : 'text-[#ffb700]'}`}>
-                                        {log.status_label || (isOnTime ? '[ ภารกิจสำเร็จ • ตรงเวลา ]' : '[ ภารกิจสำเร็จ • สาย ]')}
+                                <div className={`flex sm:flex-col items-start sm:items-end justify-between sm:justify-center border-t sm:border-t-0 ${isSpecial ? 'border-[#8cf044]/15' : 'border-white/10'} pt-2 sm:pt-0`}>
+                                    <span className={`text-xs font-bold tracking-wide ${isOnTime ? (isSpecial ? 'text-[#8cf044]' : 'text-emerald-400') : 'text-[#ffb700]'}`}>
+                                        {log.status_label || (isOnTime ? (isSpecial ? '[ ภารกิจสำเร็จ • ตรงเวลา ]' : 'ตรงเวลา') : (isSpecial ? '[ ภารกิจสำเร็จ • สาย ]' : 'เลยเวลา'))}
                                     </span>
                                     <span className="text-[11px] text-zinc-400 mt-0.5">
                                         {log.reward}

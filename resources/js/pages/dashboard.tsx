@@ -83,6 +83,8 @@ export default function Dashboard() {
         resetAlertSequence,
         resetHp,
         toggleAlertPause,
+        theme_preference,
+        border_style,
         setQuickBedtime,
         saveSettings,
     } = useSleepStore();
@@ -106,6 +108,8 @@ export default function Dashboard() {
                 enable_cpp_detection: (auth.user as any).enable_cpp_detection ?? true,
                 is_system_active: (auth.user as any).is_system_active ?? true,
                 last_sleep_confirmed_at: auth.user.last_sleep_confirmed_at ?? null,
+                theme_preference: (auth.user as any).theme_preference || (typeof window !== 'undefined' ? localStorage.getItem('sleep_theme_preference') : 'dark') || 'dark',
+                border_style: (auth.user as any).border_style || (typeof window !== 'undefined' ? localStorage.getItem('sleep_border_style') : 'rounded') || 'rounded',
             });
         }
 
@@ -137,6 +141,9 @@ export default function Dashboard() {
 
     const [activeTab, setActiveTab] = React.useState<number>(1);
 
+    const isSpecial = theme_preference === 'special';
+    const isSharp = border_style === 'sharp';
+
     if (is_disabled) {
         return <TombstoneScreen daysSurvived={days_survived} userName={auth?.user?.name || 'ผู้ใช้งาน'} onResetHp={resetHp} />;
     }
@@ -149,59 +156,44 @@ export default function Dashboard() {
             <StageOverlay stage={stage} secondsRemaining={secondsRemaining} />
 
             <div className="max-w-4xl w-full mx-auto p-4 md:p-6 space-y-5 select-none">
-                {/* Tactical Header Tabs matching user screenshot */}
+                {/* Header Tabs matching active theme */}
                 <div className="flex flex-wrap items-center justify-between gap-2.5 pb-1">
-                    <div className="flex flex-wrap items-center gap-2 font-mono text-xs sm:text-sm">
-                        <button
-                            type="button"
-                            onClick={() => setActiveTab(1)}
-                            className={`px-3 sm:px-4 py-2 border transition-all rounded ${
-                                activeTab === 1
+                    <div className={`flex flex-wrap items-center gap-2 text-xs sm:text-sm ${isSpecial ? 'font-mono' : 'font-sans'}`}>
+                        {[
+                            { id: 1, label: isSpecial ? '[ 1. เรดาร์ & พลังชีวิต ]' : '1. เรดาร์ & พลังชีวิต' },
+                            { id: 2, label: isSpecial ? '[ 2. กระเป๋าเก็บของ ]' : '2. กระเป๋าเก็บของ' },
+                            { id: 3, label: isSpecial ? '[ 3. ตลาดมืด ]' : '3. ตลาดมืด' },
+                            { id: 4, label: isSpecial ? '[ 4. ประวัติภารกิจ ]' : '4. ประวัติภารกิจ' },
+                        ].map((tab) => {
+                            const isActive = activeTab === tab.id;
+                            let btnClasses = '';
+                            if (isSpecial) {
+                                btnClasses = isActive
                                     ? 'bg-[#8cf044] text-black font-bold border-[#8cf044] shadow-[0_0_12px_rgba(140,240,68,0.35)]'
-                                    : 'bg-[#060c06] text-[#8cf044] border-[#8cf044]/30 hover:border-[#8cf044]/70 hover:bg-[#0c180c]'
-                            }`}
-                        >
-                            [ 1. เรดาร์ &amp; พลังชีวิต ]
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setActiveTab(2)}
-                            className={`px-3 sm:px-4 py-2 border transition-all rounded ${
-                                activeTab === 2
-                                    ? 'bg-[#8cf044] text-black font-bold border-[#8cf044] shadow-[0_0_12px_rgba(140,240,68,0.35)]'
-                                    : 'bg-[#060c06] text-[#8cf044] border-[#8cf044]/30 hover:border-[#8cf044]/70 hover:bg-[#0c180c]'
-                            }`}
-                        >
-                            [ 2. กระเป๋าเก็บของ ]
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setActiveTab(3)}
-                            className={`px-3 sm:px-4 py-2 border transition-all rounded ${
-                                activeTab === 3
-                                    ? 'bg-[#8cf044] text-black font-bold border-[#8cf044] shadow-[0_0_12px_rgba(140,240,68,0.35)]'
-                                    : 'bg-[#060c06] text-[#8cf044] border-[#8cf044]/30 hover:border-[#8cf044]/70 hover:bg-[#0c180c]'
-                            }`}
-                        >
-                            [ 3. ตลาดมืด ]
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setActiveTab(4)}
-                            className={`px-3 sm:px-4 py-2 border transition-all rounded ${
-                                activeTab === 4
-                                    ? 'bg-[#8cf044] text-black font-bold border-[#8cf044] shadow-[0_0_12px_rgba(140,240,68,0.35)]'
-                                    : 'bg-[#060c06] text-[#8cf044] border-[#8cf044]/30 hover:border-[#8cf044]/70 hover:bg-[#0c180c]'
-                            }`}
-                        >
-                            [ 4. ประวัติภารกิจ ]
-                        </button>
+                                    : 'bg-[#060c06] text-[#8cf044] border-[#8cf044]/30 hover:border-[#8cf044]/70 hover:bg-[#0c180c]';
+                            } else {
+                                btnClasses = isActive
+                                    ? 'bg-zinc-800 text-white font-medium border-zinc-700 shadow-sm ring-1 ring-white/10'
+                                    : 'bg-[#121215] text-zinc-400 border-white/5 hover:bg-zinc-800/60 hover:text-zinc-200 hover:border-white/10';
+                            }
+
+                            return (
+                                <button
+                                    key={tab.id}
+                                    type="button"
+                                    onClick={() => setActiveTab(tab.id)}
+                                    className={`px-3 sm:px-4 py-2 border transition-all ${isSharp ? 'rounded-none' : 'rounded-lg'} ${btnClasses}`}
+                                >
+                                    {tab.label}
+                                </button>
+                            );
+                        })}
                     </div>
 
                     <button
                         type="button"
                         onClick={() => toggleAudio()}
-                        className="size-8 rounded-lg bg-[#121215] hover:bg-[#18181b] text-zinc-400 hover:text-white flex items-center justify-center transition-colors border border-white/5"
+                        className={`size-8 ${isSharp ? 'rounded-none' : 'rounded-lg'} bg-[#121215] hover:bg-[#18181b] text-zinc-400 hover:text-white flex items-center justify-center transition-colors border border-white/5`}
                         title={audioEnabled ? 'ปิดเสียงแจ้งเตือน' : 'เปิดเสียงแจ้งเตือน'}
                     >
                         {audioEnabled ? (

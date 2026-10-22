@@ -50,7 +50,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
     'border_style',
     'sleep_history',
 ])]
-#[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
+#[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token', 'discord_bot_token'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
@@ -102,6 +102,7 @@ class User extends Authenticatable
             'inventory' => 'array',
             'inventory_capacity' => 'integer',
             'sleep_history' => 'array',
+            'discord_bot_token' => 'encrypted',
         ];
     }
 }

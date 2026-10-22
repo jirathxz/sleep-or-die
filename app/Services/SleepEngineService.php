@@ -453,7 +453,8 @@ class SleepEngineService
             return false;
         }
 
-        if (!$this->isWithinBedtimeHours($user, $now)) {
+        // Must now be morning (outside bedtime hours) AND sleep must have started during bedtime hours
+        if (!$this->isWithinBedtimeHours($user, $now) && $this->isWithinBedtimeHours($user, $user->last_sleep_confirmed_at)) {
             if ($user->last_sleep_confirmed_at->diffInMinutes($now) >= 60) {
                 $this->rewardSurvival($user);
                 return true;
@@ -565,8 +566,8 @@ class SleepEngineService
     {
         $target = $user->sleep_target_time ?? '23:15';
         $messages = [
-            'alert' => "🔔 [SleepOrDie] เหลืออีก 10 นาทีจะถึงเวลานอนเป้าหมาย ({$target} น.) กรุณาเตรียมตัวพักผ่อน",
-            'lockdown' => "⚠️ [SleepOrDie] เหลืออีก 5 นาที! เข้าสู่ช่วง Lockdown กรุณาปิดหน้าจอและเตรียมเข้านอน",
+            'alert' => "🔔 [SleepOrDie] เหลืออีก 30 นาทีจะถึงเวลานอนเป้าหมาย ({$target} น.) กรุณาเตรียมตัวพักผ่อน",
+            'lockdown' => "⚠️ [SleepOrDie] เหลืออีก 15 นาที! เข้าสู่ช่วง Lockdown กรุณาปิดหน้าจอและเตรียมเข้านอน",
             'deadline' => "🚨 [SleepOrDie] ถึงเวลาเข้านอนแล้ว ({$target} น.)! กรุณาเข้านอนทันที มิเช่นนั้นระบบจะถือว่าทำผิดวินัย",
             'test' => "✨ [SleepOrDie] ยินดีด้วย! การเชื่อมต่อ Discord ของคุณทำงานได้สมบูรณ์แบบ บอทสามารถส่งแจ้งเตือนถึงคุณได้จริง",
         ];
@@ -605,18 +606,24 @@ class SleepEngineService
             }
 
             $targetCarbon = Carbon::createFromTimeString($user->sleep_target_time);
-            $alert10 = $targetCarbon->copy()->subMinutes(10)->format('H:i');
-            $alert5 = $targetCarbon->copy()->subMinutes(5)->format('H:i');
+            $alert30 = $targetCarbon->copy()->subMinutes(30)->format('H:i');
+            $alert15 = $targetCarbon->copy()->subMinutes(15)->format('H:i');
             $deadline = $targetCarbon->format('H:i');
 
-            if ($currentTime === $alert10) {
-                $this->sendBedtimeAlert($user, 'alert');
-                $sentCount++;
-            } elseif ($currentTime === $alert5) {
-                $this->sendBedtimeAlert($user, 'lockdown');
-                $sentCount++;
-            } elseif ($currentTime === $deadline) {
-                $this->sendBedtimeAlert($user, 'deadline');
+            $stage = match ($currentTime) {
+                $alert30 => 'alert',
+                $alert15 => 'lockdown',
+                $deadline => 'deadline',
+                default => null,
+            };
+
+            if ($stage) {
+                // Dispatch queued closure or execute safely without hanging cron
+                if (app()->runningUnitTests()) {
+                    $this->sendBedtimeAlert($user, $stage);
+                } else {
+                    dispatch(fn() => app(SleepEngineService::class)->sendBedtimeAlert($user, $stage));
+                }
                 $sentCount++;
             }
         }

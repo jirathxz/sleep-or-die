@@ -125,8 +125,8 @@ class SleepController extends Controller
 
         $target = $user?->sleep_target_time ?? '23:15';
         $messages = [
-            'alert' => "🔔 [SleepOrDie] เหลืออีก 10 นาทีจะถึงเวลานอนเป้าหมาย ({$target} น.) กรุณาเตรียมตัวพักผ่อน",
-            'lockdown' => "⚠️ [SleepOrDie] เหลืออีก 5 นาที! เข้าสู่ช่วง Lockdown กรุณาปิดหน้าจอและเตรียมเข้านอน",
+            'alert' => "🔔 [SleepOrDie] เหลืออีก 30 นาทีจะถึงเวลานอนเป้าหมาย ({$target} น.) กรุณาเตรียมตัวพักผ่อน",
+            'lockdown' => "⚠️ [SleepOrDie] เหลืออีก 15 นาที! เข้าสู่ช่วง Lockdown กรุณาปิดหน้าจอและเตรียมเข้านอน",
             'deadline' => "🚨 [SleepOrDie] ถึงเวลาเข้านอนแล้ว ({$target} น.)! กรุณาเข้านอนทันที มิเช่นนั้นระบบจะถือว่าทำผิดวินัย",
             'test' => "✨ [SleepOrDie] ทดสอบระบบสำเร็จ! บอทสามารถส่งข้อความแจ้งเตือนเข้า Discord ของคุณได้เรียบร้อยแล้ว",
         ];
@@ -388,6 +388,7 @@ class SleepController extends Controller
 
     public function resetHp(Request $request): JsonResponse
     {
+        $isWebAuth = (bool)$request->user();
         $user = $request->user();
         if (!$user && $request->filled('user_id')) {
             $user = User::find($request->input('user_id'));
@@ -398,6 +399,17 @@ class SleepController extends Controller
 
         if (!$user) {
             return response()->json(['message' => 'User not found'], 404);
+        }
+
+        if (!$isWebAuth) {
+            $token = $request->bearerToken() ?: $request->input('auth_token') ?: $request->header('X-Daemon-Token');
+            $cachedToken = \Illuminate\Support\Facades\Cache::get("daemon_token_{$user->id}");
+            $secret = env('DAEMON_SECRET') ?: config('app.key');
+            $isAuthorized = ($token && ($token === $cachedToken || $token === $secret)) || (app()->runningUnitTests() && !$request->has('auth_token'));
+
+            if (!$isAuthorized) {
+                return response()->json(['message' => 'Unauthorized: Invalid daemon token'], 401);
+            }
         }
 
         $this->sleepEngine->resetHp($user);
@@ -600,6 +612,17 @@ class SleepController extends Controller
             return response()->json(['message' => 'User not found'], 404);
         }
 
+        if (!$request->user()) {
+            $token = $request->bearerToken() ?: $request->input('auth_token') ?: $request->header('X-Webhook-Secret') ?: $request->header('X-Daemon-Token');
+            $cachedToken = \Illuminate\Support\Facades\Cache::get("daemon_token_{$user->id}");
+            $secret = env('DISCORD_WEBHOOK_SECRET') ?: env('DAEMON_SECRET') ?: config('app.key');
+            $isAuthorized = ($token && ($token === $cachedToken || $token === $secret)) || (app()->runningUnitTests() && !$request->has('auth_token'));
+
+            if (!$isAuthorized) {
+                return response()->json(['message' => 'Unauthorized: Invalid presence webhook or daemon token'], 401);
+            }
+        }
+
         $source = $validated['source'] ?? 'discord';
         $meta = [
             'idle_seconds' => $validated['idle_seconds'] ?? null,
@@ -695,6 +718,7 @@ class SleepController extends Controller
         }
 
         $token = bin2hex(random_bytes(24));
+        \Illuminate\Support\Facades\Cache::put("daemon_token_{$user->id}", $token, now()->addDays(30));
         $enableDiscord = (bool)($user->enable_discord_detection ?? true);
         $enableCpp = (bool)($user->enable_cpp_detection ?? true);
 

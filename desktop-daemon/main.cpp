@@ -39,6 +39,7 @@
 #define ID_TRAY_STATUS 2001
 #define ID_TRAY_SIMULATE 2002
 #define ID_TRAY_TEST_SLEEP 2005
+#define ID_TRAY_RESET_HP 2006
 #define ID_TRAY_LOGIN 2003
 #define ID_TRAY_EXIT 2004
 
@@ -418,6 +419,9 @@ void ReportPresence(const std::string& status, int idleSeconds, bool screenLocke
     if (config.userId > 0) {
         json += ",\"user_id\":" + std::to_string(config.userId);
     }
+    if (!config.authToken.empty()) {
+        json += ",\"auth_token\":\"" + config.authToken + "\"";
+    }
     if (!alertAction.empty()) {
         json += ",\"alert_action\":\"" + alertAction + "\"";
     }
@@ -471,6 +475,9 @@ void ReportPresenceTestSleep(bool sleeping) {
     }
     if (config.userId > 0) {
         json += ",\"user_id\":" + std::to_string(config.userId);
+    }
+    if (!config.authToken.empty()) {
+        json += ",\"auth_token\":\"" + config.authToken + "\"";
     }
     json += "}";
 
@@ -798,6 +805,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
                 AppendMenuW(hMenu, MF_STRING, ID_TRAY_TEST_SLEEP, testSleepText.c_str());
 
                 AppendMenuW(hMenu, MF_STRING, ID_TRAY_SIMULATE, L"🧪 ทดสอบจำลองเส้นตาย 3-2-1");
+                AppendMenuW(hMenu, MF_STRING, ID_TRAY_RESET_HP, L"❤️ รีเซ็ตพลังชีวิต (Reset HP 100%)");
                 AppendMenuW(hMenu, MF_STRING, ID_TRAY_LOGIN, L"🔑 เข้าสู่ระบบใหม่ (Switch User)");
                 AppendMenuW(hMenu, MF_SEPARATOR, 0, NULL);
                 AppendMenuW(hMenu, MF_STRING, ID_TRAY_EXIT, L"🚪 ออกจากโปรแกรม (Exit)");
@@ -828,6 +836,16 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
                     ReportPresenceTestSleep(sleeping);
                 } else if (cmd == ID_TRAY_SIMULATE) {
                     RunSimulation321();
+                } else if (cmd == ID_TRAY_RESET_HP) {
+                    std::string jsonReq = "{\"user_id\":" + std::to_string(config.userId) + (!config.authToken.empty() ? (",\"auth_token\":\"" + config.authToken + "\"") : "") + ",\"email\":\"" + config.userEmail + "\"}";
+                    std::string resp;
+                    DWORD statusCode = 0;
+                    SendHttpJson(config.apiHost, config.apiPort, L"/api/sleep/reset-hp", jsonReq, resp, statusCode);
+                    config.currentHp = 100;
+                    currentStage = SleepStage::Normal;
+                    ShowTrayBalloon(L"SleepOrDie Guard", L"❤️ รีเซ็ตพลังชีวิตกลับสู่ 100% เรียบร้อยแล้ว!", NIIF_INFO);
+                    std::wstring tip = L"SleepOrDie: รีเซ็ต HP เต็ม 100% เรียบร้อย";
+                    UpdateTrayTooltip(tip);
                 } else if (cmd == ID_TRAY_LOGIN) {
                     if (PromptLoginDialog(hWnd)) {
                         ShowTrayBalloon(L"SleepOrDie", L"เข้าสู่ระบบใหม่สำเร็จ บันทึกการตั้งค่าเรียบร้อยแล้ว", NIIF_INFO);
