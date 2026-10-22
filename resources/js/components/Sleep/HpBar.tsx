@@ -1,12 +1,14 @@
 import React from 'react';
 import { useTranslation } from '@/lib/i18n';
+import { Heart } from 'lucide-react';
 
 interface HpBarProps {
     hp: number;
     stage: string;
+    onResetHp?: () => void;
 }
 
-export const HpBar: React.FC<HpBarProps> = ({ hp, stage }) => {
+export const HpBar: React.FC<HpBarProps> = ({ hp, stage, onResetHp }) => {
     const clampedHp = Math.max(0, Math.min(100, hp));
     const { t, isTactical } = useTranslation();
 
@@ -58,6 +60,17 @@ export const HpBar: React.FC<HpBarProps> = ({ hp, stage }) => {
                     <h2 className="text-xs font-mono tracking-wider text-zinc-300 uppercase">
                         {t('hp_title')}
                     </h2>
+                    {onResetHp && (
+                        <button
+                            type="button"
+                            onClick={onResetHp}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 text-[11px] font-normal transition-all active:scale-95 ml-1"
+                            title="รีเซ็ตพลังชีวิตกลับเป็น 100% เต็มกำลัง"
+                        >
+                            <Heart className="size-3 fill-emerald-500/30" />
+                            <span>รีเซ็ต HP</span>
+                        </button>
+                    )}
                 </div>
 
                 <div className="flex items-center gap-2 text-xs font-mono">

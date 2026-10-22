@@ -82,3 +82,67 @@ test('drain hp reduces hp and triggers shutdown at 0', function () {
     expect($user->fresh()->current_hp)->toBe(0)
         ->and($user->fresh()->shutdown_stacks)->toBe(1);
 });
+
+test('checkMorningReward rejects daytime sleep confirmations', function () {
+    $service = new SleepEngineService;
+    $user = User::factory()->create([
+        'wake_up_time' => '07:00',
+        'sleep_target_time' => '23:15',
+        // Sleep confirmed at 13:00 (afternoon outside bedtime hours)
+        'last_sleep_confirmed_at' => \Illuminate\Support\Carbon::parse('2026-10-21 13:00:00'),
+    ]);
+
+    // Checked at 15:00 afternoon
+    $result = $service->checkMorningReward($user, '2026-10-21 15:00:00');
+
+    expect($result)->toBeFalse()
+        ->and($user->fresh()->days_survived)->toBe(0)
+        ->and($user->fresh()->last_sleep_confirmed_at)->not->toBeNull();
+});
+
+test('checkMorningReward awards survival when slept during bedtime hours and woke in morning', function () {
+    $service = new SleepEngineService;
+    $user = User::factory()->create([
+        'wake_up_time' => '07:00',
+        'sleep_target_time' => '23:15',
+        'days_survived' => 0,
+        // Sleep confirmed at 23:20 (during bedtime hours)
+        'last_sleep_confirmed_at' => \Illuminate\Support\Carbon::parse('2026-10-21 23:20:00'),
+    ]);
+
+    // Checked at 07:30 morning (outside bedtime hours, >60 min after sleep)
+    $result = $service->checkMorningReward($user, '2026-10-22 07:30:00');
+
+    expect($result)->toBeTrue()
+        ->and($user->fresh()->days_survived)->toBe(1)
+        ->and($user->fresh()->last_sleep_confirmed_at)->toBeNull();
+});
+
+test('checkAndSendBedtimeAlerts matches T-30m and T-15m spec', function () {
+    $service = new SleepEngineService;
+    $user = User::factory()->create([
+        'sleep_target_time' => '23:15',
+        'discord_user_id' => '123456',
+        'discord_bot_token' => 'test_token',
+        'is_disabled' => false,
+        'last_sleep_confirmed_at' => null,
+    ]);
+
+    \Illuminate\Support\Facades\Http::fake();
+
+    // 22:45 is T-30m before 23:15
+    $sent30 = $service->checkAndSendBedtimeAlerts(\Illuminate\Support\Carbon::parse('2026-10-21 22:45:00'));
+    expect($sent30)->toBe(1);
+
+    // 23:00 is T-15m before 23:15
+    $sent15 = $service->checkAndSendBedtimeAlerts(\Illuminate\Support\Carbon::parse('2026-10-21 23:00:00'));
+    expect($sent15)->toBe(1);
+
+    // 23:15 is deadline
+    $sent0 = $service->checkAndSendBedtimeAlerts(\Illuminate\Support\Carbon::parse('2026-10-21 23:15:00'));
+    expect($sent0)->toBe(1);
+
+    // 23:10 is not an alert minute
+    $sentNone = $service->checkAndSendBedtimeAlerts(\Illuminate\Support\Carbon::parse('2026-10-21 23:10:00'));
+    expect($sentNone)->toBe(0);
+});

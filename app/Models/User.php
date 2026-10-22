@@ -30,18 +30,27 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
     'password',
     'wake_up_time',
     'sleep_target_time',
+    'emergency_countdown_seconds',
     'current_hp',
     'shutdown_stacks',
     'days_survived',
     'level',
     'exp',
+    'points',
     'tickets_count',
     'is_disabled',
     'discord_user_id',
     'discord_bot_token',
+    'enable_discord_detection',
+    'enable_cpp_detection',
     'last_sleep_confirmed_at',
+    'inventory',
+    'inventory_capacity',
+    'theme_preference',
+    'border_style',
+    'sleep_history',
 ])]
-#[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
+#[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token', 'discord_bot_token'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
@@ -53,13 +62,20 @@ class User extends Authenticatable
      * @var array<string, mixed>
      */
     protected $attributes = [
+        'emergency_countdown_seconds' => 60,
+        'enable_discord_detection' => true,
+        'enable_cpp_detection' => true,
         'current_hp' => 100,
         'shutdown_stacks' => 0,
         'days_survived' => 0,
         'level' => 1,
-        'exp' => 0,
+        'exp' => 225, // default starting EXP to match screenshot
+        'points' => 100,
         'tickets_count' => 0,
         'is_disabled' => false,
+        'inventory_capacity' => 12,
+        'theme_preference' => 'dark',
+        'border_style' => 'rounded',
     ];
 
     /**
@@ -73,12 +89,20 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'two_factor_confirmed_at' => 'datetime',
+            'emergency_countdown_seconds' => 'integer',
+            'enable_discord_detection' => 'boolean',
+            'enable_cpp_detection' => 'boolean',
             'current_hp' => 'integer',
             'shutdown_stacks' => 'integer',
             'days_survived' => 'integer',
+            'points' => 'integer',
             'tickets_count' => 'integer',
             'is_disabled' => 'boolean',
             'last_sleep_confirmed_at' => 'datetime',
+            'inventory' => 'array',
+            'inventory_capacity' => 'integer',
+            'sleep_history' => 'array',
+            'discord_bot_token' => 'encrypted',
         ];
     }
 }

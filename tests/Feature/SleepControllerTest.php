@@ -283,8 +283,15 @@ test('user can update sleep schedule by providing direct sleep target time', fun
 });
 
 test('user can trigger test alert endpoint', function () {
+    Illuminate\Support\Facades\Http::fake([
+        'https://discord.com/api/v10/users/@me/channels' => Illuminate\Support\Facades\Http::response(['id' => 'dm_ch_999'], 200),
+        'https://discord.com/api/v10/channels/dm_ch_999/messages' => Illuminate\Support\Facades\Http::response(['id' => 'msg_111'], 200),
+    ]);
+
     $user = User::factory()->create([
         'sleep_target_time' => '23:00',
+        'discord_user_id' => '123456789012345678',
+        'discord_bot_token' => 'sample_bot_token_abc',
     ]);
 
     $response = $this->actingAs($user)->postJson('/sleep/test-alert', [
@@ -317,5 +324,94 @@ test('bedtime alert command dispatches notification at scheduled target time', f
         ->expectsOutput('Checking bedtime alert schedules...')
         ->expectsOutput('Completed. Alerts dispatched: 1')
         ->assertSuccessful();
+});
+
+test('user can update enable_discord_detection and enable_cpp_detection toggles', function () {
+    $user = User::factory()->create([
+        'enable_discord_detection' => true,
+        'enable_cpp_detection' => true,
+    ]);
+
+    $response = $this->actingAs($user)->postJson('/sleep/settings', [
+        'enable_discord_detection' => false,
+        'enable_cpp_detection' => true,
+    ]);
+
+    $response->assertOk()
+        ->assertJson([
+            'enable_discord_detection' => false,
+            'enable_cpp_detection' => true,
+            'is_system_active' => true,
+        ]);
+
+    expect($user->fresh()->enable_discord_detection)->toBeFalse()
+        ->and($user->fresh()->enable_cpp_detection)->toBeTrue();
+});
+
+test('when both detection toggles are disabled system is inactive', function () {
+    $user = User::factory()->create([
+        'enable_discord_detection' => false,
+        'enable_cpp_detection' => false,
+        'last_sleep_confirmed_at' => now(),
+    ]);
+
+    $response = $this->actingAs($user)->getJson('/sleep/status');
+
+    $response->assertOk()
+        ->assertJson([
+            'enable_discord_detection' => false,
+            'enable_cpp_detection' => false,
+            'is_system_active' => false,
+            'is_sleeping' => false,
+        ]);
+
+    // Presence update when both are false is ignored and system is reported inactive
+    $updateResponse = $this->postJson('/api/presence/update', [
+        'user_id' => $user->id,
+        'status' => 'online',
+        'source' => 'desktop_daemon',
+    ]);
+
+    $updateResponse->assertOk()
+        ->assertJson([
+            'is_system_active' => false,
+        ]);
+});
+
+test('cpp desktop guard can send simulate_sleep to confirm sleep mode', function () {
+    $user = User::factory()->create([
+        'enable_cpp_detection' => true,
+        'last_sleep_confirmed_at' => null,
+    ]);
+
+    $response = $this->postJson('/api/presence/update', [
+        'user_id' => $user->id,
+        'status' => 'offline',
+        'source' => 'desktop_daemon',
+        'simulate_sleep' => true,
+    ]);
+
+    $response->assertOk()
+        ->assertJson([
+            'auto_confirmed' => true,
+            'is_sleeping' => true,
+        ]);
+
+    expect($user->fresh()->last_sleep_confirmed_at)->not->toBeNull();
+
+    // Now test waking up via C++ tray
+    $wakeResponse = $this->postJson('/api/presence/update', [
+        'user_id' => $user->id,
+        'status' => 'online',
+        'source' => 'desktop_daemon',
+        'wake_up_simulation' => true,
+    ]);
+
+    $wakeResponse->assertOk()
+        ->assertJson([
+            'is_sleeping' => false,
+        ]);
+
+    expect($user->fresh()->last_sleep_confirmed_at)->toBeNull();
 });
 

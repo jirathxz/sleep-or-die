@@ -30,6 +30,7 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
+/.superpowers
 /.agents
 /.amp
 /.claude
@@ -46,4 +47,8 @@ yarn-error.log
 /opencode.json
 /opencode.jsonc
 *.obj
+discordbot-token.txt
+supa.txt
+*.token
+config.json
 

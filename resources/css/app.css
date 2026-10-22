@@ -147,3 +147,148 @@
         color-scheme: dark;
     }
 }
+
+/* =========================================================================
+   SPECIAL THEME: Tactical Terminal / MGS Pip-Boy Green Phosphor Overrides
+   ========================================================================= */
+.theme-special,
+.theme-special *,
+[data-theme="special"],
+[data-theme="special"] * {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+}
+
+.theme-special,
+[data-theme="special"] {
+    color-scheme: dark;
+    --background: #050a05;
+    --foreground: #8cf044;
+    --card: #071207;
+    --card-foreground: #8cf044;
+    --popover: #071207;
+    --popover-foreground: #8cf044;
+    --primary: #8cf044;
+    --primary-foreground: #050a05;
+    --secondary: #0b1a0b;
+    --secondary-foreground: #8cf044;
+    --muted: #0a170a;
+    --muted-foreground: #5a8a40;
+    --accent: #152d15;
+    --accent-foreground: #8cf044;
+    --destructive: #ff3333;
+    --destructive-foreground: #ffffff;
+    --border: rgba(140, 240, 68, 0.25);
+    --input: #0b1a0b;
+    --ring: rgba(140, 240, 68, 0.45);
+}
+
+.theme-special body,
+[data-theme="special"] body {
+    background-color: #040904 !important;
+    color: #8cf044 !important;
+}
+
+/* Transform dark zinc cards to tactical terminal green */
+.theme-special .bg-\[\#121215\],
+[data-theme="special"] .bg-\[\#121215\],
+.theme-special .bg-\[\#0a0a0c\],
+[data-theme="special"] .bg-\[\#0a0a0c\],
+.theme-special .bg-\[\#09090b\],
+[data-theme="special"] .bg-\[\#09090b\],
+.theme-special .bg-zinc-900,
+[data-theme="special"] .bg-zinc-900 {
+    background-color: #071207 !important;
+    border: 1px solid rgba(140, 240, 68, 0.25) !important;
+    box-shadow: 0 0 15px rgba(0, 20, 0, 0.6) !important;
+}
+
+.theme-special .bg-\[\#18181b\],
+[data-theme="special"] .bg-\[\#18181b\],
+.theme-special .bg-zinc-800,
+[data-theme="special"] .bg-zinc-800 {
+    background-color: #0b1a0b !important;
+    border: 1px solid rgba(140, 240, 68, 0.2) !important;
+}
+
+/* Phosphor green typography */
+.theme-special .text-white,
+[data-theme="special"] .text-white,
+.theme-special .text-zinc-100,
+[data-theme="special"] .text-zinc-100 {
+    color: #8cf044 !important;
+    text-shadow: 0 0 6px rgba(140, 240, 68, 0.35);
+}
+
+.theme-special .text-zinc-200,
+[data-theme="special"] .text-zinc-200,
+.theme-special .text-zinc-300,
+[data-theme="special"] .text-zinc-300,
+.theme-special .text-zinc-400,
+[data-theme="special"] .text-zinc-400 {
+    color: #74bf35 !important;
+}
+
+.theme-special .text-zinc-500,
+[data-theme="special"] .text-zinc-500,
+.theme-special .text-zinc-600,
+[data-theme="special"] .text-zinc-600 {
+    color: #447222 !important;
+}
+
+/* Borders */
+.theme-special .border-white\/5,
+[data-theme="special"] .border-white\/5,
+.theme-special .border-white\/10,
+[data-theme="special"] .border-white\/10,
+.theme-special .border-white\/20,
+[data-theme="special"] .border-white\/20,
+.theme-special .border-zinc-800,
+[data-theme="special"] .border-zinc-800,
+.theme-special .border-zinc-700,
+[data-theme="special"] .border-zinc-700 {
+    border-color: rgba(140, 240, 68, 0.25) !important;
+}
+
+/* Gauges, progress bars and indicators */
+.theme-special .bg-emerald-500,
+[data-theme="special"] .bg-emerald-500,
+.theme-special .bg-cyan-400,
+[data-theme="special"] .bg-cyan-400,
+.theme-special .from-teal-500,
+[data-theme="special"] .from-teal-500,
+.theme-special .to-cyan-400,
+[data-theme="special"] .to-cyan-400 {
+    background-color: #8cf044 !important;
+    background-image: none !important;
+    box-shadow: 0 0 10px rgba(140, 240, 68, 0.5) !important;
+}
+
+.theme-special .text-cyan-400,
+[data-theme="special"] .text-cyan-400 {
+    color: #8cf044 !important;
+}
+
+/* Subtle CRT scanline effect on tactical theme */
+.theme-special::before,
+[data-theme="special"]::before {
+    content: " ";
+    display: block;
+    position: fixed;
+    top: 0; left: 0; bottom: 0; right: 0;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(140, 240, 68, 0.02), rgba(0, 255, 0, 0.01), rgba(140, 240, 68, 0.02));
+    z-index: 9999;
+    background-size: 100% 3px, 6px 100%;
+    pointer-events: none;
+    opacity: 0.6;
+}
+
+/* =========================================================================
+   CORNER STYLE: Sharp Tactical Corners
+   ========================================================================= */
+.corners-sharp,
+.corners-sharp *,
+[data-corners="sharp"],
+[data-corners="sharp"] * {
+    border-radius: 0px !important;
+}
+
