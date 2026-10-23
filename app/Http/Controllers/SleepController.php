@@ -206,7 +206,7 @@ class SleepController extends Controller
             'error_code' => $discordResult['error_code'] ?? null,
             'discord_bot_token' => $user?->discord_bot_token,
             'discord_user_id' => $user?->discord_user_id,
-        ]);
+        ], 200, [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }
 
     public function confirmSleep(Request $request): JsonResponse
@@ -802,7 +802,7 @@ class SleepController extends Controller
             'is_system_active' => $enableDiscord || $enableCpp,
         ];
 
-        return response()->json($result);
+        return response()->json($result, 200, [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }
 
     public function daemonLogin(Request $request): JsonResponse

@@ -341,6 +341,74 @@ void UpdateTrayTooltip(const std::wstring& tooltip);
 void ExecuteFinalEnforcement();
 void ReportPresence(const std::string& status, int idleSeconds, bool screenLocked, const std::string& alertAction = "");
 
+std::wstring UnescapeJsonToWString(const std::string& str) {
+    if (str.empty()) return L"";
+
+    std::wstring result;
+    result.reserve(str.length());
+
+    for (size_t i = 0; i < str.length(); ++i) {
+        if (str[i] == '\\' && i + 1 < str.length()) {
+            char next = str[i + 1];
+            if (next == 'u' && i + 5 < str.length()) {
+                std::string hexStr = str.substr(i + 2, 4);
+                try {
+                    wchar_t codePoint = static_cast<wchar_t>(std::stoul(hexStr, nullptr, 16));
+                    result.push_back(codePoint);
+                    i += 5;
+                    continue;
+                } catch (...) {
+                    // Ignore error and fall through
+                }
+            } else if (next == 'n') {
+                result.push_back(L'\n');
+                i += 1;
+                continue;
+            } else if (next == 'r') {
+                result.push_back(L'\r');
+                i += 1;
+                continue;
+            } else if (next == 't') {
+                result.push_back(L'\t');
+                i += 1;
+                continue;
+            } else if (next == '"') {
+                result.push_back(L'\"');
+                i += 1;
+                continue;
+            } else if (next == '\\') {
+                result.push_back(L'\\');
+                i += 1;
+                continue;
+            }
+        }
+
+        unsigned char c = static_cast<unsigned char>(str[i]);
+        if (c < 0x80) {
+            result.push_back(static_cast<wchar_t>(c));
+        } else {
+            size_t seqLen = 1;
+            if ((c & 0xE0) == 0xC0) seqLen = 2;
+            else if ((c & 0xF0) == 0xE0) seqLen = 3;
+            else if ((c & 0xF8) == 0xF0) seqLen = 4;
+
+            if (i + seqLen <= str.length()) {
+                std::string sub = str.substr(i, seqLen);
+                wchar_t wbuf[4] = {0};
+                int wlen = MultiByteToWideChar(CP_UTF8, 0, sub.c_str(), (int)seqLen, wbuf, 4);
+                for (int j = 0; j < wlen; ++j) {
+                    result.push_back(wbuf[j]);
+                }
+                i += seqLen - 1;
+            } else {
+                result.push_back(static_cast<wchar_t>(c));
+            }
+        }
+    }
+
+    return result;
+}
+
 void HandlePendingNotification(const std::string& resp) {
     size_t notifyPos = resp.find("\"pending_notification\"");
     if (notifyPos == std::string::npos) return;
@@ -352,8 +420,14 @@ void HandlePendingNotification(const std::string& resp) {
         if (cpos == std::string::npos) return "";
         size_t q1 = resp.find("\"", cpos);
         if (q1 == std::string::npos) return "";
-        size_t q2 = resp.find("\"", q1 + 1);
-        if (q2 == std::string::npos) return "";
+        size_t q2 = q1 + 1;
+        while (q2 < resp.length()) {
+            if (resp[q2] == '"' && resp[q2 - 1] != '\\') {
+                break;
+            }
+            q2++;
+        }
+        if (q2 >= resp.length()) return "";
         return resp.substr(q1 + 1, q2 - q1 - 1);
     };
 
@@ -373,17 +447,8 @@ void HandlePendingNotification(const std::string& resp) {
 
     if (title.empty() && message.empty()) return;
 
-    auto toWString = [](const std::string& str) -> std::wstring {
-        if (str.empty()) return L"";
-        int len = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, NULL, 0);
-        if (len <= 1) return L"";
-        std::wstring ws(len - 1, 0);
-        MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, &ws[0], len);
-        return ws;
-    };
-
-    std::wstring wTitle = toWString(title.empty() ? "SleepOrDie Guard" : title);
-    std::wstring wMessage = toWString(message);
+    std::wstring wTitle = UnescapeJsonToWString(title.empty() ? "SleepOrDie Guard" : title);
+    std::wstring wMessage = UnescapeJsonToWString(message);
 
     DWORD infoFlags = NIIF_INFO;
     if (level == "warning") infoFlags = NIIF_WARNING;
@@ -441,8 +506,14 @@ void HandleAlertStateResponse(const std::string& resp) {
         if (cpos == std::string::npos) return "";
         size_t q1 = resp.find("\"", cpos);
         if (q1 == std::string::npos) return "";
-        size_t q2 = resp.find("\"", q1 + 1);
-        if (q2 == std::string::npos) return "";
+        size_t q2 = q1 + 1;
+        while (q2 < resp.length()) {
+            if (resp[q2] == '"' && resp[q2 - 1] != '\\') {
+                break;
+            }
+            q2++;
+        }
+        if (q2 >= resp.length()) return "";
         return resp.substr(q1 + 1, q2 - q1 - 1);
     };
 
