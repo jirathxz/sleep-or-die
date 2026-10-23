@@ -1,31 +1,44 @@
 # DESIGN SYSTEM SPECIFICATION (DESIGN.md)
 **Project:** SleepOrDie — Hardcore Sleep & Discipline Protocol  
-**Style Architecture:** Minimalist Industrial Dark / Anti-AI Cliché System  
-**Core Rules:** Dark/Gray 80% • White 20% • No Border • Perfect Border Radius • No Badge • Font: Kanit
+**Style Architecture:** Minimalist Industrial Dark / High-Discipline Visual Hierarchy  
+**Core Rules:** Dark/Gray 80% • White 20% • No Border • Concentric Radius • No Badge • Zero Emoji • Direct Microcopy • Normal Font: Kanit • Special Font: Chakra Petch
 
 ---
 
-## 1. ปรัชญาการออกแบบ (Design Philosophy & Manifesto)
+## 1. ปรัชญาและโครงสร้างลำดับสายตา (Design Philosophy & Visual Hierarchy)
 
-ระบบการออกแบบนี้ถูกสร้างขึ้นเพื่อปฏิเสธความจำเจและข้อบกพร่องที่พบบ่อยใน **AI-Generated UI** โดยเน้นความสุขุม เรียบง่าย ทรงพลัง มีโครงสร้างที่ชัดเจน (Ergonomic Visual Hierarchy) และเหมาะสำหรับการใช้งานจริงในชีวิตประจำวัน ไม่สร้างความล้าทางสายตา (Visual Fatigue)
+ระบบการออกแบบนี้สร้างขึ้นเพื่อปฏิเสธความจำเจ ความรก และข้อบกพร่องของ AI-Generated UI โดยมุ่งเน้นความสุขุม เรียบง่าย ทรงพลัง และมีลำดับความสำคัญของสายตา (Visual Hierarchy) ที่ชัดเจนที่สุด ผู้ใช้ต้องเข้าใจสถานะและเวลาเส้นตายได้ภายใน 1 วินาทีแรกโดยไม่เกิดความล้าทางสายตา
+
+### ลำดับความสำคัญของข้อมูลบนหน้าจอ (Visual Hierarchy 3 Levels)
+1. **Primary Focal Point (จุดเด่นระดับ 1 - ขาว 20% เด่นชัดที่สุด):**
+   - เวลานับถอยหลังสู่เส้นตาย (Countdown Timer) และหลอดพลังชีวิต (HP Bar)
+   - เป็นจุดรวมสายตาเพียงจุดเดียวต่อหน้าจอ ใช้ขนาดตัวอักษรใหญ่ คอนทราสต์ขาวบริสุทธิ์ (#FFFFFF) ท่ามกลางพื้นหลังมืดสนิท
+2. **Secondary Controls (ระดับ 2 - ข้อมูลและปุ่มควบคุมหลัก):**
+   - ปุ่มยืนยันการนอน (Confirm Sleep) และแท็บนำทางหลัก (Clean Navigation)
+   - ใช้ขนาดและคอนทราสต์ระดับกลาง เป็นระเบียบ ไม่แย่งความเด่นจากจุดศูนย์กลาง
+3. **Tertiary Metadata (ระดับ 3 - ข้อมูลบริบทและส่วนเสริม):**
+   - สถิติสะสม, เวลาเป้าหมาย, ข้อมูลเชื่อมต่อ และเมนูตั้งค่ารอง
+   - ใช้สีเทาเรียบ (#71717A ถึง #A1A1AA) ตัวอักษรขนาดกะทัดรัด อยู่ในระนาบที่เงียบสงบ
 
 ### กฎสัดส่วนสี 80/20 (The 80/20 Contrast Rule)
-- **80% Dark & Neutral Grays:** พื้นที่ส่วนใหญ่ (Canvas, Surface Panels, Backgrounds, Muted Structure) ถูกจัดอยู่ในช่วงโทนสีเทาเข้มหลายระดับ เพื่อสร้างมิติและความลึกโดยไม่ต้องพึ่งพาเส้นขอบ
-- **20% Crisp White & High-Contrast Accents:** พื้นที่ข้อมูลสำคัญ (Primary Value, Active Countdown, Core Action, Key Status) ใช้สีขาวสะอาดตา (#FFFFFF / #F4F4F5) หรือสีเน้นสถานะเฉพาะจุด เพื่อดึงสายตาไปยังสิ่งที่สำคัญที่สุดทันทีใน 1 วินาทีแรก
+- **80% Dark & Neutral Grays:** พื้นที่ส่วนใหญ่ (Canvas, Surface Panels, Backgrounds) อยู่ในช่วงเทาเข้มหลายระดับ เพื่อสร้างมิติและความลึกโดยไม่ต้องใช้เส้นขอบ
+- **20% Crisp White & High-Contrast Accents:** สงวนสีขาวบริสุทธิ์ (#FFFFFF) และสีสถานะเฉพาะจุดสำหรับข้อมูลวิกฤตเท่านั้น
 
 ---
 
-## 2. แก้ปัญหา 7 จุดสังเกตของ AI-Generated UI (Anti-Pattern Matrix)
+## 2. แก้ปัญหาจุดสังเกตของ AI-Generated UI (Anti-Pattern Matrix)
 
 | จุดสังเกตที่มักพบใน AI UI | ปัญหาที่เกิดขึ้น | กฎบังคับใช้ของ SleepOrDie (Solution Rule) |
 | :--- | :--- | :--- |
-| **1. Layout** | ยัดทุกข้อมูลใส่ Card ซ้ำ ๆ กันจนรก | **Fluid Tonal Planes:** เลิกใช้ Card ในทุกจุด ใช้การแบ่งกลุ่มข้อมูลด้วยพื้นที่ว่าง (Negative Space) และระดับสีพื้นผิว (Tonal Shift) ไม่ล้อมกรอบสิ่งที่ไม่มีปฏิสัมพันธ์ |
-| **2. Spacing** | เว้นช่องไฟกว้างเกินไป ข้อมูลลอยกระจัดกระจาย | **Compact Proximity:** จัดระยะตาม Gestalt Principle สิ่งที่เกี่ยวข้องกันชิดกัน (Gap 8px–12px) ส่วนที่ต่างกันแยกด้วยระยะ 20px–32px พอดีกับสายตา ไม่สร้าง Void ขนาดใหญ่ |
-| **3. Typography** | ตัวหนังสือใหญ่และหนา (ExtraBold/Black) แทบทุกบรรทัด | **Kanit Balanced Scale:** ใช้ Font **Kanit** จำกัดน้ำหนักหลักที่ 400 (Regular) และ 500 (Medium) อนุญาตให้ใช้ 600 (SemiBold) เฉพาะตัวเลขสถิติหรือหัวข้อหลักเท่านั้น |
-| **4. Color** | สาด Gradient สีม่วง-น้ำเงิน หรือเรืองแสง (Glow) เลอะเทอะ | **Pure Dark/Gray Neutrality:** ห้ามใช้ Gradient สีม่วงนีออน ใช้สีเทาเนื้อแมตต์ (Matte Slate/Charcoal) สะอาด ไร้แสงสะท้อนหรือ Drop Shadow รกตา |
-| **5. Visual Hierarchy** | ทุกอย่างโดดเด่นเท่ากัน สายตาไม่รู้จะโฟกัสตรงไหน | **Single Primary Focal Point:** มีพระเอกเพียงจุดเดียวต่อหน้าจอ (เช่น Countdown & Health Bar) ส่วนควบคุมอื่นทำหน้าที่เป็นบริบทเสริม (Subordinate) |
-| **6. Components** | แปะ Badge / Chip / Icon ตกแต่งพร่ำเพรื่อ | **Strictly No Badge:** แบนการใช้ Badge/Tag แคปซูลซ้อนกัน แสดงสถานะด้วยข้อความตรงไปตรงมา หรือไฟจุดสถานะขนาด 6px (Status Dot) แทน |
-| **7. UX Logic** | ดูสวยแต่คลิกยาก ขั้นตอนใช้งานไม่คล่องตัว | **Instant Kinetic Action:** ปุ่มกดขนาดพอดีนิ้ว (Min 44px) รองรับคีย์บอร์ดชอร์ตคัต ไม่ต้องคลิกซ้อนหลายขั้นตอนเพื่อยืนยันการนอน |
+| **1. Layout** | ยัดทุกข้อมูลใส่ Card ซ้ำๆ จนรกหน้าจอ | **Fluid Tonal Planes:** แบ่งกลุ่มด้วยระยะห่างและระดับสีเทา ไม่ล้อมกรอบสิ่งที่ไม่มีปฏิสัมพันธ์ |
+| **2. Spacing** | เว้นช่องไฟกว้างเกินไป ข้อมูลลอยกระจัดกระจาย | **Compact Proximity:** จัดกลุ่มชิดกัน (Gap 8px–12px) ส่วนที่ต่างกันแยก 20px–32px |
+| **3. Typography** | ตัวหนังสือหนาเกร่อ ขาดน้ำหนักเปรียบเทียบ | **Dual Font & Balanced Weight:** ฟอนต์ Kanit ในธีมปกติ และ Chakra Petch ในธีมพิเศษ จำกัดน้ำหนักที่ 400 และ 500 |
+| **4. Color & Glow** | สาด Gradient นีออนหรือเงาเรืองแสงรกตา | **Pure Matte Neutrality:** พื้นผิวเนื้อแมตต์ ปราศจาก Gradient หลากสีและแสงเรืองแสงฟุ้งกระจาย |
+| **5. Navigation** | ใส่ตัวเลข 01, 02 หรือ 1. 2. 3. นำหน้าเมนู | **Clean Nav Labels:** ตัดตัวเลขนำหน้าออกทั้งหมด ใช้ชื่อหมวดหมู่สั้น กระชับ ตรงประเด็น |
+| **6. Decoration** | ใส่เครื่องหมาย // หรือโค้ดสัญลักษณ์รกหน้า | **No "//" in Normal Theme:** ห้ามใช้เครื่องหมาย // ตกแต่งในธีมปกติ เน้นความเรียบหรูระดับโปรดักชัน |
+| **7. Emojis** | แปะอีโมจิตามหัวข้อ ปุ่ม และสถานะ | **Zero Emoji Standard:** ห้ามใช้อีโมจิเป็นองค์ประกอบ UI เด็ดขาด ให้ใช้ SVG Icons หรือจุดสถานะเรียบ |
+| **8. Copywriting** | ขึ้นต้นด้วยคำว่า "ระบบ" หรือเวิ่นเว้อ | **Direct Microcopy:** ตัดคำว่า "ระบบ" และ "System" ออกทั้งหมด สื่อสารด้วยคำกริยาตรงไปตรงมา |
+| **9. Low-Usage Controls** | แผ่ปุ่มทดสอบและคำสั่งรองเต็มหน้าจอ | **Progressive Disclosure:** ยุบส่วนที่กดใช้น้อยลง Dropdown หรือปุ่มกะทัดรัด (Compact Controls) |
 
 ---
 
@@ -42,9 +55,9 @@
        │
        ├── [ Text-Primary: #FAFAFA ] (Headers, Numbers, Main Readings)
        └── [ Functional Accents ]
-             ├── Safe: #10B981 (Subtle Emerald)
-             ├── Warning: #F59E0B (Subtle Amber)
-             └── Critical: #EF4444 (Subtle Crimson)
+             ├── Safe: #10B981 (Emerald)
+             ├── Warning: #F59E0B (Amber)
+             └── Critical: #EF4444 (Crimson)
 ```
 
 ### Color Palette Specification:
@@ -56,158 +69,228 @@
 - **Secondary / Subdued Text:** `#A1A1AA` (Zinc-400)
 - **Muted / Metadata Text:** `#71717A` (Zinc-500)
 
-> 🚫 **ข้อห้ามเด็ดขาด (Prohibited):**
-> - ห้ามใช้ขอบสีสว่าง (No 1px solid white/gray borders)
-> - ห้ามใช้ Multi-color Gradient ฟุ้งกระจาย (No Purple/Cyan AI-glow)
-> - ห้ามใช้ Box Shadow สีสดเรืองแสง
+[ กฎข้อห้ามเด็ดขาด ]
+- ห้ามใช้ขอบสีสว่างทึบ (No 1px solid white/gray borders)
+- ห้ามใช้ Gradient สีม่วง-ฟ้าแบบ AI ทั่วไป
+- ห้ามใช้ Box Shadow สีสดเรืองแสง
 
 ---
 
 ## 4. โครงสร้างเส้นขอบและการไล่ระดับมิติ (Border & Elevation: "No Border")
 
-แนวคิด **"No Border"** ไม่ได้หมายถึงการทำให้องค์ประกอบกลืนหายไป แต่เป็นการแบ่งขอบเขตด้วย **Tonal Elevation (ความต่างของระดับสีเทา)**:
+แนวคิด **"No Border"** คือการกำหนดขอบเขตด้วยระดับสีพื้นผิว (Tonal Shift) และระยะว่าง (Spacing):
 
 1. **Surface Separation:**
-   - ใช้วิธีเปลี่ยนพื้นหลังจาก `#09090B` (Canvas) เป็น `#121215` (Container) เพื่อสร้างระนาบที่แยกกันอย่างเป็นธรรมชาติ
-   - กรณีที่ต้องการแยกบรรทัดในตารางหรือรายการ ให้ใช้ `border-b border-white/[0.04]` (Opacity ต่ำมาก) หรือเว้นระยะ `gap` แทนเส้นขอบทึบ
+   - เปลี่ยนพื้นหลังจาก `#09090B` (Canvas) เป็น `#121215` (Container) เพื่อสร้างระนาบที่แยกกันอย่างเป็นธรรมชาติ
+   - ในกรณีที่ต้องแยกบรรทัดในรายการ ให้ใช้เส้นโปร่งแสงบางเบา `border-b border-white/[0.04]` หรือใช้ช่องว่าง `gap` แทน
 2. **Elevated Surfaces:**
-   - ใช้ Soft Ambient Shadow ที่โปร่งแสงและเป็นธรรมชาติ:
+   - ใช้ Ambient Shadow โปร่งแสงนุ่มนวล:
      `box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.4);`
 3. **Interactive Focus State:**
-   - เมื่อโฟกัส input หรือปุ่มกด ห้ามใช้กรอบหนา ใช้เพียงวงแหวนโปร่งแสงบางเบา `ring-1 ring-white/20`
+   - เมื่อโฟกัส Input หรือปุ่มกด ให้ใช้วงแหวนโปร่งแสงบางเบา `ring-1 ring-white/20` ห้ามใช้กรอบหนาฉูดฉาด
 
 ---
 
-## 5. การคำนวณความโค้งมนที่สมบูรณ์แบบ (Perfect Border Radius)
+## 5. การคำนวณความโค้งมนที่สมบูรณ์แบบ (Concentric Border Radius)
 
-ความโค้งมนของมุมต้องมีความสอดคล้องทางคณิตศาสตร์ (Concentric Nested Radius Formula):
+ความโค้งมนของมุมต้องสอดคล้องทางคณิตศาสตร์ตามสูตร:
 
 $$\mathbf{R_{\text{inner}} = R_{\text{outer}} - \text{Padding}}$$
 
-หากนำกล่องที่มีความโค้งเท่ากันไปซ้อนข้างในกล่องอื่น จะเกิดความรู้สึกเบี้ยวทางสายตา ดังนั้นระบบนี้จึงกำหนดโทเค็นที่เคร่งครัด:
-
 | ขนาด Token | ค่ารัศมี (Radius) | การนำไปใช้งาน (Usage) |
 | :--- | :--- | :--- |
-| `radius-outer` | `16px` (`rounded-2xl`) | Main Screen Containers, Outer Application Modules |
-| `radius-surface` | `12px` (`rounded-xl`) | Sub-panels, Settings Dialogs, Health Display Pods |
-| `radius-control` | `8px` (`rounded-lg`) | Action Buttons, Input Fields, Time Pickers |
-| `radius-inner` | `4px` (`rounded`) | Inner Indicators, Metric Bars, Mini Progress Trackers |
+| `radius-outer` | `16px` (`rounded-2xl`) | Main Screen Containers, Outer Modules |
+| `radius-surface` | `12px` (`rounded-xl`) | Sub-panels, Settings Dialogs, Metric Pods |
+| `radius-control` | `8px` (`rounded-lg`) | Action Buttons, Dropdowns, Input Fields |
+| `radius-inner` | `4px` (`rounded`) | Inner Indicators, Metric Bars, Sliders |
 
-> 🚫 **ข้อห้าม:** ห้ามใช้ `rounded-full` (มุมแคปซูลทรงยา) กับปุ่มทั่วไป เพื่อหลีกเลี่ยงภาพลักษณ์แบบของเล่นหรือ Badge สำเร็จรูป ให้ใช้ `rounded-lg` (8px) หรือ `rounded-xl` (12px) เท่านั้น
+[ กฎข้อห้าม ] ห้ามใช้ `rounded-full` (ทรงแคปซูลยา) กับปุ่มกดทั่วไป เพื่อหลีกเลี่ยงภาพลักษณ์แบบของเล่นสำเร็จรูป ให้ใช้ `rounded-lg` (8px) หรือ `rounded-xl` (12px) เท่านั้น
 
 ---
 
-## 6. อักษรศาสตร์ (Typography System: Font Kanit)
+## 6. อักษรศาสตร์และระบบ 2 ธีม (Typography: Normal Theme vs Special Theme)
 
-ใช้ฟอนต์ **Kanit** (Google Fonts) ซึ่งมีความเป็นระเบียบ ทันสมัย และอ่านง่ายทั้งภาษาไทยและตัวเลขอังกฤษ
+ระบบรองรับ 2 สไตล์ตามบริบทการใช้งาน โดยแยกฟอนต์และโทนอย่างเด็ดขาด:
+
+### 1) Normal Theme (ธีมปกติ - มาตรฐาน Minimalist Industrial Dark)
+- **Primary Font:** **Kanit** (Google Fonts)
+- **ลักษณะ:** สุขุม อ่านง่าย สะอาดตา ไร้การปรุงแต่งรกรุงรัง
+- **กฎเหล็กของ Normal Theme:**
+  - **ห้ามใช้เครื่องหมาย `//` โดยเด็ดขาด:** ห้ามมี `// RADAR`, `// SETTINGS`, `// STATUS` ในธีมปกติเด็ดขาด ให้ใช้ชื่อหมวดหมู่ตัวพิมพ์มาตรฐาน
+  - สัดส่วนตัวหนังสือเป็นระเบียบ ไม่ใช้ตัวหนาพรำเพรื่อ
 
 ```css
+/* Normal Theme Typography */
 font-family: 'Kanit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+```
+
+### 2) Special Theme (ธีมพิเศษ - Tactical / Military Terminal)
+- **Primary Font:** **Chakra Petch** (Google Fonts)
+- **ลักษณะ:** เหลี่ยมเรขาคณิต สไตล์หน้าจอยุทธวิธีทางทหาร (Tactical HUD / Cybernetic Command)
+- **การนำไปใช้งาน:** ใช้งานเมื่อเปิดใช้งานโหมดธีมพิเศษ (Tactical Green / Terminal) เพื่อให้ได้ความรู้สึกจริงจังและเฉียบคม
+
+```css
+/* Special Theme Typography */
+.theme-special, [data-theme="special"] {
+    font-family: 'Chakra Petch', -apple-system, BlinkMacSystemFont, sans-serif !important;
+}
 ```
 
 ### Hierarchy & Weights Scale:
 
 | ลำดับ (Role) | ขนาด (Size) | น้ำหนัก (Weight) | สี (Color) | การใช้งาน |
 | :--- | :--- | :--- | :--- | :--- |
-| **Metric Display** | `48px` - `64px` | `500 Medium` | `#FFFFFF` | ตัวเลขนับถอยหลัง, เปอร์เซ็นต์พลังชีวิต |
-| **Page Title** | `22px` - `26px` | `600 SemiBold` | `#FAFAFA` | หัวข้อหน้าจอ เช่น "ระบบควบคุมการนอน" |
-| **Section Header** | `15px` - `17px` | `500 Medium` | `#F4F4F5` | ชื่อหมวดหมู่การตั้งค่า, ข้อมูลสุขภาพ |
-| **Body / Readout** | `14px` | `400 Regular` | `#D4D4D8` | คำอธิบาย, ข้อมูลสรุป, ข้อความนำทาง |
-| **Sub-text / Meta** | `12px` - `13px` | `300 Light / 400` | `#71717A` | เวลาเป้าหมาย, หน่วยกำกับ, สถิติสะสม |
+| **Metric Display** | `48px` - `64px` | `500 Medium` | `#FFFFFF` | ตัวเลขนับถอยหลัง, เปอร์เซ็นต์ HP |
+| **Page Title** | `20px` - `24px` | `600 SemiBold` | `#FAFAFA` | หัวข้อหน้าจอ เช่น "แผงควบคุม" |
+| **Section Header** | `14px` - `16px` | `500 Medium` | `#F4F4F5` | ชื่อกลุ่มข้อมูล, หัวข้อย่อย |
+| **Body / Readout** | `13px` - `14px` | `400 Regular` | `#D4D4D8` | ข้อมูลสรุป, คำอธิบายการตั้งค่า |
+| **Sub-text / Meta** | `11px` - `12px` | `300 Light / 400` | `#71717A` | เวลาเป้าหมาย, หน่วยกำกับ, รายละเอียดรอง |
 
-### กฎสำคัญด้านตัวพิมพ์:
-- **ห้าม Bold พร่ำเพรื่อ:** ข้อความทั่วไปและปุ่มกดใช้น้ำหนัก `400 Regular` หรือ `500 Medium` เท่านั้น ไม่ใช้ `700 Bold` หรือ `800 ExtraBold` กับข้อความยาว
-- **ตัวเลขสถิติ (Tabular Numbers):** ใช้ CSS `font-variant-numeric: tabular-nums;` เพื่อไม่ให้ตัวเลขขยับสั่นขณะเวลานับถอยหลัง
+- **ตัวเลขสถิติ (Tabular Numbers):** ใช้ CSS `font-variant-numeric: tabular-nums;` เสมอ เพื่อป้องกันตัวเลขสั่นไหวขณะนับถอยหลัง
 
 ---
 
-## 7. กฎการไม่ใช้ Badge (The "No Badge" Standard)
+## 7. โครงสร้างเมนูนำทาง (Navigation Architecture: "No Numbering")
 
-AI มักติดการแปะ `<Badge>` แคปซูลสีฉูดฉาดไว้ตามมุมกล่องเพื่อบอกสถานะ ทำให้หน้าจอเหมือนแดชบอร์ดต้นแบบที่ยังไม่เสร็จ
+### กฎการตัดตัวเลขนำหน้าออกจากเมนูนำทาง
+ห้ามใส่ตัวเลขลำดับ เช่น `1.`, `2.`, `3.` หรือ `01`, `02`, `03` นำหน้าชื่อเมนูหรือแท็บนำทาง เพื่อให้การนำทางดูสะอาด เป็นมืออาชีพ และไม่สร้างความสับสนกับตัวเลขข้อมูลสถิติ
 
-### วิธีแสดงสถานะโดยไม่ใช้ Badge:
-1. **Semantic Text Hierarchy:** ใช้ตัวอักษรและน้ำหนักบอกสถานะโดยตรง เช่น:
+[ ตัวอย่างที่ห้ามใช้ ]
+- `01 เรดาร์` หรือ `01 RADAR`
+- `02 คลังอุปกรณ์` หรือ `02 INVENTORY`
+- `03 ตลาดมืด` หรือ `03 BLACK MARKET`
+- `04 ประวัติภารกิจ` หรือ `04 MISSION HISTORY`
+- `1. แผงควบคุม  2. ตารางเวลา  3. การตั้งค่า`
+
+[ ตัวอย่างที่ถูกต้อง ]
+- `เรดาร์`
+- `คลังอุปกรณ์`
+- `ตลาดมืด`
+- `ประวัติภารกิจ`
+- `ตารางเวลา`
+- `การตั้งค่า`
+
+---
+
+## 8. การจัดการ UI ที่กดใช้น้อย (Progressive Disclosure & Compact Controls)
+
+เพื่อรักษา Visual Hierarchy ให้โดดเด่น และไม่ให้ปุ่มที่ไม่ค่อยได้กดมาแย่งพื้นที่สายตา ให้ใช้หลักการ **Progressive Disclosure**:
+
+1. **ยุบเครื่องมือเสริมลง Dropdown / Popover:**
+   - **โหมดจำลองและทดสอบ (Simulation / Debug Presets):** ยุบรวมไว้ใน Dropdown "ทดสอบระบบ" หรือปุ่มไอคอนขนาดกะทัดรัด
+   - **การกระทำสำรอง (Secondary Actions):** เช่น การปรับแต่งขั้นสูง, ล็อกเอาต์ หรือเมนูจัดการบัญชี ให้รวมไว้ใน Dropdown เมนูของโปรไฟล์หรือจุดสามจุด
+2. **Compact Controls (การควบคุมขนาดกะทัดรัด):**
+   - ส่วนปรับเวลาฉุกเฉินหรือสลับโหมด ให้ใช้ตัวเลือกแบบ Segmented Control แบนเรียบ หรือ Dropdown ขนาดเล็ก (Height 32px–36px) แทนการวางการ์ดขนาดใหญ่
+   - ซ่อนข้อมูลการดีบั๊กหรือรายละเอียดเชิงลึกไว้ใน Collapsible Drawer หรือ Tooltip เมื่อนำเมาส์ไปชี้
+
+---
+
+## 9. กฎการไม่ใช้ Badge (The "No Badge" Standard)
+
+แบนการใช้กล่องแคปซูลสีฉูดฉาด (<Badge>) ลอยอยู่ตามมุมกล่อง
+
+### วิธีแสดงสถานะที่ถูกต้อง:
+1. **Semantic Text Hierarchy:** แสดงสถานะด้วยข้อความและระดับสีของตัวอักษรโดยตรง
    - *แทนที่จะเป็น:* `<Badge variant="danger">5 Strikes</Badge>`
-   - *ให้เป็น:* `ความเสี่ยงบัญชี: 5/5 ครั้ง` หรือ `Account Risk: 5/5 Strikes` (ใช้สีแดงเรียบที่ตัวเลข หรือตัวอักษรสีขาวกับคำบรรยายสีเทา)
+   - *ให้เป็น:* `บันทึกโทษ: 5/5 ครั้ง` (ตัวเลขสีแดงเรียบ ตัวหนังสือสีขาว-เทา)
 2. **Minimal Status Dot (จุดไฟนำสายตา):**
-   - ใช้ไฟสถานะทรงกลมขนาดเล็ก `size-2` (8px) แบบ Flat ข้างชื่อสถานะ:
-     - 🟢 สีเขียว: ปกติ
-     - 🟡 สีส้ม: ระยะเตือน
-     - 🔴 สีแดง: ระยะวิกฤต หรือพลังชีวิตหมด
-3. **Inline Metrics:** เขียนตัวเลขควบคู่กับ Label ในแถวเดียวกันโดยไม่ต้องมีกล่องแคปซูลหุ้ม
+   - ใช้จุดไฟสถานะทรงกลมขนาดเล็ก `size-2` (8px) แบบ Flat ข้างข้อความ:
+     - จุดสีเขียว: ปกติ / กำลังตรวจจับ
+     - จุดสีส้ม: ระยะเตือน
+     - จุดสีแดง: ระยะวิกฤต / พลังชีวิตหมด
+3. **Inline Metrics:** วางตัวเลขและหน่วยวัดในบรรทัดเดียวกันโดยไม่ต้องตีกรอบหุ้ม
 
 ---
 
-## 8. กฎความเป็นเอกภาพทางภาษาและข้อห้ามใช้วงเล็บ (Language Purity & No Parentheses Rule)
+## 10. ภาษา ข้อความแจ้งเตือน และข้อห้ามใช้อิโมจิ (Language, Direct Copy & Zero Emoji)
 
-เพื่อความเป็นมืออาชีพ ความสะอาดของหน้าตา UI และความกระชับ ไม่ให้ดูเหมือนงานแปลดิบที่ยังไม่ได้ขัดเกลา ระบบมีข้อกำหนดด้านภาษาดังนี้:
+### 1) ห้ามใช้อิโมจิเป็นองค์ประกอบ UI เด็ดขาด (Zero Emoji Standard)
+- **ห้ามมีอีโมจิในทุกส่วนของ UI:** ห้ามใส่อีโมจิในปุ่ม, หัวข้อ, การแจ้งเตือน (Toast), แท็บเมนู, หรือสถานะใดๆ
+- **สิ่งที่ใช้แทนอีโมจิ:**
+  - ใช้ **Lucide / SVG Icons** สีโมโนโครมขนาดเล็ก (16px–20px)
+  - ใช้ **Status Dot** ขนาด 6px–8px สำหรับบอกสถานะ
+  - ใช้ **Typography & Space** ในการสื่อสาร
 
-### 1) ห้ามมีวงเล็บ `()` กำกับข้อความบนหน้าเว็บเด็ดขาด
-- 🚫 **ห้าม:** ห้ามใส่วงเล็บกำกับคำแปลสองภาษา หรือข้อความอธิบายขยายความย่อย เช่น:
-  - `แผงควบคุม (Dashboard)`
-  - `การตั้งค่าระบบ (Unified Settings)`
-  - `เส้นตายเข้านอนคืนนี้ (Bedtime Deadline)`
-  - `พลังชีวิต (HP)`
-  - `(Strike Recorded)`
-  - `(5 รอบการนอน)`
-  - `อยู่ในสถานะนอน (ตรวจจับออฟไลน์...)`
-- ✅ **ถูกต้อง:** ใช้ข้อความตรงไปตรงมา ไร้วงเล็บ หากต้องการคั่นข้อมูลให้ใช้จุดนำสายตา `•` หรือเว้นวรรค เช่น:
-  - `แผงควบคุม`
-  - `การตั้งค่าระบบ`
-  - `เส้นตายเข้านอนคืนนี้`
-  - `พลังชีวิต`
-  - `5 รอบการนอน`
+### 2) ห้ามขึ้นต้นข้อความด้วย "ระบบ" หรือ "System" (Direct Action Copy)
+ข้อความแจ้งเตือน Toast, Alert, และคำอธิบายสถานะต้องสื่อสารด้วยการกระทำโดยตรง ไม่ต้องอ้างอิงคำว่า "ระบบ" นำหน้า:
+
+| รูปแบบที่ห้ามใช้ (Prohibited) | รูปแบบที่ถูกต้อง (Correct & Direct) |
+| :--- | :--- |
+| `ระบบ: บันทึกการตั้งค่าสำเร็จ` | `บันทึกการตั้งค่าแล้ว` |
+| `[ ระบบ ] ยืนยันการใช้ตั๋วฉุกเฉิน` | `ใช้ตั๋วฉุกเฉินสำเร็จ เลื่อนเวลา +30 นาที` |
+| `ระบบกำลังตรวจจับผ่าน C++ Guard` | `กำลังตรวจจับผ่าน C++ Guard` |
+| `ระบบพร้อมทำงาน` | `พร้อมใช้งาน` |
+| `ระบบพบข้อผิดพลาดในการเชื่อมต่อ` | `เชื่อมต่อไม่สำเร็จ ตรวจสอบ Token อีกครั้ง` |
+| `System: Alert sequence initiated` | `Alert sequence initiated` |
+
+### 3) ภาษาไทยนำในคำทั่วไป / ภาษาอังกฤษเฉพาะคำศัพท์ทางเทคนิค
+- ใช้ภาษาไทยกระชับและเป็นธรรมชาติ:
+  - ใช้ `แผงควบคุม` (ไม่ใช้ Dashboard)
+  - ใช้ `การตั้งค่า` (ไม่ใช้ Settings)
+  - ใช้ `ประวัติภารกิจ` (ไม่ใช้ Mission History)
+  - ใช้ `ตารางเวลา` (ไม่ใช้ Schedule)
+  - ใช้ `พลังชีวิต` (ไม่ใช้ HP Bar)
+  - ใช้ `ยืนยันการนอน` (ไม่ใช้ Confirm Sleep)
+- คำศัพท์เฉพาะทางเทคนิคให้ใช้ภาษาอังกฤษเดี่ยวๆ โดยไม่ต้องมีวงเล็บคำแปลไทย:
+  - `Discord`, `Token`, `C++ Guard`, `LockWorkStation`, `API`, `WinHTTP`
+
+### 4) ห้ามมีวงเล็บ `()` กำกับข้อความขยายความซ้ำซ้อน
+- ห้ามใส่วงเล็บขยายความ เช่น `แผงควบคุม (Dashboard)`, `พลังชีวิต (HP)`, `(ตรวจจับออฟไลน์)`
+- ให้ใช้คำเดี่ยว หรือคั่นข้อมูลย่อยด้วยจุดนำสายตา `•` เช่น:
   - `อยู่ในสถานะนอน • ตรวจจับออฟไลน์ผ่าน Discord และ C++ Guard`
 
-### 2) ภาษาไทยนำในคำทั่วไป / ภาษาอังกฤษล้วนเฉพาะคำศัพท์ทางเทคนิค
-- **คำใดที่ภาษาไทยสื่อความหมายได้สมบูรณ์และเป็นธรรมชาติ ให้ใช้ภาษาไทยล้วน ไม่จำเป็นต้องใช้ภาษาอังกฤษ:**
-  - ใช้ **`แผงควบคุม`** (ห้ามใช้ Dashboard)
-  - ใช้ **`การตั้งค่า`** (ห้ามใช้ Settings)
-  - ใช้ **`ประวัติการนอน`** (ห้ามใช้ History)
-  - ใช้ **`ตารางเวลา`** (ห้ามใช้ Schedule)
-  - ใช้ **`ภารกิจและรางวัล`** (ห้ามใช้ Quests & Rewards)
-  - ใช้ **`การวิเคราะห์`** (ห้ามใช้ Analytics)
-  - ใช้ **`ความช่วยเหลือ`** (ห้ามใช้ Help)
-  - ใช้ **`เสียงเตือน`** (ห้ามใช้ Alarms)
-  - ใช้ **`พลังชีวิต`** (ห้ามใช้ HP หรือ Health Bar)
-  - ใช้ **`ระดับและประสบการณ์`** (แทน Level & EXP)
-  - ใช้ **`เข้าสู่ระบบ`** / **`สมัครสมาชิก`** (แทน Log in / Register)
-- **หากเป็นคำศัพท์เฉพาะทางหรือชื่อระบบ ให้ใช้ภาษาอังกฤษเดี่ยวๆ ไปเลยโดยไม่ต้องมีวงเล็บคำแปลไทย:**
-  - ตัวอย่าง: `Discord`, `Token`, `API`, `Windows Sign Out`, `Sleep Mode`, `Shutdown`, `LockWorkStation`, `WinHTTP`
-
 ---
 
-## 9. ตัวอย่างโครงสร้าง Component ตามข้อกำหนด (Blueprint Code)
+## 11. ตัวอย่างโครงสร้าง Component ตามข้อกำหนด (Blueprint Code)
 
-### 1) Container (No Border, Tonal Shift, Perfect Radius):
+### 1) Navigation Bar (ไร้ตัวเลขนำหน้า, ไร้เครื่องหมาย `//`):
 ```tsx
-// ✅ ถูกต้อง: ไร้เส้นขอบ ใช้สีพื้นเทาเข้ม มีมิติด้วย Tonal Contrast
-<section className="bg-[#121215] rounded-2xl p-6 space-y-4">
-    <div className="flex items-center justify-between">
-        <h2 className="text-sm font-medium text-zinc-300">ความพร้อมของระบบ</h2>
-        <span className="text-xs text-zinc-500 font-light">อัปเดตแบบเรียลไทม์</span>
-    </div>
-    
-    <div className="bg-[#18181B] rounded-xl p-4">
-        {/* Sub-surface nested correctly: R_inner (12px) = R_outer (16px) - Padding approx */}
-        <span className="text-2xl font-medium text-white tabular-nums">100%</span>
-    </div>
-</section>
+// ถูกต้อง: เมนูสะอาด ไร้ตัวเลข 01 02, ไร้ //, ไม่ใช้อีโมจิ
+<nav className="flex items-center gap-1 bg-[#121215] p-1.5 rounded-xl">
+    <button className="px-4 py-2 rounded-lg text-sm font-medium bg-white text-zinc-950 transition-colors">
+        เรดาร์
+    </button>
+    <button className="px-4 py-2 rounded-lg text-sm font-normal text-zinc-400 hover:text-white hover:bg-[#18181B] transition-colors">
+        คลังอุปกรณ์
+    </button>
+    <button className="px-4 py-2 rounded-lg text-sm font-normal text-zinc-400 hover:text-white hover:bg-[#18181B] transition-colors">
+        ตลาดมืด
+    </button>
+    <button className="px-4 py-2 rounded-lg text-sm font-normal text-zinc-400 hover:text-white hover:bg-[#18181B] transition-colors">
+        ประวัติภารกิจ
+    </button>
+</nav>
 ```
 
-### 2) Button (No Badge, Clean Ergonomics):
+### 2) Compact Dropdown สำหรับคำสั่งที่กดใช้น้อย (Progressive Disclosure):
 ```tsx
-// ✅ ถูกต้อง: ปุ่มเรียบ คมชัด สัดส่วนขาว 20%
-<button className="h-11 px-5 rounded-lg bg-white text-zinc-950 font-medium text-sm transition-colors hover:bg-zinc-200 active:scale-[0.99] flex items-center justify-center gap-2">
-    ยืนยันการเข้านอน
-</button>
+// ถูกต้อง: ยุบคำสั่งทดสอบและเครื่องมือรองลง Dropdown ไม่เกะกะสายตา
+<div className="relative inline-block text-left">
+    <button className="h-9 px-3 rounded-lg bg-[#18181B] text-xs text-zinc-400 hover:text-white hover:bg-[#27272A] flex items-center gap-2 transition-colors">
+        <Sliders className="size-3.5" />
+        <span>ทดสอบระบบ</span>
+        <ChevronDown className="size-3" />
+    </button>
+    {/* Dropdown Menu Items */}
+    <div className="absolute right-0 mt-1 w-48 bg-[#121215] rounded-lg shadow-xl p-1 border border-white/[0.04] space-y-0.5">
+        <button className="w-full text-left px-3 py-1.5 text-xs text-zinc-300 hover:bg-[#18181B] rounded">
+            จำลองนับถอยหลัง 3 2 1
+        </button>
+        <button className="w-full text-left px-3 py-1.5 text-xs text-zinc-300 hover:bg-[#18181B] rounded">
+            ทดสอบเสียงเตือน
+        </button>
+        <button className="w-full text-left px-3 py-1.5 text-xs text-rose-400 hover:bg-[#18181B] rounded">
+            รีเซ็ตพลังชีวิต
+        </button>
+    </div>
+</div>
 ```
 
-### 3) Countdown & Status (Balanced Hierarchy):
+### 3) Countdown & Primary Focal Point (เด่นชัด ไร้ Badge ไร้อีโมจิ):
 ```tsx
-// ✅ ถูกต้อง: ข้อมูลเด่นเพียงจุดเดียว ไม่มี Badge และไม่มีวงเล็บกวนสายตา
-<div className="flex flex-col items-center justify-center py-8">
-    <span className="text-xs uppercase tracking-wider text-zinc-500 font-normal mb-1">
+// ถูกต้อง: ข้อมูลสำคัญอันดับ 1 ชัดเจนที่สุด ไร้ Badge และไร้วงเล็บ
+<div className="flex flex-col items-center justify-center py-10">
+    <span className="text-xs tracking-wider text-zinc-500 font-normal mb-1">
         เวลาที่เหลือก่อนถึงเส้นตาย
     </span>
     <span className="text-6xl font-medium text-white tracking-tight tabular-nums">
@@ -220,16 +303,29 @@ AI มักติดการแปะ `<Badge>` แคปซูลสีฉู
 </div>
 ```
 
+### 4) Direct Microcopy Notification (ไร้คำว่า "ระบบ", กระชับ ได้ใจความ):
+```tsx
+// ถูกต้อง: สื่อสารตรงประเด็น ทันใจใน 1 วินาที
+<div className="bg-[#18181B] text-zinc-200 text-xs px-4 py-2.5 rounded-lg flex items-center justify-between border border-white/[0.04]">
+    <span>ใช้ตั๋วฉุกเฉินสำเร็จ เลื่อนเวลาเป้าหมายเป็น 23:45 น.</span>
+    <button className="text-zinc-500 hover:text-white text-xs ml-4">ปิด</button>
+</div>
+```
+
 ---
 
-## 10. สรุป Checklist สำหรับการ Review โค้ด UI
+## 12. รายการตรวจสอบสำหรับการ Review โค้ด UI (Checklist)
 
-- [ ] **สีพื้นผิว:** ใช้โทน Dark/Gray `#09090B` ถึง `#18181B` ครบ 80% หรือไม่?
-- [ ] **สีคอนทราสต์:** มีสีขาวและสีเน้นไม่เกิน 20% สว่างเฉพาะจุดสำคัญหรือไม่?
-- [ ] **เส้นขอบ:** ตัด border เส้นทึบ 1px รอบกล่องออกทั้งหมดแล้วหรือไม่?
-- [ ] **ความโค้งมน:** ใช้ Nested Radius ที่ถูกต้อง (`16px` นอก, `12px` กลาง, `8px` ใน) หรือไม่?
-- [ ] **Badge:** กำจัด Badge / Pill / Chip ที่ไม่จำเป็นออกหมดแล้วหรือไม่?
-- [ ] **ภาษาและวงเล็บ:** ห้ามมีวงเล็บ `()` กำกับข้อความบน UI เด็ดขาด และใช้ภาษาไทยล้วนในส่วนที่สื่อความหมายได้ชัดเจน เช่น "แผงควบคุม" แทน "Dashboard" หรือไม่?
-- [ ] **Typography:** โหลดและแสดงผลด้วยฟอนต์ `Kanit` สัดส่วนน้ำหนักเหมาะสม ไม่หนาเกินไปหรือไม่?
-- [ ] **UX:** ใช้งานได้จริงใน 1-2 คลิก ข้อมูลกระชับ ไม่ต้องเลื่อนหาในพื้นที่ว่างที่กว้างเกินไปหรือไม่?
-
+- [ ] **Visual Hierarchy:** มีจุดเด่นระดับ 1 (Countdown/HP) ชัดเจนเพียงจุดเดียว ไม่แย่งสายตากันหรือไม่?
+- [ ] **Zero Emoji:** ปราศจากอีโมจิในทุกปุ่ม ข้อความสถานะ หัวข้อ และการแจ้งเตือน 100% หรือไม่?
+- [ ] **Direct Copy:** ปราศจากคำขึ้นต้นว่า "ระบบ" หรือ "System" ในข้อความ Toast และสถานะทั้งหมดหรือไม่?
+- [ ] **No "//" in Normal Theme:** ปราศจากเครื่องหมาย `//` ตกแต่งในหน้าจอโหมดปกติหรือไม่?
+- [ ] **No Numbering in Nav:** เมนูและแท็บนำทางปราศจากตัวเลข `1. 2. 3.` หรือ `01, 02` หรือไม่?
+- [ ] **Compact / Dropdown for Secondary UI:** ส่วนที่กดใช้น้อย (เช่น ปุ่มทดสอบ, ดีบั๊ก, เมนูย่อย) ถูกยุบลงเป็น Dropdown หรือใช้ขนาดกะทัดรัดแล้วหรือไม่?
+- [ ] **Dual Theme Typography:**
+  - ธีมปกติ แสดงผลด้วยฟอนต์ `Kanit` สะอาดตา
+  - ธีมพิเศษ (Special / Tactical) แสดงผลด้วยฟอนต์ `Chakra Petch`
+- [ ] **สีและคอนทราสต์:** คุมโทน Dark/Gray 80% และใช้สีขาว/สีเน้นคอนทราสต์ไม่เกิน 20% หรือไม่?
+- [ ] **No Border & Perfect Radius:** ตัดเส้นขอบแข็งทึบออก และใช้ Concentric Radius (`16px`, `12px`, `8px`, `4px`) หรือไม่?
+- [ ] **No Badge:** แสดงสถานะด้วยข้อความและ Status Dot แทน Badge ทรงแคปซูลหรือไม่?
+- [ ] **No Parentheses:** ปราศจากวงเล็บ `()` กำกับคำแปลหรือขยายความซ้ำซ้อนบนหน้าจอหรือไม่?

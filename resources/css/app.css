@@ -155,7 +155,7 @@
 .theme-special *,
 [data-theme="special"],
 [data-theme="special"] * {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+    font-family: 'Chakra Petch', ui-sans-serif, system-ui, sans-serif !important;
 }
 
 .theme-special,

@@ -92,7 +92,7 @@ export const SyncAlertModal: React.FC<SyncAlertModalProps> = ({
                             เวลากำลังนับถอยหลัง {currentSec} วินาที กรุณากดเข้าใจแล้วและปิดเครื่องเพื่อเข้านอน
                         </p>
                         <div className="p-3 rounded-xl bg-amber-500/5 border border-amber-500/10 text-amber-200/90 text-xs text-left">
-                            <span className="font-medium text-amber-300">⚠️ ข้อกำหนดวินัย:</span> หากเวลานับถอยหลังหมดลง หรือกด <span className="underline font-normal">&quot;เข้าใจแล้ว&quot;</span> แต่ยังไม่ยอมนอนและ C++ ยังตรวจพบว่า PC ออนไลน์ ระบบจะยกระดับเข้าสู่โหมด <span className="font-medium text-amber-300">Lockdown (จำลอง Sign Out Windows)</span> ทันที
+                            <span className="font-medium text-amber-300">ข้อกำหนดวินัย:</span> หากเวลานับถอยหลังหมดลง หรือกด <span className="underline font-normal">&quot;เข้าใจแล้ว&quot;</span> แต่ยังไม่ยอมนอนและ C++ ยังตรวจพบว่า PC ออนไลน์ ระบบจะยกระดับเข้าสู่โหมด <span className="font-medium text-amber-300">Lockdown (จำลอง Sign Out Windows)</span> ทันที
                         </div>
                     </div>
 
@@ -183,13 +183,17 @@ export const SyncAlertModal: React.FC<SyncAlertModalProps> = ({
                                         onClick={onTogglePause}
                                         className="px-2.5 py-0.5 rounded-md bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 text-[11px] font-normal transition-colors"
                                     >
-                                        {is_paused ? '▶ นับต่อ' : '⏸ หยุดชั่วคราว'}
+                                        {is_paused ? (
+                                            <span className="inline-flex items-center gap-1.5"><Play className="size-3.5" /> นับต่อ</span>
+                                        ) : (
+                                            <span className="inline-flex items-center gap-1.5"><Pause className="size-3.5" /> พักชั่วคราว</span>
+                                        )}
                                     </button>
                                 )}
                             </div>
 
                             <div className="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs mt-2">
-                                <strong>⚠️ ขั้นตอนต่อไป:</strong> หากเวลาหมดหรือคุณกด &quot;เข้าใจแล้ว&quot; แต่ยังคงกลับมาเปิดคอมพิวเตอร์ใช้งานต่อ ระบบจะ <span className="font-semibold text-rose-200">หักพลังชีวิต (HP) 25 แต้ม</span> และจำลองเข้าสู่ Windows Sleep Mode
+                                <strong>ขั้นตอนต่อไป:</strong> หากเวลาหมดหรือคุณกด &quot;เข้าใจแล้ว&quot; แต่ยังคงกลับมาเปิดคอมพิวเตอร์ใช้งานต่อ ระบบจะ <span className="font-semibold text-rose-200">หักพลังชีวิต (HP) 25 แต้ม</span> และจำลองเข้าสู่ Windows Sleep Mode
                             </div>
                         </div>
 
@@ -233,7 +237,7 @@ export const SyncAlertModal: React.FC<SyncAlertModalProps> = ({
                             ตรวจพบคุณกลับมาใช้งานคอมพิวเตอร์หลังได้รับคำเตือน Lockdown ระบบจึงจำลองเข้าสู่ <strong className="text-white">Windows Sleep Mode</strong>
                         </p>
                         <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-500/20 text-rose-200 text-xs text-left">
-                            <strong>⚠️ เส้นตายสุดท้าย:</strong> หากยังคงฝ่าฝืนใช้งานต่อ ระบบจะยกระดับสู่ <span className="font-semibold text-rose-400">ขั้นตอนที่ 4: Shutdown</span> และหัก HP ทั้งหมดเหลือ 0% ทันที
+                            <strong>เส้นตายสุดท้าย:</strong> หากยังคงฝ่าฝืนใช้งานต่อ ระบบจะยกระดับสู่ <span className="font-semibold text-rose-400">ขั้นตอนที่ 4: Shutdown</span> และหัก HP ทั้งหมดเหลือ 0% ทันที
                         </div>
                     </div>
 

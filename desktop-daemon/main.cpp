@@ -34,12 +34,14 @@
 #pragma comment(lib, "winmm.lib")
 #pragma comment(lib, "winhttp.lib")
 #pragma comment(lib, "powrprof.lib")
+#pragma comment(lib, "advapi32.lib")
 
 #define WM_TRAYICON (WM_USER + 101)
 #define ID_TRAY_STATUS 2001
 #define ID_TRAY_SIMULATE 2002
 #define ID_TRAY_TEST_SLEEP 2005
 #define ID_TRAY_RESET_HP 2006
+#define ID_TRAY_TOGGLE_TEST_MODE 2007
 #define ID_TRAY_LOGIN 2003
 #define ID_TRAY_EXIT 2004
 
@@ -73,7 +75,8 @@ struct DaemonConfig {
     std::string userEmail = "";
     bool enableAudio = true;
     bool lockWorkstationOnLockdown = true;
-    std::string enforceAction = "sleep"; // "sleep", "shutdown", "test_msgbox"
+    bool testMode = true; // Test Mode: true = MessageBox mock only; false = Real LockWorkStation & Real Shutdown
+    std::string enforceAction = "shutdown"; // "sleep", "shutdown", "test_msgbox"
     bool antiEvasion = true;
     int idleThresholdSeconds = 60;
     int checkIntervalSeconds = 2;
@@ -107,6 +110,7 @@ void SaveConfigJson() {
     file << "  \"email\": \"" << config.userEmail << "\",\n";
     file << "  \"enable_audio\": " << (config.enableAudio ? "true" : "false") << ",\n";
     file << "  \"lock_workstation_on_lockdown\": " << (config.lockWorkstationOnLockdown ? "true" : "false") << ",\n";
+    file << "  \"test_mode\": " << (config.testMode ? "true" : "false") << ",\n";
     file << "  \"enforce_action\": \"" << config.enforceAction << "\",\n";
     file << "  \"anti_evasion\": " << (config.antiEvasion ? "true" : "false") << ",\n";
     file << "  \"idle_threshold_seconds\": " << config.idleThresholdSeconds << ",\n";
@@ -162,6 +166,11 @@ void LoadConfigJson() {
 
     if (content.find("\"lock_workstation_on_lockdown\": false") != std::string::npos) {
         config.lockWorkstationOnLockdown = false;
+    }
+    if (content.find("\"test_mode\": false") != std::string::npos) {
+        config.testMode = false;
+    } else if (content.find("\"test_mode\": true") != std::string::npos) {
+        config.testMode = true;
     }
     if (content.find("\"anti_evasion\": false") != std::string::npos) {
         config.antiEvasion = false;
@@ -370,19 +379,25 @@ void HandleAlertStateResponse(const std::string& resp) {
     } else if (phase == "lockdown" && !g_alertModalActive.exchange(true)) {
         std::thread([]() {
             PlaySoundForStage(SleepStage::Lockdown);
-            ShowTrayBalloon(L"🔒 เข้าสู่โหมด Lockdown (จำลอง Sign Out Windows)", L"เวลานับถอยหลังถูกหยุดชั่วคราวรอการตัดสินใจ กรุณาปิดเครื่องไปนอนจริง", NIIF_WARNING);
+            if (config.testMode) {
+                ShowTrayBalloon(L"🔒 เข้าสู่โหมด Lockdown (จำลอง — Test Mode ON)", L"เวลานับถอยหลังถูกหยุดชั่วคราวรอการตัดสินใจ กรุณาปิดเครื่องไปนอนจริง", NIIF_WARNING);
 
-            MessageBoxW(
-                NULL,
-                L"🔒 [SleepOrDie: โหมด LOCKDOWN — จำลอง Sign Out Windows]\n\n"
-                L"คุณกดรับทราบแล้ว แต่ระบบยังตรวจพบว่า PC ยังออนไลน์และมีการใช้งานอยู่!\n\n"
-                L"🖥️ ระบบจำลองการออกจากระบบ Windows (Sign Out) เพื่อบังคับวินัยการเข้านอน\n"
-                L"⏸️ เวลานับถอยหลังถูกหยุดชั่วคราว (Pause) เพื่อรอการตัดสินใจของคุณ\n\n"
-                L"⚠️ หากกด 'เข้าใจแล้ว' แต่ยังฝ่าฝืนกลับมาใช้งานคอมพิวเตอร์อีก ระบบจะหักพลังชีวิต (HP) 25 แต้มและจำลอง Sleep Mode ต่อไป\n\n"
-                L"กดปุ่ม OK เพื่อยืนยันว่าเข้าใจแล้ว และปิดหน้าจอไปนอนจริง",
-                L"SleepOrDie Lockdown (Sign Out Windows แบบจำลอง)",
-                MB_OK | MB_ICONWARNING | MB_SYSTEMMODAL
-            );
+                MessageBoxW(
+                    NULL,
+                    L"🔒 [SleepOrDie: โหมด LOCKDOWN — จำลอง (Test Mode ON)]\n\n"
+                    L"คุณกดรับทราบแล้ว แต่ระบบยังตรวจพบว่า PC ยังออนไลน์และมีการใช้งานอยู่!\n\n"
+                    L"🖥️ คุณตั้งค่า Test Mode = ON ไว้ใน Settings\n"
+                    L"ระบบจึงแสดงเพียงกล่องข้อความนี้เพื่อจำลอง และไม่มีการล็อกหน้าจอคอมพิวเตอร์จริง\n\n"
+                    L"⚠️ หากปิดสวิตช์ Test Mode ใน Settings ระบบจะสั่ง LockWorkStation ล็อกหน้าจอ Windows ทันที!\n\n"
+                    L"กดปุ่ม OK เพื่อยืนยันว่าเข้าใจแล้ว และปิดหน้าจอไปนอนจริง",
+                    L"SleepOrDie Lockdown (Test Mode Mock)",
+                    MB_OK | MB_ICONWARNING | MB_SYSTEMMODAL
+                );
+            } else {
+                ShowTrayBalloon(L"🔒 SleepOrDie — REAL LOCKDOWN", L"ระบบล็อกหน้าจอคอมพิวเตอร์จริงตามวินัยการพักผ่อน!", NIIF_WARNING);
+                Sleep(800);
+                LockWorkStation();
+            }
 
             g_alertModalActive.store(false);
             ReportPresence("offline", 300, true, "acknowledge_lockdown");
@@ -390,18 +405,24 @@ void HandleAlertStateResponse(const std::string& resp) {
     } else if (phase == "sleep_warning" && !g_alertModalActive.exchange(true)) {
         std::thread([]() {
             PlaySoundForStage(SleepStage::SleepWarning);
-            ShowTrayBalloon(L"⚠️ ตรวจพบกลับมาใช้งาน! หัก HP 25 แต้ม", L"ระบบจำลองเข้าสู่ Windows Sleep Mode หากยังฝ่าฝืนจะถูก Shutdown", NIIF_ERROR);
+            if (config.testMode) {
+                ShowTrayBalloon(L"⚠️ ตรวจพบกลับมาใช้งาน! หัก HP 25 แต้ม (Test Mode ON)", L"ระบบจำลองเข้าสู่ Windows Sleep Mode หากยังฝ่าฝืนจะถูก Shutdown", NIIF_ERROR);
 
-            MessageBoxW(
-                NULL,
-                L"⚠️ [SleepOrDie: ตรวจพบกลับมาใช้งาน! หัก HP 25 แต้ม]\n\n"
-                L"ระบบตรวจพบว่าคุณกลับมาใช้งานคอมพิวเตอร์อีกครั้งหลังจาก Lockdown!\n"
-                L"💔 หักพลังชีวิต 25 HP\n\n"
-                L"💤 ระบบจำลองการเข้าสู่ Windows Sleep Mode\n"
-                L"หากยังฝ่าฝืนเปิดเครื่องใช้งานต่อ ระบบจะเข้าสู่ Shutdown และตัด HP เหลือ 0% ทันที!",
-                L"SleepOrDie Windows Sleep Mode (Mock)",
-                MB_OK | MB_ICONERROR | MB_SYSTEMMODAL
-            );
+                MessageBoxW(
+                    NULL,
+                    L"⚠️ [SleepOrDie: ตรวจพบกลับมาใช้งาน! หัก HP 25 แต้ม (Test Mode ON)]\n\n"
+                    L"ระบบตรวจพบว่าคุณกลับมาใช้งานคอมพิวเตอร์อีกครั้งหลังจาก Lockdown!\n"
+                    L"💔 หักพลังชีวิต 25 HP\n\n"
+                    L"💤 ระบบจำลองการเข้าสู่ Windows Sleep Mode (Test Mode ON)\n"
+                    L"หากยังฝ่าฝืนเปิดเครื่องใช้งานต่อ ระบบจะเข้าสู่ Shutdown และตัด HP เหลือ 0% ทันที!",
+                    L"SleepOrDie Windows Sleep Mode (Mock)",
+                    MB_OK | MB_ICONERROR | MB_SYSTEMMODAL
+                );
+            } else {
+                ShowTrayBalloon(L"⚠️ ตรวจพบกลับมาใช้งาน! หัก HP 25 แต้ม", L"ระบบล็อกหน้าจอเพื่อเตือนขั้นเด็ดขาด หากยังฝ่าฝืนจะเข้าสู่ Shutdown จริงทันที", NIIF_ERROR);
+                Sleep(800);
+                LockWorkStation();
+            }
 
             g_alertModalActive.store(false);
             ReportPresence("offline", 300, true, "acknowledge_sleep_warning");
@@ -444,6 +465,20 @@ void ReportPresence(const std::string& status, int idleSeconds, bool screenLocke
                                 config.emergencyCountdownSeconds = sec;
                             }
                         } catch (...) {}
+                    }
+                }
+            }
+
+            // Check if response contains updated test_mode setting
+            size_t tmPos = resp.find("\"test_mode\"");
+            if (tmPos != std::string::npos) {
+                size_t colon = resp.find(":", tmPos);
+                if (colon != std::string::npos) {
+                    std::string valSub = resp.substr(colon, 12);
+                    if (valSub.find("false") != std::string::npos) {
+                        config.testMode = false;
+                    } else if (valSub.find("true") != std::string::npos) {
+                        config.testMode = true;
                     }
                 }
             }
@@ -498,17 +533,51 @@ void ExecuteFinalEnforcement() {
     ReportPresence("shutdown", 0, true);
     PlaySoundForStage(SleepStage::Shutdown);
 
-    ShowTrayBalloon(L"SleepOrDie — 0% HP SHUTDOWN", L"ถึงเวลานอนที่ตั้งไว้และหมดเวลาฉุกเฉินแล้ว! เริ่มดำเนินการ Shutdown (จำลอง)", NIIF_ERROR);
+    if (config.testMode) {
+        ShowTrayBalloon(L"SleepOrDie — 0% HP SHUTDOWN [Test Mode ON]", L"ถึงเวลานอนที่ตั้งไว้และหมดเวลาฉุกเฉินแล้ว! เริ่มดำเนินการ Shutdown (จำลอง)", NIIF_ERROR);
 
-    MessageBoxW(
-        NULL,
-        L"💀 [SleepOrDie: HARDCORE SHUTDOWN WARNING]\n\n"
-        L"ถึงเวลานอนที่ตั้งไว้แล้ว และหมดเวลาผ่อนผันฉุกเฉิน!\n"
-        L"พลังชีวิต (HP) ของคุณลดลงเหลือ 0% แล้ว\n\n"
-        L"[ระบบจำลอง: แสดงแจ้งเตือน Shutdown สำเร็จโดยไม่ปิดเครื่องจริง]",
-        L"SleepOrDie — SHUTDOWN (Mock 0% HP)",
-        MB_OK | MB_ICONERROR | MB_SYSTEMMODAL
-    );
+        MessageBoxW(
+            NULL,
+            L"💀 [SleepOrDie: HARDCORE SHUTDOWN WARNING — Test Mode ON]\n\n"
+            L"ถึงเวลานอนที่ตั้งไว้แล้ว และหมดเวลาผ่อนผันฉุกเฉิน!\n"
+            L"พลังชีวิต (HP) ของคุณลดลงเหลือ 0% แล้ว\n\n"
+            L"⚙️ เนื่องจากเปิดใช้งาน 'Test Mode Toggle: ON' ไว้ใน Settings\n"
+            L"ระบบจึงแสดงผลเพียงกล่องข้อความนี้โดยไม่มีการปิดเครื่องคอมพิวเตอร์จริง\n\n"
+            L"[ระบบจำลอง: แสดงแจ้งเตือน Shutdown สำเร็จโดยไม่ปิดเครื่องจริง]\n"
+            L"(หากคุณปิด Test Mode ไว้ใน Settings ระบบจะสั่ง Shutdown ปิดเครื่องจริงทันที)",
+            L"SleepOrDie — SHUTDOWN (Mock 0% HP)",
+            MB_OK | MB_ICONERROR | MB_SYSTEMMODAL
+        );
+    } else {
+        // REAL SYSTEM SHUTDOWN!
+        ShowTrayBalloon(L"💀 SleepOrDie — 0% HP REAL SHUTDOWN", L"พลังชีวิตเหลือ 0% หมดเวลาผ่อนผัน! กำลังดำเนินการปิดเครื่อง (Shutdown) จริงใน 30 วินาที...", NIIF_ERROR);
+
+        // 1. Grant SE_SHUTDOWN_NAME privilege
+        HANDLE hToken = NULL;
+        TOKEN_PRIVILEGES tkp = {};
+        if (OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &hToken)) {
+            LookupPrivilegeValue(NULL, SE_SHUTDOWN_NAME, &tkp.Privileges[0].Luid);
+            tkp.PrivilegeCount = 1;
+            tkp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+            AdjustTokenPrivileges(hToken, FALSE, &tkp, 0, (PTOKEN_PRIVILEGES)NULL, 0);
+            CloseHandle(hToken);
+        }
+
+        // 2. Initiate System Shutdown using Windows Native API with 30s countdown message
+        BOOL initiated = InitiateSystemShutdownExW(
+            NULL,
+            (LPWSTR)L"🚨 [SleepOrDie Hardcore Bedtime Enforcer]\nคุณทำผิดวินัยเวลาเข้านอนจน HP ลดเหลือ 0%!\nระบบกำลังสั่งปิดเครื่องคอมพิวเตอร์ (Shutdown) ใน 30 วินาที กรุณาบันทึกงานและไปเข้านอนทันที",
+            30,
+            TRUE,  // Force close apps
+            FALSE, // Shutdown (not reboot)
+            0x00000004 | 0x00000001 // SHTDN_REASON_MAJOR_APPLICATION | SHTDN_REASON_MINOR_MAINTENANCE
+        );
+
+        if (!initiated) {
+            // Fallback command line shutdown
+            system("shutdown /s /t 30 /c \"SleepOrDie Bedtime Enforcer: HP reached 0%! Shutting down computer in 30 seconds.\"");
+        }
+    }
 }
 
 void RunSimulation321() {
@@ -804,6 +873,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
                     : L"🌙 ทดสอบ: จำลองสถานะนอนแล้ว (Test Sleep)";
                 AppendMenuW(hMenu, MF_STRING, ID_TRAY_TEST_SLEEP, testSleepText.c_str());
 
+                std::wstring testModeText = config.testMode
+                    ? L"⚙️ โหมดทดสอบ (Test Mode): [ ✓ เปิดอยู่ (Mock) ]"
+                    : L"⚡ โหมดวินัยจริง (Live Mode): [ ! ล็อก/ปิดเครื่องจริง ]";
+                AppendMenuW(hMenu, MF_STRING, ID_TRAY_TOGGLE_TEST_MODE, testModeText.c_str());
+
                 AppendMenuW(hMenu, MF_STRING, ID_TRAY_SIMULATE, L"🧪 ทดสอบจำลองเส้นตาย 3-2-1");
                 AppendMenuW(hMenu, MF_STRING, ID_TRAY_RESET_HP, L"❤️ รีเซ็ตพลังชีวิต (Reset HP 100%)");
                 AppendMenuW(hMenu, MF_STRING, ID_TRAY_LOGIN, L"🔑 เข้าสู่ระบบใหม่ (Switch User)");
@@ -827,6 +901,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
                                         L"• เวลาตื่นนอน: " + std::to_wstring(config.wakeUpHour) + L":" + (config.wakeUpMinute < 10 ? L"0" : L"") + std::to_wstring(config.wakeUpMinute) + L" น.\n"
                                         L"• เวลานับถอยหลังฉุกเฉิน: " + std::to_wstring(config.emergencyCountdownSeconds) + L" วินาที\n"
                                         L"• พลังชีวิต (HP): " + std::to_wstring(config.currentHp) + L"%\n"
+                                        L"• การตั้งค่า Test Mode: " + std::wstring(config.testMode ? L"เปิดอยู่ (ON — แสดงเพียง MessageBox)" : L"ปิดอยู่ (OFF — ล็อกหน้าจอและชัตดาวน์จริง!)") + L"\n"
                                         L"• โหมดทดสอบจำลองนอน: " + (g_simulatedSleeping.load() ? L"เปิดใช้งานอยู่ (Simulated Sleeping)" : L"ไม่ได้เปิด") + L"\n"
                                         L"• สถานะเคอร์ฟิว: " + (IsWithinCurfewHours() ? L"กำลังอยู่ในช่วงเคอร์ฟิวเข้านอน" : L"ช่วงเวลาปกติ");
                     MessageBoxW(hWnd, info.c_str(), L"สถานะระบบ SleepOrDie", MB_OK | MB_ICONINFORMATION);
@@ -834,6 +909,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
                     bool sleeping = !g_simulatedSleeping.load();
                     g_simulatedSleeping.store(sleeping);
                     ReportPresenceTestSleep(sleeping);
+                } else if (cmd == ID_TRAY_TOGGLE_TEST_MODE) {
+                    config.testMode = !config.testMode;
+                    SaveConfigJson();
+                    if (config.testMode) {
+                        ShowTrayBalloon(L"SleepOrDie Settings", L"สลับเป็น: โหมดทดสอบ (Test Mode: ON)\nเมื่อถึงช่วง Lockdown หรือ Shutdown จะแสดงเพียง MessageBox", NIIF_INFO);
+                    } else {
+                        ShowTrayBalloon(L"SleepOrDie Settings", L"สลับเป็น: โหมดวินัยจริง (Live Mode: OFF)\nเมื่อถึงช่วง Lockdown จะล็อกหน้าจอจริง และ HP 0% จะสั่ง Shutdown ปิดเครื่องจริง!", NIIF_WARNING);
+                    }
                 } else if (cmd == ID_TRAY_SIMULATE) {
                     RunSimulation321();
                 } else if (cmd == ID_TRAY_RESET_HP) {
@@ -907,7 +990,8 @@ void DaemonLoop() {
         // Update Tray Tooltip
         long hoursLeft = std::max(0L, secondsRemaining / 3600);
         long minsLeft = std::max(0L, (secondsRemaining % 3600) / 60);
-        std::wstring tip = L"SleepOrDie: " + std::to_wstring(hoursLeft) + L"h " + std::to_wstring(minsLeft) + L"m to Bedtime | HP: " + std::to_wstring(config.currentHp) + L"%";
+        std::wstring modeTag = config.testMode ? L" [Test Mode]" : L" [LIVE]";
+        std::wstring tip = L"SleepOrDie: " + std::to_wstring(hoursLeft) + L"h " + std::to_wstring(minsLeft) + L"m to Bedtime | HP: " + std::to_wstring(config.currentHp) + L"%" + modeTag;
         UpdateTrayTooltip(tip);
 
         // Stage transition events
@@ -919,20 +1003,28 @@ void DaemonLoop() {
                 ShowTrayBalloon(L"SleepOrDie เตือนเวลานอน (T-10m)", L"เหลือเวลา 10 นาทีก่อนถึงเวลานอน กรุณาเริ่มวางงานและเตรียมตัวเข้านอน", NIIF_INFO);
                 ReportPresence("idle", (int)idleSeconds, false);
             } else if (currentStage == SleepStage::Lockdown) {
-                ShowTrayBalloon(L"SleepOrDie ล็อคดาวน์ (T-5m)", L"เหลือเวลา 5 นาทีสุดท้าย! หากยังไม่ยอมนอน ระบบเข้าสู่โหมด Lockdown", NIIF_WARNING);
-                ReportPresence("offline", 300, true);
+                if (config.testMode) {
+                    ShowTrayBalloon(L"SleepOrDie ล็อคดาวน์ (T-5m) [Test Mode ON]", L"เหลือเวลา 5 นาทีสุดท้าย! แสดงแจ้งเตือนจำลอง Lockdown", NIIF_WARNING);
+                    ReportPresence("offline", 300, true);
 
-                std::thread([]() {
-                    MessageBoxW(
-                        NULL,
-                        L"🚨 [SleepOrDie: LOCKDOWN WARNING (T-5m)]\n\n"
-                        L"เหลือเวลา 5 นาทีก่อนถึงเวลานอน!\n"
-                        L"หากผู้ใช้ยังไม่ยอมนอน ระบบเข้าสู่โหมด Lockdown\n\n"
-                        L"[โหมดจำลอง: แสดงแจ้งเตือนโดยไม่ล็อกหน้าจอจริง]",
-                        L"SleepOrDie Lockdown (Mock)",
-                        MB_OK | MB_ICONWARNING | MB_SYSTEMMODAL
-                    );
-                }).detach();
+                    std::thread([]() {
+                        MessageBoxW(
+                            NULL,
+                            L"🚨 [SleepOrDie: LOCKDOWN WARNING (T-5m) — Test Mode ON]\n\n"
+                            L"เหลือเวลา 5 นาทีก่อนถึงเวลานอน!\n"
+                            L"หากผู้ใช้ยังไม่ยอมนอน ระบบเข้าสู่โหมด Lockdown\n\n"
+                            L"⚙️ โหมดจำลอง Test Mode ON: แสดงแจ้งเตือนโดยไม่ล็อกหน้าจอจริง\n"
+                            L"(หากปิด Test Mode ใน Settings ระบบจะล็อกหน้าจอจริงทันที)",
+                            L"SleepOrDie Lockdown (Test Mode Mock)",
+                            MB_OK | MB_ICONWARNING | MB_SYSTEMMODAL
+                        );
+                    }).detach();
+                } else {
+                    ShowTrayBalloon(L"SleepOrDie ล็อคดาวน์ (T-5m) [REAL LOCKDOWN]", L"เหลือเวลา 5 นาทีสุดท้าย! ระบบสั่ง LockWorkStation ล็อกหน้าจอ Windows ทันที", NIIF_WARNING);
+                    ReportPresence("offline", 300, true);
+                    Sleep(800);
+                    LockWorkStation();
+                }
             } else if (currentStage == SleepStage::SleepWarning) {
                 ShowTrayBalloon(L"SleepOrDie สลีปโหมด (T-2m)", L"เหลือเวลา 2 นาที! หากฝ่าฝืนอีกระบบจะสั่ง Windows Sleep Mode", NIIF_WARNING);
                 ReportPresence("offline", 120, true);

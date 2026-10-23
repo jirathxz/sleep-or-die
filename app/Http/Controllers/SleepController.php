@@ -25,6 +25,7 @@ class SleepController extends Controller
             'discord_bot_token' => ['nullable', 'string', 'max:255'],
             'enable_discord_detection' => ['nullable', 'boolean'],
             'enable_cpp_detection' => ['nullable', 'boolean'],
+            'test_mode' => ['nullable', 'boolean'],
             'theme_preference' => ['nullable', 'string', 'in:dark,special'],
             'border_style' => ['nullable', 'string', 'in:rounded,sharp'],
         ]);
@@ -68,6 +69,9 @@ class SleepController extends Controller
         if (array_key_exists('enable_cpp_detection', $validated)) {
             $updateData['enable_cpp_detection'] = (bool)$validated['enable_cpp_detection'];
         }
+        if (array_key_exists('test_mode', $validated)) {
+            $updateData['test_mode'] = (bool)$validated['test_mode'];
+        }
         if (array_key_exists('theme_preference', $validated) && $validated['theme_preference'] !== null) {
             $updateData['theme_preference'] = $validated['theme_preference'];
         }
@@ -90,6 +94,7 @@ class SleepController extends Controller
             'discord_bot_token' => $user->discord_bot_token,
             'enable_discord_detection' => $enableDiscord,
             'enable_cpp_detection' => $enableCpp,
+            'test_mode' => (bool)($user->test_mode ?? true),
             'is_system_active' => $enableDiscord || $enableCpp,
             'theme_preference' => $user->theme_preference ?? 'dark',
             'border_style' => $user->border_style ?? 'rounded',
@@ -350,6 +355,7 @@ class SleepController extends Controller
             'discord_bot_token' => $user->discord_bot_token,
             'enable_discord_detection' => $enableDiscord,
             'enable_cpp_detection' => $enableCpp,
+            'test_mode' => (bool)($user->test_mode ?? true),
             'is_system_active' => $isSystemActive,
             'discord_presence' => [
                 'is_in_voice' => $voiceState['in_voice'],
@@ -702,6 +708,7 @@ class SleepController extends Controller
             'current_hp' => $user->current_hp ?? 100,
             'enable_discord_detection' => $enableDiscord,
             'enable_cpp_detection' => $enableCpp,
+            'test_mode' => (bool)($user->test_mode ?? true),
             'is_system_active' => $enableDiscord || $enableCpp,
         ];
 
@@ -759,6 +766,7 @@ class SleepController extends Controller
             'current_hp' => $user->current_hp ?? 100,
             'enable_discord_detection' => $enableDiscord,
             'enable_cpp_detection' => $enableCpp,
+            'test_mode' => (bool)($user->test_mode ?? true),
             'is_system_active' => $enableDiscord || $enableCpp,
         ]);
     }

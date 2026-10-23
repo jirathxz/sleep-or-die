@@ -90,6 +90,7 @@ export interface SleepState {
     voice_channel: string | null;
     enable_discord_detection: boolean;
     enable_cpp_detection: boolean;
+    test_mode: boolean;
     is_system_active: boolean;
 
     // Theme & UI Preferences
@@ -407,6 +408,7 @@ export const useSleepStore = create<SleepState>((set, get) => ({
     voice_channel: null,
     enable_discord_detection: true,
     enable_cpp_detection: true,
+    test_mode: true,
     is_system_active: true,
 
     theme_preference: getInitialTheme(),
@@ -1206,6 +1208,7 @@ export const useSleepStore = create<SleepState>((set, get) => ({
         sleepTargetTime?: string | null,
         enableDiscordDetection?: boolean,
         enableCppDetection?: boolean,
+        testMode?: boolean,
         themePreference?: 'dark' | 'special',
         borderStyle?: 'rounded' | 'sharp'
     ) => {
@@ -1246,6 +1249,7 @@ export const useSleepStore = create<SleepState>((set, get) => ({
                         emergency_countdown_seconds: emergencyCountdownSeconds,
                         enable_discord_detection: enableDiscordDetection,
                         enable_cpp_detection: enableCppDetection,
+                        test_mode: testMode,
                         theme_preference: currentTheme,
                         border_style: currentBorder,
                     }),
@@ -1269,6 +1273,7 @@ export const useSleepStore = create<SleepState>((set, get) => ({
                 emergency_countdown_seconds: emergencyCountdownSeconds || 60,
                 enable_discord_detection: enableDiscordDetection ?? true,
                 enable_cpp_detection: enableCppDetection ?? true,
+                test_mode: testMode ?? true,
                 theme_preference: currentTheme,
                 border_style: currentBorder,
             });

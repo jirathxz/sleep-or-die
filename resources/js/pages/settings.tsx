@@ -15,6 +15,7 @@ export default function SettingsPage() {
         emergency_countdown_seconds,
         enable_discord_detection,
         enable_cpp_detection,
+        test_mode,
         is_system_active,
         theme_preference,
         border_style,
@@ -40,6 +41,9 @@ export default function SettingsPage() {
     );
     const [enableCpp, setEnableCpp] = useState(
         enable_cpp_detection !== undefined ? enable_cpp_detection : (user?.enable_cpp_detection ?? true)
+    );
+    const [testMode, setTestMode] = useState(
+        test_mode !== undefined ? test_mode : (user?.test_mode ?? true)
     );
     const [showToken, setShowToken] = useState(false);
     const [savedSuccess, setSavedSuccess] = useState(false);
@@ -130,7 +134,13 @@ export default function SettingsPage() {
         } else if (user?.enable_cpp_detection !== undefined) {
             setEnableCpp(user.enable_cpp_detection);
         }
-    }, [sleep_target_time, discord_bot_token, discord_user_id, wake_up_time, emergency_countdown_seconds, enable_discord_detection, enable_cpp_detection, user]);
+
+        if (test_mode !== undefined) {
+            setTestMode(test_mode);
+        } else if (user?.test_mode !== undefined) {
+            setTestMode(user.test_mode);
+        }
+    }, [sleep_target_time, discord_bot_token, discord_user_id, wake_up_time, emergency_countdown_seconds, enable_discord_detection, enable_cpp_detection, test_mode, user]);
 
     const handleTestDiscord = async () => {
         if (!discordToken) {
@@ -176,7 +186,8 @@ export default function SettingsPage() {
             Number(countdownSeconds),
             bedtime,
             enableDiscord,
-            enableCpp
+            enableCpp,
+            testMode
         );
         setSaving(false);
         if (ok) {
@@ -245,7 +256,7 @@ export default function SettingsPage() {
                                 className="w-full h-11 px-3 bg-[#18181b] text-white rounded-lg border-0 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-white/20"
                             />
                             <p className="text-[11px] text-zinc-500 font-light">
-                                💡 วิธีคัดลอก: ใน Discord ไปที่ Settings &gt; Advanced &gt; เปิด Developer Mode &gt; คลิกขวาที่โปรไฟล์ตัวเอง &gt; กด "Copy User ID"
+                                วิธีคัดลอก: ใน Discord ไปที่ Settings &gt; Advanced &gt; เปิด Developer Mode &gt; คลิกขวาที่โปรไฟล์ตัวเอง &gt; กด "Copy User ID"
                             </p>
                         </div>
 
@@ -358,6 +369,55 @@ export default function SettingsPage() {
                                     </p>
                                 </div>
                             </div>
+
+                            {/* Toggle 3: Test Mode Toggle (Safe Mock Mode vs Live Hardcore Mode) */}
+                            <div className={`p-4 rounded-xl border transition-all ${
+                                testMode
+                                    ? 'bg-[#18181b] border-amber-500/30'
+                                    : 'bg-[#18181b] border-rose-500/40'
+                            }`}>
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <Shield className={`size-4 ${testMode ? 'text-amber-400' : 'text-rose-500'}`} />
+                                        <div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-xs font-medium text-white">โหมดทดสอบ (Test Mode Toggle)</span>
+                                                <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full uppercase ${
+                                                    testMode
+                                                        ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                                        : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                                                }`}>
+                                                    {testMode ? 'Mock Only (จำลอง)' : 'Live Hardcore (จริง)'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setTestMode(!testMode)}
+                                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                                            testMode ? 'bg-amber-500' : 'bg-zinc-700'
+                                        }`}
+                                    >
+                                        <span
+                                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                                                testMode ? 'translate-x-4' : 'translate-x-0'
+                                            }`}
+                                        />
+                                    </button>
+                                </div>
+                                <div className="mt-2 text-[11px] leading-relaxed">
+                                    {testMode ? (
+                                        <p className="text-amber-300/90 font-light">
+                                            🟡 <span className="font-medium text-amber-200">เปิดอยู่ (ON):</span> ปลอดภัยสำหรับทดสอบ — เมื่อเข้าสู่ช่วง Lockdown หรือ Shutdown โปรแกรม C++ จะแสดงเพียงกล่องข้อความ <strong>MessageBox</strong> แจ้งเตือนเท่านั้น โดยไม่ล็อกหน้าจอหรือปิดคอมพิวเตอร์จริง
+                                        </p>
+                                    ) : (
+                                        <p className="text-rose-300/90 font-light">
+                                            🔴 <span className="font-medium text-rose-200">ปิดอยู่ (OFF):</span> โหมดวินัยเข้มงวด — โปรแกรม C++ จะทำการล็อกหน้าจอจริง (<strong>LockWorkStation</strong>) และสั่งปิดเครื่องจริง (<strong>System Shutdown</strong>) เมื่อ HP หมดหรือถึงเส้นตาย!
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
                         </div>
 
                         <div className="space-y-2 sm:col-span-2">
@@ -382,7 +442,7 @@ export default function SettingsPage() {
                                 className="w-full h-11 px-3 bg-[#18181b] text-white rounded-lg border-0 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-white/20"
                             />
                             <p className="text-[11px] text-zinc-500 font-light">
-                                💡 ได้มาจาก <a href="https://discord.com/developers/applications" target="_blank" rel="noreferrer" className="text-indigo-400 hover:underline">Discord Developer Portal</a> &gt; Application ของคุณ &gt; แท็บ Bot &gt; Reset Token / Copy
+                                แหล่งที่มา: <a href="https://discord.com/developers/applications" target="_blank" rel="noreferrer" className="text-indigo-400 hover:underline">Discord Developer Portal</a> &gt; Application ของคุณ &gt; แท็บ Bot &gt; Reset Token / Copy
                             </p>
 
                             {/* Dual action buttons: Verify Bot status & Send real test DM */}
@@ -458,8 +518,9 @@ export default function SettingsPage() {
                                                         </div>
                                                         <p className="text-xs pt-1 flex items-center gap-1.5 font-medium">
                                                             <span className="text-zinc-300">ผลการประเมิน:</span>
-                                                            <span className={testResult.target_user.is_considered_online ? 'text-emerald-400' : 'text-zinc-400'}>
-                                                                {testResult.target_user.is_considered_online ? '🟢 ถือว่าออนไลน์ (ONLINE)' : '⚪ ถือว่าออฟไลน์ (OFFLINE)'}
+                                                            <span className={testResult.target_user.is_considered_online ? 'text-emerald-400 flex items-center gap-1.5' : 'text-zinc-400 flex items-center gap-1.5'}>
+                                                                <span className={`size-2 rounded-full ${testResult.target_user.is_considered_online ? 'bg-emerald-400' : 'bg-zinc-500'}`} />
+                                                                {testResult.target_user.is_considered_online ? 'ถือว่าออนไลน์ (ONLINE)' : 'ถือว่าออฟไลน์ (OFFLINE)'}
                                                             </span>
                                                         </p>
                                                         {testResult.target_user.reason && (
@@ -551,7 +612,7 @@ export default function SettingsPage() {
                             >
                                 <div className="flex items-center justify-between">
                                     <span className="font-medium text-white flex items-center gap-2">
-                                        <span>🌑 Dark Theme</span>
+                                        <span>Dark Theme</span>
                                         <span className="text-[10px] text-zinc-500 font-normal">(ค่าเริ่มต้น)</span>
                                     </span>
                                     {theme_preference === 'dark' && <Check className="size-4 text-emerald-400" />}
@@ -579,7 +640,7 @@ export default function SettingsPage() {
                             >
                                 <div className="flex items-center justify-between">
                                     <span className="font-medium text-[#8cf044] flex items-center gap-2">
-                                        <span>📟 Special Theme</span>
+                                        <span>Special Theme</span>
                                         <span className="text-[10px] text-[#ffb700] font-normal">[TACTICAL TERMINAL]</span>
                                     </span>
                                     {theme_preference === 'special' && <Check className="size-4 text-[#8cf044]" />}

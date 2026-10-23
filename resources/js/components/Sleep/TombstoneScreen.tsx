@@ -1,6 +1,6 @@
 import React from 'react';
 import { router } from '@inertiajs/react';
-import { Skull, LogOut } from 'lucide-react';
+import { Skull, LogOut, Heart } from 'lucide-react';
 
 interface TombstoneScreenProps {
     daysSurvived: number;
@@ -66,7 +66,8 @@ export const TombstoneScreen: React.FC<TombstoneScreenProps> = ({ daysSurvived, 
                             onClick={onResetHp}
                             className="w-full h-11 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs transition-colors flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/25 active:scale-[0.98]"
                         >
-                            <span>❤️ ชุบชีวิต / รีเซ็ต HP (100%)</span>
+                            <Heart className="size-4 text-white" />
+                            <span>ชุบชีวิต • ฟื้นฟู HP 100%</span>
                         </button>
                     )}
 

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { SleepStage, DebriefData } from '@/stores/useSleepStore';
 import {
     Moon,
@@ -13,6 +13,8 @@ import {
     Bot,
     AlertCircle,
     BellRing,
+    ChevronDown,
+    Sliders,
 } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n';
 
@@ -73,6 +75,7 @@ export const CountdownDisplay: React.FC<CountdownDisplayProps> = ({
 }) => {
     const pad = (n: number) => n.toString().padStart(2, '0');
     const { t, isTactical } = useTranslation();
+    const [showTestMenu, setShowTestMenu] = useState(false);
 
     // PHASE 3: MORNING DEBRIEFING (สรุปผลภารกิจยามเช้า แสดงผลในจุดเดียว)
     if (debriefData) {
@@ -88,7 +91,7 @@ export const CountdownDisplay: React.FC<CountdownDisplayProps> = ({
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 text-xs font-mono text-emerald-400">
                         <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
-                        <span>// MORNING DEBRIEFING REPORT</span>
+                        <span>{isTactical ? '// MORNING DEBRIEFING REPORT' : 'รายงานผลการนอนยามเช้า'}</span>
                     </div>
                     <div className="px-3 py-1 rounded-full bg-emerald-950/60 border border-emerald-500/40 text-xs font-mono font-bold text-emerald-400 flex items-center gap-1.5">
                         <Award className="size-3.5" />
@@ -99,7 +102,7 @@ export const CountdownDisplay: React.FC<CountdownDisplayProps> = ({
                 {/* Mission Pass Message */}
                 <div className="space-y-1">
                     <h3 className="text-xl font-medium text-white tracking-tight">
-                        ภารกิจเข้านอนสำเร็จ (Mission Accomplished)
+                        {isTactical ? 'MISSION ACCOMPLISHED' : 'ภารกิจเข้านอนสำเร็จ'}
                     </h3>
                     <p className="text-xs text-zinc-400 font-light">
                         ร่างกายได้รับการฟื้นฟูเต็มที่ เลือด (LIFE) ฟื้นเต็ม 100% พร้อมรับรอบวันใหม่
@@ -147,7 +150,7 @@ export const CountdownDisplay: React.FC<CountdownDisplayProps> = ({
                         className="w-full h-12 px-6 rounded-xl text-sm font-semibold bg-white hover:bg-zinc-200 text-zinc-950 transition-all flex items-center justify-center gap-2 active:scale-[0.98] cursor-pointer shadow-lg"
                     >
                         <Sun className="size-4 text-amber-500" />
-                        <span>[ เริ่มรอบวันใหม่ ]</span>
+                        <span>{isTactical ? '[ เริ่มรอบวันใหม่ ]' : 'เริ่มรอบวันใหม่'}</span>
                     </button>
                 </div>
             </section>
@@ -179,7 +182,7 @@ export const CountdownDisplay: React.FC<CountdownDisplayProps> = ({
                 <div className="flex items-center justify-center gap-2 text-xs font-mono">
                     <span className="size-2 rounded-full bg-cyan-400 animate-pulse" />
                     <span className="text-cyan-300 font-medium">
-                        {isTactical ? '// CRYO-STASIS CHAMBER ACTIVE' : 'กำลังนอนหลับพักผ่อน (Cryo-Stasis Chamber)'}
+                        {isTactical ? '// CRYO-STASIS CHAMBER ACTIVE' : 'กำลังนอนหลับพักผ่อน'}
                     </span>
                 </div>
 
@@ -194,7 +197,7 @@ export const CountdownDisplay: React.FC<CountdownDisplayProps> = ({
                             {isTactical ? 'STASIS IN PROGRESS' : 'ร่างกายกำลังฟื้นฟู'}
                         </p>
                         <p className="text-xs text-zinc-400 font-light">
-                            ระบบล็อกเป้าหมายสำเร็จ ตัวเลขเวลานับถอยหลังหยุดทำงาน
+                            ล็อกเวลาเป้าหมายแล้ว ตัวเลขนับถอยหลังหยุดทำงาน
                         </p>
                     </div>
                 </div>
@@ -219,7 +222,7 @@ export const CountdownDisplay: React.FC<CountdownDisplayProps> = ({
                         className="w-full h-12 px-6 rounded-xl text-sm font-semibold bg-cyan-500 hover:bg-cyan-400 text-zinc-950 transition-all flex items-center justify-center gap-2 active:scale-[0.98] cursor-pointer shadow-lg shadow-cyan-500/20"
                     >
                         <Sun className="size-4" />
-                        <span>{isTactical ? '[ WAKE UP & DEBRIEF ]' : 'ตื่นนอน (Wake Up)'}</span>
+                        <span>{isTactical ? '[ WAKE UP & DEBRIEF ]' : 'ตื่นนอน'}</span>
                     </button>
                 </div>
             </section>
@@ -235,7 +238,7 @@ export const CountdownDisplay: React.FC<CountdownDisplayProps> = ({
     const isVerifying = Boolean(lastConfirmedAt) && !isInVoice && (!enableCpp || !isPcOnline) && isSystemActive;
 
     if (!isSystemActive) {
-        stageText = 'ระบบหยุดการทำงาน • ไม่ได้เปิดใช้งานการตรวจจับ Discord หรือ C++';
+        stageText = 'หยุดการทำงานชั่วคราว • ไม่ได้เปิดใช้งานการตรวจจับ Discord หรือ C++';
         dotColor = 'bg-rose-500';
         stageTextColor = 'text-rose-400 font-medium';
         digitsColor = 'text-zinc-500';
@@ -359,55 +362,34 @@ export const CountdownDisplay: React.FC<CountdownDisplayProps> = ({
                     <div className="text-xs text-rose-400 font-normal animate-pulse pb-0.5">
                         {isTactical
                             ? `EMERGENCY ALERT: ${seconds} SECONDS REMAINING! ENGAGE STASIS NOW`
-                            : `⚠️ ถึงเวลาเข้านอนแล้ว! กรุณาปิดเครื่องคอมพิวเตอร์ หรือออฟไลน์ Discord ทันที`}
+                            : 'ถึงเวลาเข้านอนแล้ว กรุณาปิดเครื่องคอมพิวเตอร์ หรือออฟไลน์ Discord ทันที'}
                     </div>
                 )}
 
-                {/* Status Indicator Card (No Manual Button) */}
-                {!isSystemActive ? (
-                    <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs font-normal flex flex-col items-center justify-center gap-1 text-center">
-                        <span className="font-medium text-rose-200 flex items-center gap-1.5">
-                            <AlertCircle className="size-4 text-rose-400" />
-                            ระบบไม่ได้ทำงาน (ปิดการตรวจจับทั้งหมด)
-                        </span>
-                        <span className="text-[11px] text-rose-300/80 font-light">
-                            กรุณาเปิดการตรวจจับ Discord Bot หรือ C++ Guard ในหน้าตั้งค่าอย่างน้อยหนึ่งช่องทาง
-                        </span>
-                    </div>
-                ) : isInVoice ? (
-                    <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs font-normal flex items-center justify-center gap-2">
-                        <Volume2 className="size-4 text-rose-400 shrink-0" />
-                        <span>กำลังอยู่ในห้องคุยเสียง {voiceChannel ? `"${voiceChannel}"` : ''} • ไม่ถือว่านอน</span>
-                    </div>
-                ) : isVerifying ? (
-                    <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs font-normal flex items-center justify-center gap-2.5">
-                        <Moon className="size-4 text-emerald-400" />
-                        <span>อยู่ในสถานะนอนแล้ว • ตรวจจับผ่าน Discord และ C++ Guard</span>
-                    </div>
-                ) : (
-                    <div className="p-3.5 rounded-xl bg-[#18181b] border border-white/5 text-zinc-300 text-xs flex flex-col items-center justify-center gap-1.5 text-center shadow-sm">
-                        <div className="flex items-center gap-2 text-white font-medium">
-                            <Shield className="size-3.5 text-emerald-400" />
-                            <span>ตรวจจับการนอนอัตโนมัติผ่าน Discord และ C++</span>
-                        </div>
-                        <p className="text-[11px] text-zinc-400 font-light leading-relaxed">
-                            ระบบจะบันทึกสถานะนอนให้โดยอัตโนมัติเมื่อตรวจพบการออฟไลน์ ปิดคอมพิวเตอร์ หรือล็อกหน้าจอ
-                        </p>
-                        <div className="flex items-center gap-2.5 text-[10px] text-zinc-400 pt-0.5">
-                            <span className="flex items-center gap-1">
-                                <Bot className="size-3 text-indigo-400" />
-                                <span className={enableDiscord ? 'text-indigo-300 font-medium' : 'text-zinc-600 line-through'}>
-                                    Discord {enableDiscord ? 'เปิด' : 'ปิด'}
-                                </span>
-                            </span>
-                            <span>•</span>
-                            <span className="flex items-center gap-1">
-                                <Shield className={`size-3 ${enableCpp && isPcOnline ? 'text-amber-400 animate-pulse' : 'text-emerald-400'}`} />
-                                <span className={enableCpp ? (isPcOnline ? 'text-amber-300 font-medium' : 'text-emerald-300 font-medium') : 'text-zinc-600 line-through'}>
-                                    C++ Guard {enableCpp ? (isPcOnline ? 'เปิด (PC Online • ตรวจพบใช้งาน)' : 'เปิด (พร้อมตรวจจับ)') : 'ปิด'}
-                                </span>
-                            </span>
-                        </div>
+                {/* Active Status Alert: Displays only when there is an active event/warning */}
+                {(!isSystemActive || isInVoice || isVerifying || (enableCpp && isPcOnline)) && (
+                    <div className="flex items-center justify-center">
+                        {!isSystemActive ? (
+                            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-800/60 border border-white/5 text-[11px] text-zinc-400">
+                                <AlertCircle className="size-3.5 text-zinc-500" />
+                                <span>ปิดการตรวจจับทั้งหมด</span>
+                            </div>
+                        ) : isInVoice ? (
+                            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-[11px] text-rose-300">
+                                <Volume2 className="size-3.5 text-rose-400 shrink-0" />
+                                <span>อยู่ในห้องคุยเสียง {voiceChannel ? `"${voiceChannel}"` : ''} • ยังไม่ถือว่านอน</span>
+                            </div>
+                        ) : isVerifying ? (
+                            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-400">
+                                <Moon className="size-3.5 text-emerald-400 shrink-0" />
+                                <span>บันทึกสถานะนอนแล้ว • ตรวจจับผ่าน Discord & C++</span>
+                            </div>
+                        ) : (
+                            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300">
+                                <span className="size-1.5 rounded-full bg-amber-400 animate-pulse" />
+                                <span>C++ Guard ตรวจพบ PC มีการใช้งาน</span>
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -432,103 +414,150 @@ export const CountdownDisplay: React.FC<CountdownDisplayProps> = ({
                     </button>
                 )}
 
-                {/* Simulation & Alert Sync Controls */}
-                <div className="flex flex-wrap items-center justify-center gap-2 pt-0.5">
-                    {!simulationActive ? (
-                        <>
-                            {onStartSimulation && (
-                                <button
-                                    type="button"
-                                    onClick={onStartSimulation}
-                                    className="h-8 px-3 rounded-lg bg-[#18181b] hover:bg-[#27272a] text-zinc-400 hover:text-white text-xs font-normal transition-colors flex items-center gap-1.5 active:scale-[0.98]"
-                                    title="ทดสอบนับถอยหลัง 3 2 1 สู่เวลานอนและดูเอฟเฟกต์การลดเลือด"
-                                >
-                                    <Zap className="size-3.5 text-amber-400" />
-                                    <span>ทดสอบตอนถึงเวลานอน 3 2 1</span>
-                                </button>
-                            )}
+                {/* Progressive Disclosure: Compact Status & Test Simulation Actions */}
+                <div className="flex items-center justify-between pt-1">
+                    <div className="flex items-center gap-1.5 text-[11px] text-zinc-400 font-light">
+                        <span className={`size-1.5 rounded-full ${isSystemActive ? 'bg-emerald-400' : 'bg-zinc-600'}`} />
+                        <span>
+                            {isTactical
+                                ? 'TELEMETRY STANDBY'
+                                : isSystemActive
+                                  ? 'ตรวจจับอัตโนมัติ: Discord • C++ Guard พร้อม'
+                                  : 'ปิดการตรวจจับอัตโนมัติ'}
+                        </span>
+                    </div>
 
-                            {onTriggerAlertSync && (
+                    {simulationActive && onResetSimulation ? (
+                        <button
+                            type="button"
+                            onClick={onResetSimulation}
+                            className="h-7 px-3 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white text-[11px] font-normal transition-colors flex items-center gap-1.5 active:scale-[0.98] cursor-pointer border border-white/10"
+                            title="รีเซ็ตคืนค่าเวลาและพลังชีวิตปกติ"
+                        >
+                            <RotateCcw className="size-3 text-zinc-400" />
+                            <span>คืนค่าปกติ</span>
+                        </button>
+                    ) : (
+                        (onStartSimulation || onTriggerAlertSync || onSetQuickBedtime) && (
+                            <div className="relative inline-block text-left">
                                 <button
                                     type="button"
-                                    onClick={onTriggerAlertSync}
-                                    className="h-8 px-3.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/20 hover:border-amber-500/30 text-xs font-normal transition-colors flex items-center gap-1.5 active:scale-[0.98]"
-                                    title="ทดสอบการ Alert 60 วิ และ Lockdown Sign Out ที่ซิงค์กับ C++ Guard แบบเรียลไทม์"
+                                    onClick={() => setShowTestMenu((prev) => !prev)}
+                                    className="h-7 px-2.5 rounded-lg bg-[#18181b] hover:bg-[#27272a] text-zinc-400 hover:text-white text-[11px] font-normal transition-colors flex items-center gap-1.5 border border-white/5 cursor-pointer"
+                                    title="เครื่องมือทดสอบระบบและจำลองเวลา"
                                 >
-                                    <BellRing className="size-3.5 text-amber-400" />
-                                    <span>ทดสอบ Alert 60 วิ (Sync C++)</span>
+                                    <Sliders className="size-3 text-zinc-400" />
+                                    <span>ทดสอบระบบ</span>
+                                    <ChevronDown className={`size-3 text-zinc-500 transition-transform ${showTestMenu ? 'rotate-180' : ''}`} />
                                 </button>
-                            )}
-                        </>
-                    ) : (
-                        onResetSimulation && (
-                            <button
-                                type="button"
-                                onClick={onResetSimulation}
-                                className="h-8 px-3.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-normal transition-colors flex items-center gap-1.5 active:scale-[0.98]"
-                                title="รีเซ็ตคืนค่าเวลาและพลังชีวิตปกติ"
-                            >
-                                <RotateCcw className="size-3.5 text-zinc-400" />
-                                <span>คืนค่าปกติ</span>
-                            </button>
+
+                                {showTestMenu && (
+                                    <div className="absolute right-0 bottom-full mb-1.5 w-60 bg-[#121215] border border-white/10 rounded-xl shadow-2xl p-1.5 space-y-0.5 z-30 animate-in fade-in zoom-in-95 duration-150">
+                                        <div className="px-2 py-1 text-[10px] font-medium text-zinc-500 uppercase tracking-wider">
+                                            จำลองเหตุการณ์
+                                        </div>
+                                        {onStartSimulation && (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setShowTestMenu(false);
+                                                    onStartSimulation();
+                                                }}
+                                                className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-zinc-300 hover:bg-[#18181b] hover:text-white flex items-center gap-2 transition-colors cursor-pointer"
+                                            >
+                                                <Zap className="size-3.5 text-amber-400 shrink-0" />
+                                                <span>นับถอยหลัง 3 2 1 สู่เวลานอน</span>
+                                            </button>
+                                        )}
+                                        {onTriggerAlertSync && (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setShowTestMenu(false);
+                                                    onTriggerAlertSync();
+                                                }}
+                                                className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-amber-300 hover:bg-[#18181b] flex items-center gap-2 transition-colors cursor-pointer"
+                                            >
+                                                <BellRing className="size-3.5 text-amber-400 shrink-0" />
+                                                <span>ทดสอบ Alert 60 วิ (Sync C++)</span>
+                                            </button>
+                                        )}
+
+                                        {onSetQuickBedtime && (
+                                            <>
+                                                <div className="px-2 pt-1.5 pb-1 text-[10px] font-medium text-zinc-500 uppercase tracking-wider border-t border-white/5">
+                                                    ทดสอบเวลานอนทันที
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setShowTestMenu(false);
+                                                        onSetQuickBedtime(1);
+                                                    }}
+                                                    className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-rose-300 hover:bg-[#18181b] flex items-center gap-2 transition-colors cursor-pointer"
+                                                >
+                                                    <span className="size-1.5 rounded-full bg-rose-400" />
+                                                    <span>+1 นาที (เส้นตายฉุกเฉิน)</span>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setShowTestMenu(false);
+                                                        onSetQuickBedtime(5);
+                                                    }}
+                                                    className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-amber-300 hover:bg-[#18181b] flex items-center gap-2 transition-colors cursor-pointer"
+                                                >
+                                                    <span className="size-1.5 rounded-full bg-amber-400" />
+                                                    <span>+5 นาที (Lockdown)</span>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setShowTestMenu(false);
+                                                        onSetQuickBedtime(10);
+                                                    }}
+                                                    className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-amber-300 hover:bg-[#18181b] flex items-center gap-2 transition-colors cursor-pointer"
+                                                >
+                                                    <span className="size-1.5 rounded-full bg-amber-400" />
+                                                    <span>+10 นาที (Alert)</span>
+                                                </button>
+                                                {onResetBedtimeDefault && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setShowTestMenu(false);
+                                                            onResetBedtimeDefault();
+                                                        }}
+                                                        className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-zinc-400 hover:text-white hover:bg-[#18181b] flex items-center gap-2 transition-colors cursor-pointer"
+                                                    >
+                                                        <RotateCcw className="size-3 text-zinc-500 shrink-0" />
+                                                        <span>คืนค่าเวลา 23:15 น.</span>
+                                                    </button>
+                                                )}
+                                            </>
+                                        )}
+
+                                        {onResetHp && (
+                                            <div className="pt-1 border-t border-white/5">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setShowTestMenu(false);
+                                                        onResetHp();
+                                                    }}
+                                                    className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-emerald-400 hover:bg-[#18181b] flex items-center gap-2 transition-colors cursor-pointer"
+                                                >
+                                                    <Shield className="size-3.5 text-emerald-400 shrink-0" />
+                                                    <span>ฟื้นฟูพลังชีวิต 100%</span>
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
                         )
                     )}
                 </div>
-
-                {/* Quick Bedtime Presets for Real Testing */}
-                {onSetQuickBedtime && (
-                    <div className="pt-2 border-t border-white/5 space-y-2">
-                        <div className="flex items-center justify-between text-[11px] text-zinc-500 font-light px-1">
-                            <span>ทดสอบเวลานับถอยหลังจริง (ตั้งเวลานอนทันที):</span>
-                            {onResetHp && (
-                                <button
-                                    type="button"
-                                    onClick={onResetHp}
-                                    className="text-emerald-400 hover:text-emerald-300 transition-colors flex items-center gap-1 font-normal"
-                                    title="รีเซ็ตพลังชีวิต (HP 100%)"
-                                >
-                                    <span>❤️ รีเซ็ต HP (100%)</span>
-                                </button>
-                            )}
-                        </div>
-                        <div className="flex flex-wrap items-center justify-center gap-1.5">
-                            <button
-                                type="button"
-                                onClick={() => onSetQuickBedtime(1)}
-                                className="h-7 px-2.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/20 text-[11px] font-normal transition-colors"
-                                title="ตั้งเวลานอนในอีก 1 นาทีข้างหน้า เพื่อนับถอยหลังจริง 60 วิ และทดสอบการลด HP"
-                            >
-                                ⏱️ +1 นาที (ทดสอบเส้นตาย)
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => onSetQuickBedtime(5)}
-                                className="h-7 px-2.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/20 text-[11px] font-normal transition-colors"
-                                title="ตั้งเวลานอนในอีก 5 นาทีข้างหน้า เพื่อทดสอบระยะ Lockdown"
-                            >
-                                🔒 +5 นาที (Lockdown)
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => onSetQuickBedtime(10)}
-                                className="h-7 px-2.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/20 text-[11px] font-normal transition-colors"
-                                title="ตั้งเวลานอนในอีก 10 นาทีข้างหน้า เพื่อทดสอบระยะ Alert"
-                            >
-                                🔔 +10 นาที (Alert)
-                            </button>
-                            {onResetBedtimeDefault && (
-                                <button
-                                    type="button"
-                                    onClick={onResetBedtimeDefault}
-                                    className="h-7 px-2.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white text-[11px] font-normal transition-colors"
-                                    title="คืนค่าเวลานอนมาตรฐาน 23:15 น."
-                                >
-                                    🌙 คืนค่า 23:15 น.
-                                </button>
-                            )}
-                        </div>
-                    </div>
-                )}
             </div>
         </section>
     );

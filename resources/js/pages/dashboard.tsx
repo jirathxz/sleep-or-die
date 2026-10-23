@@ -110,7 +110,7 @@ export default function Dashboard() {
         const success = await useTicket();
         if (success) {
             const nextTarget = useSleepStore.getState().sleep_target_time;
-            setToastMessage(`[ ยืนยัน ] ใช้ตั๋วฉุกเฉินสำเร็จ: เลื่อนเวลาเข้านอนออกไปอีก +30 นาที (เวลาเป้าหมายใหม่: ${nextTarget} น.)`);
+            setToastMessage(`ใช้ตั๋วฉุกเฉินสำเร็จ เลื่อนเวลาเข้านอน +30 นาที (เวลาเป้าหมายใหม่: ${nextTarget} น.)`);
             setTimeout(() => setToastMessage(null), 4000);
         } else {
             setToastMessage('ไม่สามารถใช้ตั๋วได้ (ไม่มีตั๋วคงเหลือ หรืออยู่นอกช่วงเวลา)');
@@ -237,10 +237,10 @@ export default function Dashboard() {
                 {/* Header Tabs matching active theme */}
                 <div className={`flex flex-wrap items-center gap-2 text-xs sm:text-sm ${isSpecial ? 'font-mono' : 'font-sans'}`}>
                     {[
-                        { id: 1, label: isSpecial ? '[ 1. เรดาร์ & พลังชีวิต ]' : '1. เรดาร์ & พลังชีวิต' },
-                        { id: 2, label: isSpecial ? '[ 2. กระเป๋าเก็บของ ]' : '2. กระเป๋าเก็บของ' },
-                        { id: 3, label: isSpecial ? '[ 3. ตลาดมืด ]' : '3. ตลาดมืด' },
-                        { id: 4, label: isSpecial ? '[ 4. ประวัติภารกิจ ]' : '4. ประวัติภารกิจ' },
+                        { id: 1, label: isSpecial ? '[ เรดาร์ & พลังชีวิต ]' : 'เรดาร์' },
+                        { id: 2, label: isSpecial ? '[ คลังอุปกรณ์ ]' : 'คลังอุปกรณ์' },
+                        { id: 3, label: isSpecial ? '[ ตลาดมืด ]' : 'ตลาดมืด' },
+                        { id: 4, label: isSpecial ? '[ ประวัติภารกิจ ]' : 'ประวัติภารกิจ' },
                     ].map((tab) => {
                         const isActive = activeTab === tab.id;
                         let btnClasses = '';
