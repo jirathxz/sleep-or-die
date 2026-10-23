@@ -239,7 +239,7 @@ class SleepEngineService
             } elseif ($meta['alert_action'] === 'acknowledge_lockdown') {
                 $this->acknowledgeLockdown($user);
             } elseif ($meta['alert_action'] === 'acknowledge_sleep_warning') {
-                $this->escalateToShutdown($user);
+                $this->acknowledgeSleepWarning($user);
             } elseif ($meta['alert_action'] === 'trigger') {
                 $this->triggerAlertSequence($user, $user->emergency_countdown_seconds ?? 60);
             } elseif ($meta['alert_action'] === 'reset') {
@@ -872,6 +872,30 @@ class SleepEngineService
             );
         }
 
+        return $state;
+    }
+
+    /**
+     * User clicked "เข้าใจแล้ว (ยอมรับวินัยและไปนอน)" on Sleep Warning:
+     * Acknowledge the penalty and dismiss alert modal back to idle.
+     */
+    public function acknowledgeSleepWarning(User $user): array
+    {
+        $total = $user->emergency_countdown_seconds ?? 60;
+        $state = [
+            'phase' => 'idle',
+            'seconds_remaining' => $total,
+            'total_seconds' => $total,
+            'is_paused' => false,
+            'step_index' => 0,
+            'step_title' => '',
+            'step_message' => '',
+            'acknowledged' => true,
+            'acknowledged_at' => now()->toIso8601String(),
+            'updated_at' => now()->toIso8601String(),
+        ];
+
+        \Illuminate\Support\Facades\Cache::put("alert_state_{$user->id}", $state, now()->addHours(2));
         return $state;
     }
 

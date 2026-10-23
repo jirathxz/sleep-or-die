@@ -1076,7 +1076,19 @@ export const useSleepStore = create<SleepState>((set, get) => ({
                 if (alert_state.phase === 'alert') {
                     get().acknowledgeAlert();
                 } else if (alert_state.phase === 'lockdown' || alert_state.phase === 'acknowledged_alert') {
-                    get().acknowledgeSleepWarning();
+                    const csrfToken = getCsrfToken();
+                    fetch('/sleep/alert-action', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            ...(csrfToken ? { 'X-CSRF-TOKEN': csrfToken } : {}),
+                        },
+                        body: JSON.stringify({ action: 'sleep_warning' }),
+                    }).then(res => res.json()).then(data => {
+                        if (data.alert_state) set({ alert_state: data.alert_state });
+                        if (data.current_hp !== undefined) set({ current_hp: data.current_hp });
+                    }).catch(() => {});
                 } else if (alert_state.phase === 'sleep_warning' || alert_state.phase === 'acknowledged_lockdown') {
                     const csrfToken = getCsrfToken();
                     fetch('/sleep/alert-action', {
@@ -1568,6 +1580,15 @@ export const useSleepStore = create<SleepState>((set, get) => ({
     },
 
     acknowledgeSleepWarning: async () => {
+        // Optimistically dismiss modal immediately so clicking "เข้าใจแล้ว" responds with 0ms lag
+        set((state) => ({
+            alert_state: {
+                ...state.alert_state,
+                phase: 'idle',
+                acknowledged: true,
+            },
+        }));
+
         try {
             const csrfToken = getCsrfToken();
             const res = await fetch('/sleep/alert-action', {

@@ -113,7 +113,7 @@ test('alert sync state machine: alert (60s paused) -> lockdown -> sleep warning 
 
     expect($user->fresh()->current_hp)->toBe(75);
 
-    // 5. User acknowledges sleep warning -> escalates to shutdown (0% HP)
+    // 5. User acknowledges sleep warning -> dismisses alert modal (phase: idle)
     $res5 = $this->actingAs($user)->postJson('/sleep/alert-action', [
         'action' => 'acknowledge_sleep_warning',
     ]);
@@ -121,7 +121,8 @@ test('alert sync state machine: alert (60s paused) -> lockdown -> sleep warning 
     $res5->assertOk()
         ->assertJson([
             'alert_state' => [
-                'phase' => 'sleep_warning',
+                'phase' => 'idle',
+                'acknowledged' => true,
             ],
         ]);
 

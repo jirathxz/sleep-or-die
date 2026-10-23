@@ -441,7 +441,7 @@ class SleepController extends Controller
     public function handleAlertAction(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'action' => ['required', 'string', 'in:trigger,acknowledge,acknowledge_lockdown,acknowledge_sleep_warning,shutdown,reset,toggle_pause,update_seconds'],
+            'action' => ['required', 'string', 'in:trigger,acknowledge,acknowledge_lockdown,sleep_warning,acknowledge_sleep_warning,shutdown,reset,toggle_pause,update_seconds'],
             'seconds' => ['nullable', 'integer', 'min:0', 'max:300'],
             'user_id' => ['nullable', 'integer'],
         ]);
@@ -460,7 +460,8 @@ class SleepController extends Controller
             'trigger' => $this->sleepEngine->triggerAlertSequence($user, $validated['seconds'] ?? null),
             'acknowledge' => $this->sleepEngine->acknowledgeAlert($user),
             'acknowledge_lockdown' => $this->sleepEngine->acknowledgeLockdown($user),
-            'acknowledge_sleep_warning' => $this->sleepEngine->escalateToSleepWarning($user),
+            'sleep_warning' => $this->sleepEngine->escalateToSleepWarning($user),
+            'acknowledge_sleep_warning' => $this->sleepEngine->acknowledgeSleepWarning($user),
             'shutdown' => $this->sleepEngine->escalateToShutdown($user),
             'reset' => $this->sleepEngine->resetAlertState($user),
             'toggle_pause' => $this->sleepEngine->toggleAlertPause($user),
