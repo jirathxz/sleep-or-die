@@ -694,6 +694,15 @@ class SleepEngineService
     {
         $cached = \Illuminate\Support\Facades\Cache::get("alert_state_{$user->id}");
         if ($cached && is_array($cached)) {
+            // Real-time server-side elapsed countdown calculation
+            if (!empty($cached['phase']) && $cached['phase'] !== 'idle' && empty($cached['is_paused']) && !empty($cached['updated_at'])) {
+                $elapsed = \Illuminate\Support\Carbon::parse($cached['updated_at'])->diffInSeconds(now());
+                if ($elapsed > 0) {
+                    $cached['seconds_remaining'] = max(0, ($cached['seconds_remaining'] ?? $user->emergency_countdown_seconds ?? 60) - $elapsed);
+                    $cached['updated_at'] = now()->toIso8601String();
+                    \Illuminate\Support\Facades\Cache::put("alert_state_{$user->id}", $cached, now()->addHours(2));
+                }
+            }
             return $cached;
         }
 
@@ -942,11 +951,14 @@ class SleepEngineService
     /**
      * Toggle pause / resume on alert countdown.
      */
-    public function toggleAlertPause(User $user): array
+    public function toggleAlertPause(User $user, ?int $seconds = null): array
     {
         $state = $this->getAlertState($user);
         if ($state['phase'] !== 'idle') {
             $state['is_paused'] = !($state['is_paused'] ?? false);
+            if ($seconds !== null && $seconds >= 0) {
+                $state['seconds_remaining'] = $seconds;
+            }
             $state['updated_at'] = now()->toIso8601String();
             \Illuminate\Support\Facades\Cache::put("alert_state_{$user->id}", $state, now()->addHours(2));
         }

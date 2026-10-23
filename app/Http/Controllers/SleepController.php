@@ -464,7 +464,7 @@ class SleepController extends Controller
             'acknowledge_sleep_warning' => $this->sleepEngine->acknowledgeSleepWarning($user),
             'shutdown' => $this->sleepEngine->escalateToShutdown($user),
             'reset' => $this->sleepEngine->resetAlertState($user),
-            'toggle_pause' => $this->sleepEngine->toggleAlertPause($user),
+            'toggle_pause' => $this->sleepEngine->toggleAlertPause($user, $validated['seconds'] ?? null),
             'update_seconds' => $this->sleepEngine->updateAlertSeconds($user, $validated['seconds'] ?? 0),
         };
 

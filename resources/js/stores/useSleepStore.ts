@@ -514,7 +514,30 @@ export const useSleepStore = create<SleepState>((set, get) => ({
 
             const cppPresence = (data as any).cpp_presence ?? state.cpp_presence;
             const isPcOnline = Boolean(enableCpp && cppPresence?.is_pc_online);
-            const alertState = (data as any).alert_state ?? state.alert_state;
+
+            let alertState = state.alert_state;
+            const incomingAlert = (data as any).alert_state;
+            if (incomingAlert) {
+                // If phase is the same and client is actively counting down (not paused),
+                // do NOT allow stale higher seconds_remaining from server polling to overwrite our countdown!
+                if (
+                    state.alert_state &&
+                    state.alert_state.phase === incomingAlert.phase &&
+                    !state.alert_state.is_paused &&
+                    typeof state.alert_state.seconds_remaining === 'number'
+                ) {
+                    alertState = {
+                        ...incomingAlert,
+                        // Always keep the lower countdown value to avoid looping backwards
+                        seconds_remaining: Math.min(
+                            state.alert_state.seconds_remaining,
+                            incomingAlert.seconds_remaining ?? state.alert_state.seconds_remaining
+                        ),
+                    };
+                } else {
+                    alertState = incomingAlert;
+                }
+            }
 
             // Rule: หากอยู่ในห้องคุยไม่ถือว่านอน, หาก C++ ตรวจพบว่า PC ออนไลน์ไม่ถือว่านอน, หรือหากไม่ได้เปิดใช้งานระบบเลย
             const lastConfirmed = (!isSystemActive || isInVoice || isPcOnline)
@@ -1963,7 +1986,7 @@ export const useSleepStore = create<SleepState>((set, get) => ({
                         'Accept': 'application/json',
                         'X-CSRF-TOKEN': csrfToken,
                     },
-                    body: JSON.stringify({ action: 'toggle_pause' }),
+                    body: JSON.stringify({ action: 'toggle_pause', seconds: alert_state.seconds_remaining }),
                 }).catch(() => {});
             }
             return true;

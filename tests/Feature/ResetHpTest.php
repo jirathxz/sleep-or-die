@@ -107,6 +107,32 @@ test('alert-action supports toggle_pause and update_seconds', function () {
         ]);
 });
 
+test('alert countdown decrements elapsed seconds when ticking', function () {
+    $user = User::factory()->create([
+        'emergency_countdown_seconds' => 60,
+    ]);
+
+    // Trigger
+    $this->actingAs($user)->postJson('/sleep/alert-action', [
+        'action' => 'trigger',
+        'seconds' => 60,
+    ]);
+
+    // Unpause so it starts ticking
+    $this->actingAs($user)->postJson('/sleep/alert-action', [
+        'action' => 'toggle_pause',
+    ]);
+
+    // Advance time by 5 seconds
+    \Illuminate\Support\Carbon::setTestNow(now()->addSeconds(5));
+
+    $resStatus = $this->actingAs($user)->getJson('/sleep/status');
+    $resStatus->assertOk();
+    expect($resStatus->json('alert_state.seconds_remaining'))->toBeLessThanOrEqual(55);
+
+    \Illuminate\Support\Carbon::setTestNow();
+});
+
 test('api reset-hp rejects unauthorized requests with invalid token', function () {
     $user = User::factory()->create(['current_hp' => 10]);
 
