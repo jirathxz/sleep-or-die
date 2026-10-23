@@ -112,7 +112,7 @@ class SleepController extends Controller
         $token = $request->input('discord_bot_token') ?: $user?->discord_bot_token;
         $userId = $request->input('discord_user_id') ?: $user?->discord_user_id;
 
-        if (empty($token) || empty($userId)) {
+        if ($stage === 'test' && (empty($token) || empty($userId))) {
             return response()->json([
                 'success' => false,
                 'message' => 'กรุณากรอกทั้ง Discord Bot Token และ Discord User ID ก่อนทดสอบส่งการแจ้งเตือน',
@@ -120,11 +120,15 @@ class SleepController extends Controller
         }
 
         // Auto-save to user if authenticated so it persists immediately
-        if ($user) {
-            $user->update([
-                'discord_bot_token' => trim((string)$token),
-                'discord_user_id' => trim((string)$userId),
-            ]);
+        if ($user && (!empty($token) || !empty($userId))) {
+            $updateData = [];
+            if (!empty($token)) {
+                $updateData['discord_bot_token'] = trim((string)$token);
+            }
+            if (!empty($userId)) {
+                $updateData['discord_user_id'] = trim((string)$userId);
+            }
+            $user->update($updateData);
             $user->refresh();
         }
 
@@ -133,20 +137,76 @@ class SleepController extends Controller
             'alert' => "🔔 [SleepOrDie] เหลืออีก 30 นาทีจะถึงเวลานอนเป้าหมาย ({$target} น.) กรุณาเตรียมตัวพักผ่อน",
             'lockdown' => "⚠️ [SleepOrDie] เหลืออีก 15 นาที! เข้าสู่ช่วง Lockdown กรุณาปิดหน้าจอและเตรียมเข้านอน",
             'deadline' => "🚨 [SleepOrDie] ถึงเวลาเข้านอนแล้ว ({$target} น.)! กรุณาเข้านอนทันที มิเช่นนั้นระบบจะถือว่าทำผิดวินัย",
+            'shutdown' => "💀 [SleepOrDie] ถึงเวลาเข้านอนแล้ว (0% HP) ดำเนินการ Shutdown คอมพิวเตอร์",
             'test' => "✨ [SleepOrDie] ทดสอบระบบสำเร็จ! บอทสามารถส่งข้อความแจ้งเตือนเข้า Discord ของคุณได้เรียบร้อยแล้ว",
         ];
 
         $message = $messages[$stage] ?? $messages['test'];
-        $result = $this->sleepEngine->sendDiscordDm($token, $userId, $message);
+
+        // 1. Send Discord DM if credentials are available
+        $discordResult = ['success' => false, 'message' => 'ยังไม่ได้ระบุ Discord Bot Token หรือ User ID'];
+        if (!empty($token) && !empty($userId)) {
+            $discordResult = $this->sleepEngine->sendDiscordDm($token, $userId, $message);
+        }
+
+        // 2. Sync notification with C++ Desktop Daemon
+        $cppTitles = [
+            'alert' => "🚨 แจ้งเตือนเวลาเข้านอน (Alert T-10m)",
+            'lockdown' => "🔒 เข้าสู่โหมด Lockdown (T-5m)",
+            'deadline' => "💀 เข้าสู่สถานะ Shutdown (T-0m เส้นตาย)",
+            'shutdown' => "💀 คำสั่ง Shutdown (0% HP)",
+            'test' => "✨ SleepOrDie Desktop Guard (ทดสอบเชื่อมต่อ)",
+        ];
+        $cppTitle = $cppTitles[$stage] ?? "SleepOrDie Alert";
+        $cppLevel = in_array($stage, ['deadline', 'shutdown']) ? 'error' : (in_array($stage, ['lockdown']) ? 'warning' : 'info');
+
+        if ($user) {
+            $this->sleepEngine->queueDaemonNotification($user, $cppTitle, $message, $stage, $cppLevel, ($stage !== 'test'));
+
+            // Also update alert_state if testing a major stage
+            if (in_array($stage, ['alert', 'lockdown', 'deadline', 'shutdown'])) {
+                $mappedPhase = ($stage === 'deadline') ? 'shutdown' : $stage;
+                $countdown = $user->emergency_countdown_seconds ?? 60;
+                \Illuminate\Support\Facades\Cache::put("alert_state_{$user->id}", [
+                    'phase' => $mappedPhase,
+                    'seconds_remaining' => $countdown,
+                    'total_seconds' => $countdown,
+                    'is_paused' => true,
+                    'step_index' => ($stage === 'alert' ? 1 : ($stage === 'lockdown' ? 2 : 4)),
+                    'step_title' => $cppTitle,
+                    'step_message' => $message,
+                    'acknowledged' => false,
+                    'triggered_at' => now()->toIso8601String(),
+                    'updated_at' => now()->toIso8601String(),
+                ], now()->addHours(2));
+            }
+        }
+
+        // If stage is 'test' and discord failed, pass through the failure as 400 (per existing tests)
+        if ($stage === 'test' && !$discordResult['success']) {
+            return response()->json([
+                'success' => false,
+                'stage' => $stage,
+                'message' => $discordResult['message'],
+                'error_code' => $discordResult['error_code'] ?? null,
+                'discord_bot_token' => $user?->discord_bot_token,
+                'discord_user_id' => $user?->discord_user_id,
+            ], 400);
+        }
+
+        $discordMsg = $discordResult['success'] ? 'ส่งเข้า Discord DM สำเร็จ' : 'Discord: ' . $discordResult['message'];
+        $cppMsg = 'ส่งสัญญาณเตือนไปยัง C++ Desktop Guard เรียบร้อย';
 
         return response()->json([
-            'success' => $result['success'],
+            'success' => true,
             'stage' => $stage,
-            'message' => $result['message'],
-            'error_code' => $result['error_code'] ?? null,
+            'message' => "ซิงค์การแจ้งเตือนสำเร็จ ({$discordMsg} • {$cppMsg})",
+            'discord_sent' => $discordResult['success'],
+            'cpp_sent' => true,
+            'error_code' => $discordResult['error_code'] ?? null,
             'discord_bot_token' => $user?->discord_bot_token,
             'discord_user_id' => $user?->discord_user_id,
-        ], $result['success'] ? 200 : 400);
+        ]);
     }
 
     public function confirmSleep(Request $request): JsonResponse
@@ -434,7 +494,7 @@ class SleepController extends Controller
             $token = $request->bearerToken() ?: $request->input('auth_token') ?: $request->header('X-Daemon-Token');
             $cachedToken = \Illuminate\Support\Facades\Cache::get("daemon_token_{$user->id}");
             $secret = env('DAEMON_SECRET') ?: config('app.key');
-            $isAuthorized = ($token && ($token === $cachedToken || $token === $secret)) || (app()->runningUnitTests() && !$request->has('auth_token'));
+            $isAuthorized = ($token && ($token === $cachedToken || $token === $user->daemon_token || $token === $secret)) || (app()->runningUnitTests() && !$request->has('auth_token'));
 
             if (!$isAuthorized) {
                 return response()->json(['message' => 'Unauthorized: Invalid daemon token'], 401);
@@ -507,7 +567,7 @@ class SleepController extends Controller
                         'Accept' => 'application/json',
                     ])->timeout(8)->get("https://discord.com/api/v10/users/@me/guilds");
 
-                    if ($guildsResponse->successful()) {
+                    if ($guildsResponse->successful() && is_array($guildsResponse->json())) {
                         $guilds = $guildsResponse->json();
                         foreach ($guilds as $guild) {
                             $guildId = $guild['id'];
@@ -646,7 +706,14 @@ class SleepController extends Controller
             $token = $request->bearerToken() ?: $request->input('auth_token') ?: $request->header('X-Webhook-Secret') ?: $request->header('X-Daemon-Token');
             $cachedToken = \Illuminate\Support\Facades\Cache::get("daemon_token_{$user->id}");
             $secret = env('DISCORD_WEBHOOK_SECRET') ?: env('DAEMON_SECRET') ?: config('app.key');
-            $isAuthorized = ($token && ($token === $cachedToken || $token === $secret)) || (app()->runningUnitTests() && !$request->has('auth_token'));
+            $isAuthorized = ($token && ($token === $cachedToken || $token === $user->daemon_token || $token === $secret)) || (app()->runningUnitTests() && !$request->has('auth_token'));
+
+            // Auto-bind token if user authenticated by email/id and token not yet set
+            if (!$isAuthorized && $token && strlen($token) >= 32 && empty($user->daemon_token)) {
+                $user->update(['daemon_token' => $token]);
+                \Illuminate\Support\Facades\Cache::put("daemon_token_{$user->id}", $token, now()->addDays(365));
+                $isAuthorized = true;
+            }
 
             if (!$isAuthorized) {
                 return response()->json(['message' => 'Unauthorized: Invalid presence webhook or daemon token'], 401);
@@ -671,19 +738,36 @@ class SleepController extends Controller
             'alert_action' => $validated['alert_action'] ?? null,
         ];
 
-        // Cache live presence for quick dashboard feedback
-        $effectiveStatus = !empty($validated['is_in_voice']) ? 'online' : strtolower($validated['status']);
-        \Illuminate\Support\Facades\Cache::put("discord_presence_{$user->id}", [
-            'discord_user_id' => $user->discord_user_id,
-            'effective_status' => $effectiveStatus,
-            'raw_status' => strtolower($validated['raw_status'] ?? $validated['status']),
-            'is_in_voice' => (bool)($validated['is_in_voice'] ?? false),
-            'voice_channel' => $validated['voice_channel'] ?? null,
-            'guild_name' => $validated['guild_name'] ?? null,
-            'updated_at' => now()->toIso8601String(),
-        ], now()->addDay());
+        // Cache live presence properly separated by source
+        if ($source === 'desktop_daemon') {
+            \Illuminate\Support\Facades\Cache::put("cpp_presence_{$user->id}", [
+                'is_pc_online' => true,
+                'idle_seconds' => $meta['idle_seconds'] ?? 0,
+                'screen_locked' => $meta['screen_locked'] ?? false,
+                'status' => strtolower($validated['status']),
+                'updated_at' => now()->toIso8601String(),
+            ], now()->addMinutes(5));
+        } else {
+            // Discord presence
+            $effectiveStatus = !empty($validated['is_in_voice']) ? 'online' : strtolower($validated['status']);
+            \Illuminate\Support\Facades\Cache::put("discord_presence_{$user->id}", [
+                'discord_user_id' => $user->discord_user_id,
+                'effective_status' => $effectiveStatus,
+                'raw_status' => strtolower($validated['raw_status'] ?? $validated['status']),
+                'is_in_voice' => (bool)($validated['is_in_voice'] ?? false),
+                'voice_channel' => $validated['voice_channel'] ?? null,
+                'guild_name' => $validated['guild_name'] ?? null,
+                'updated_at' => now()->toIso8601String(),
+            ], now()->addDay());
+        }
 
         $result = $this->sleepEngine->handlePresence($user, $validated['status'], $source, $meta);
+
+        // Check if there is a pending notification for C++ daemon
+        $pendingNotify = \Illuminate\Support\Facades\Cache::pull("pending_daemon_notify_{$user->id}");
+        if ($pendingNotify) {
+            $result['pending_notification'] = $pendingNotify;
+        }
 
         $bedtimeHour = 23;
         $bedtimeMinute = 15;
@@ -754,7 +838,8 @@ class SleepController extends Controller
         }
 
         $token = bin2hex(random_bytes(24));
-        \Illuminate\Support\Facades\Cache::put("daemon_token_{$user->id}", $token, now()->addDays(30));
+        $user->update(['daemon_token' => $token]);
+        \Illuminate\Support\Facades\Cache::put("daemon_token_{$user->id}", $token, now()->addDays(365));
         $enableDiscord = (bool)($user->enable_discord_detection ?? true);
         $enableCpp = (bool)($user->enable_cpp_detection ?? true);
 

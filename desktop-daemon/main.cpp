@@ -341,7 +341,96 @@ void UpdateTrayTooltip(const std::wstring& tooltip);
 void ExecuteFinalEnforcement();
 void ReportPresence(const std::string& status, int idleSeconds, bool screenLocked, const std::string& alertAction = "");
 
+void HandlePendingNotification(const std::string& resp) {
+    size_t notifyPos = resp.find("\"pending_notification\"");
+    if (notifyPos == std::string::npos) return;
+
+    auto extractString = [&](const std::string& key) -> std::string {
+        size_t kpos = resp.find("\"" + key + "\"", notifyPos);
+        if (kpos == std::string::npos) return "";
+        size_t cpos = resp.find(":", kpos);
+        if (cpos == std::string::npos) return "";
+        size_t q1 = resp.find("\"", cpos);
+        if (q1 == std::string::npos) return "";
+        size_t q2 = resp.find("\"", q1 + 1);
+        if (q2 == std::string::npos) return "";
+        return resp.substr(q1 + 1, q2 - q1 - 1);
+    };
+
+    static std::string s_lastNotificationId = "";
+    std::string notifId = extractString("id");
+    if (!notifId.empty() && notifId == s_lastNotificationId) {
+        return;
+    }
+    if (!notifId.empty()) {
+        s_lastNotificationId = notifId;
+    }
+
+    std::string title = extractString("title");
+    std::string message = extractString("message");
+    std::string stage = extractString("stage");
+    std::string level = extractString("level");
+
+    if (title.empty() && message.empty()) return;
+
+    auto toWString = [](const std::string& str) -> std::wstring {
+        if (str.empty()) return L"";
+        int len = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, NULL, 0);
+        if (len <= 1) return L"";
+        std::wstring ws(len - 1, 0);
+        MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, &ws[0], len);
+        return ws;
+    };
+
+    std::wstring wTitle = toWString(title.empty() ? "SleepOrDie Guard" : title);
+    std::wstring wMessage = toWString(message);
+
+    DWORD infoFlags = NIIF_INFO;
+    if (level == "warning") infoFlags = NIIF_WARNING;
+    else if (level == "error") infoFlags = NIIF_ERROR;
+
+    ShowTrayBalloon(wTitle, wMessage, infoFlags);
+
+    if (stage == "alert") {
+        PlaySoundForStage(SleepStage::Alert);
+    } else if (stage == "lockdown") {
+        PlaySoundForStage(SleepStage::Lockdown);
+    } else if (stage == "deadline" || stage == "shutdown") {
+        PlaySoundForStage(SleepStage::Shutdown);
+    } else if (stage == "sleep_warning") {
+        PlaySoundForStage(SleepStage::SleepWarning);
+    }
+
+    size_t showDlgPos = resp.find("\"show_dialog\"", notifyPos);
+    bool showDialog = false;
+    if (showDlgPos != std::string::npos) {
+        std::string sub = resp.substr(showDlgPos, 25);
+        if (sub.find("true") != std::string::npos) showDialog = true;
+    }
+
+    if (showDialog && !g_alertModalActive.exchange(true)) {
+        std::thread([wTitle, wMessage, infoFlags, stage]() {
+            UINT mbType = MB_OK | MB_SYSTEMMODAL;
+            if (infoFlags == NIIF_WARNING) mbType |= MB_ICONWARNING;
+            else if (infoFlags == NIIF_ERROR) mbType |= MB_ICONERROR;
+            else mbType |= MB_ICONINFORMATION;
+
+            MessageBoxW(NULL, wMessage.c_str(), wTitle.c_str(), mbType);
+            g_alertModalActive.store(false);
+
+            if (stage == "lockdown" && !config.testMode) {
+                Sleep(500);
+                LockWorkStation();
+            } else if ((stage == "deadline" || stage == "shutdown") && !config.testMode) {
+                system("shutdown /s /t 30 /c \"[SleepOrDie] ระบบปิดเครื่องเนื่องจากถึงเวลาเข้านอน\"");
+            }
+        }).detach();
+    }
+}
+
 void HandleAlertStateResponse(const std::string& resp) {
+    HandlePendingNotification(resp);
+
     size_t alertPos = resp.find("\"alert_state\"");
     if (alertPos == std::string::npos) return;
 
@@ -439,6 +528,7 @@ void HandleAlertStateResponse(const std::string& resp) {
 
 void ParseServerDaemonConfig(const std::string& resp) {
     if (resp.empty()) return;
+    HandlePendingNotification(resp);
 
     auto findInt = [&](const std::string& key, int defaultVal) -> int {
         size_t pos = resp.find("\"" + key + "\"");

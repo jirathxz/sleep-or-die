@@ -50,8 +50,9 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
     'theme_preference',
     'border_style',
     'sleep_history',
+    'daemon_token',
 ])]
-#[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token', 'discord_bot_token'])]
+#[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token', 'discord_bot_token', 'daemon_token'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */

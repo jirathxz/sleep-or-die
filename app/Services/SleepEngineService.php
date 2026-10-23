@@ -560,7 +560,23 @@ class SleepEngineService
     }
 
     /**
-     * Send bedtime notification to a user via Discord DM.
+     * Queue an alert/notification for C++ desktop daemon to show tray balloon & dialog.
+     */
+    public function queueDaemonNotification(User $user, string $title, string $message, string $stage = 'alert', string $level = 'info', bool $showDialog = false): void
+    {
+        \Illuminate\Support\Facades\Cache::put("pending_daemon_notify_{$user->id}", [
+            'id' => uniqid('alert_'),
+            'title' => $title,
+            'message' => $message,
+            'stage' => $stage,
+            'level' => $level,
+            'show_dialog' => $showDialog,
+            'timestamp' => now()->timestamp,
+        ], now()->addMinutes(3));
+    }
+
+    /**
+     * Send bedtime notification to a user via Discord DM and C++ Desktop Guard.
      */
     public function sendBedtimeAlert(User $user, string $stage = 'deadline'): array
     {
@@ -569,19 +585,61 @@ class SleepEngineService
             'alert' => "🔔 [SleepOrDie] เหลืออีก 30 นาทีจะถึงเวลานอนเป้าหมาย ({$target} น.) กรุณาเตรียมตัวพักผ่อน",
             'lockdown' => "⚠️ [SleepOrDie] เหลืออีก 15 นาที! เข้าสู่ช่วง Lockdown กรุณาปิดหน้าจอและเตรียมเข้านอน",
             'deadline' => "🚨 [SleepOrDie] ถึงเวลาเข้านอนแล้ว ({$target} น.)! กรุณาเข้านอนทันที มิเช่นนั้นระบบจะถือว่าทำผิดวินัย",
+            'shutdown' => "💀 [SleepOrDie] ถึงเวลาเข้านอนแล้ว (0% HP) ดำเนินการ Shutdown คอมพิวเตอร์",
             'test' => "✨ [SleepOrDie] ยินดีด้วย! การเชื่อมต่อ Discord ของคุณทำงานได้สมบูรณ์แบบ บอทสามารถส่งแจ้งเตือนถึงคุณได้จริง",
         ];
 
         $message = $messages[$stage] ?? $messages['deadline'];
 
+        // 1. Sync with C++ Desktop Daemon
+        $cppTitles = [
+            'alert' => "🚨 แจ้งเตือนเวลาเข้านอน (Alert T-10m)",
+            'lockdown' => "🔒 เข้าสู่โหมด Lockdown (T-5m)",
+            'deadline' => "💀 เข้าสู่สถานะ Shutdown (T-0m เส้นตาย)",
+            'shutdown' => "💀 คำสั่ง Shutdown (0% HP)",
+            'test' => "✨ SleepOrDie Desktop Guard (ทดสอบเชื่อมต่อ)",
+        ];
+        $cppTitle = $cppTitles[$stage] ?? "SleepOrDie Alert";
+        $cppLevel = in_array($stage, ['deadline', 'shutdown']) ? 'error' : (in_array($stage, ['lockdown']) ? 'warning' : 'info');
+
+        $this->queueDaemonNotification($user, $cppTitle, $message, $stage, $cppLevel, $stage !== 'test');
+
+        // Also update alert_state if major stage
+        if (in_array($stage, ['alert', 'lockdown', 'deadline', 'shutdown'])) {
+            $mappedPhase = ($stage === 'deadline') ? 'shutdown' : $stage;
+            $countdown = $user->emergency_countdown_seconds ?? 60;
+            \Illuminate\Support\Facades\Cache::put("alert_state_{$user->id}", [
+                'phase' => $mappedPhase,
+                'seconds_remaining' => $countdown,
+                'total_seconds' => $countdown,
+                'is_paused' => true,
+                'step_index' => ($stage === 'alert' ? 1 : ($stage === 'lockdown' ? 2 : 4)),
+                'step_title' => $cppTitle,
+                'step_message' => $message,
+                'acknowledged' => false,
+                'triggered_at' => now()->toIso8601String(),
+                'updated_at' => now()->toIso8601String(),
+            ], now()->addHours(2));
+        }
+
+        // 2. Sync with Discord
         if (empty($user->discord_bot_token) || empty($user->discord_user_id)) {
             return [
-                'success' => false,
-                'message' => 'ยังไม่ได้ระบุ Discord Bot Token หรือ Discord User ID ของบัญชีนี้',
+                'success' => true,
+                'discord_sent' => false,
+                'cpp_sent' => true,
+                'message' => 'ส่งการแจ้งเตือนไปยัง C++ Desktop Guard เรียบร้อย (ไม่มีการตั้งค่า Discord)',
             ];
         }
 
-        return $this->sendDiscordDm($user->discord_bot_token, $user->discord_user_id, $message);
+        $discordRes = $this->sendDiscordDm($user->discord_bot_token, $user->discord_user_id, $message);
+        return [
+            'success' => $discordRes['success'],
+            'discord_sent' => $discordRes['success'],
+            'cpp_sent' => true,
+            'message' => $discordRes['message'],
+            'error_code' => $discordRes['error_code'] ?? null,
+        ];
     }
 
     /**
@@ -594,8 +652,6 @@ class SleepEngineService
         $sentCount = 0;
 
         $users = User::whereNotNull('sleep_target_time')
-            ->whereNotNull('discord_bot_token')
-            ->whereNotNull('discord_user_id')
             ->where('is_disabled', false)
             ->get();
 
@@ -675,6 +731,24 @@ class SleepEngineService
         ];
 
         \Illuminate\Support\Facades\Cache::put("alert_state_{$user->id}", $state, now()->addHours(2));
+
+        $this->queueDaemonNotification(
+            $user,
+            '🚨 แจ้งเตือนเวลาเข้านอน (Alert)',
+            "เข้าสู่ช่วงนับถอยหลังฉุกเฉิน ({$total} วินาที)! กรุณากดเข้าใจแล้วและปิดเครื่องเพื่อเข้านอน",
+            'alert',
+            'warning',
+            true
+        );
+
+        if (!empty($user->discord_bot_token) && !empty($user->discord_user_id)) {
+            $this->sendDiscordDm(
+                $user->discord_bot_token,
+                $user->discord_user_id,
+                "🚨 [SleepOrDie] เริ่มต้นการนับถอยหลังฉุกเฉินเข้านอน ({$total} วินาที)! กรุณาเตรียมตัวปิดเครื่องเข้านอน"
+            );
+        }
+
         return $state;
     }
 
@@ -699,6 +773,23 @@ class SleepEngineService
                 'triggered_at' => now()->toIso8601String(),
                 'updated_at' => now()->toIso8601String(),
             ];
+
+            $this->queueDaemonNotification(
+                $user,
+                '🔒 เข้าสู่โหมด Lockdown (จำลอง Sign Out Windows)',
+                'ระบบจำลองการออกจากระบบ Windows เพื่อบังคับวินัยการเข้านอน',
+                'lockdown',
+                'warning',
+                true
+            );
+
+            if (!empty($user->discord_bot_token) && !empty($user->discord_user_id)) {
+                $this->sendDiscordDm(
+                    $user->discord_bot_token,
+                    $user->discord_user_id,
+                    "🔒 [SleepOrDie] รับทราบการแจ้งเตือนแล้ว เข้าสู่โหมด Lockdown กรุณาอย่าย้อนกลับมาใช้คอมพิวเตอร์"
+                );
+            }
         } else {
             $state = [
                 'phase' => 'acknowledged_alert',
@@ -763,6 +854,24 @@ class SleepEngineService
         ];
 
         \Illuminate\Support\Facades\Cache::put("alert_state_{$user->id}", $state, now()->addHours(2));
+
+        $this->queueDaemonNotification(
+            $user,
+            '⚠️ ตรวจพบกลับมาใช้งาน! หัก HP 25 แต้ม',
+            'ตรวจพบการกลับมาใช้งานคอมพิวเตอร์! หัก HP 25 แต้ม (จำลอง Sleep Mode)',
+            'sleep_warning',
+            'error',
+            true
+        );
+
+        if (!empty($user->discord_bot_token) && !empty($user->discord_user_id)) {
+            $this->sendDiscordDm(
+                $user->discord_bot_token,
+                $user->discord_user_id,
+                "⚠️ [SleepOrDie] ตรวจพบว่าคุณยังเปิดใช้งานคอมพิวเตอร์! หัก HP 25 แต้ม (จำลอง Sleep Mode)"
+            );
+        }
+
         return $state;
     }
 
@@ -785,6 +894,24 @@ class SleepEngineService
         ];
 
         \Illuminate\Support\Facades\Cache::put("alert_state_{$user->id}", $state, now()->addHours(2));
+
+        $this->queueDaemonNotification(
+            $user,
+            '🚨 เข้าสู่สถานะ Shutdown (0% HP)',
+            'พลังชีวิตหมดลง! ระบบจำลองการปิดเครื่อง Shutdown สมบูรณ์แบบเพื่อรักษาวินัย',
+            'shutdown',
+            'error',
+            true
+        );
+
+        if (!empty($user->discord_bot_token) && !empty($user->discord_user_id)) {
+            $this->sendDiscordDm(
+                $user->discord_bot_token,
+                $user->discord_user_id,
+                "💀 [SleepOrDie] พลังชีวิตหมดลง (HP 0%)! เริ่มดำเนินการชัตดาวน์คอมพิวเตอร์เพื่อรักษาวินัย"
+            );
+        }
+
         return $state;
     }
 
