@@ -1293,6 +1293,12 @@ export const useSleepStore = create<SleepState>((set, get) => ({
                 if (res.ok) {
                     const data = await res.json();
                     get().syncUser(data);
+
+                    // Send instant sync signal to C++ desktop daemon local server (port 8008)
+                    try {
+                        fetch('http://127.0.0.1:8008/sync', { mode: 'no-cors' }).catch(() => {});
+                    } catch (_) {}
+
                     return true;
                 } else {
                     return false;

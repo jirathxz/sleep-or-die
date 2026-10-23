@@ -82,6 +82,36 @@ class SleepController extends Controller
         $user->update($updateData);
         $user->refresh();
 
+        // 1. Queue daemon notification to inform C++ guard daemon of the updated settings
+        $modeText = (bool)($user->test_mode ?? true) ? 'โหมดทดสอบ (Test Mode ON)' : 'โหมดวินัยจริง (Live Mode OFF)';
+        $this->sleepEngine->queueDaemonNotification(
+            $user,
+            '⚙️ ซิงค์การตั้งค่าระบบเรียบร้อย',
+            "เวลานอน: {$user->sleep_target_time} น. | ตื่น: {$user->wake_up_time} น. | {$modeText}",
+            'config_update',
+            'info',
+            false
+        );
+
+        // 2. Send instant sync signal to C++ daemon local server (port 8008)
+        try {
+            $ctx = stream_context_create([
+                'http' => [
+                    'method' => 'GET',
+                    'timeout' => 0.2,
+                    'ignore_errors' => true,
+                ],
+            ]);
+            @file_get_contents('http://127.0.0.1:8008/sync', false, $ctx);
+        } catch (\Throwable) {}
+
+        // 3. Write sync signal file for desktop daemon
+        try {
+            $signalPath = base_path('../desktop-daemon/sync.signal');
+            @file_put_contents($signalPath, (string)now()->timestamp);
+            @file_put_contents(sys_get_temp_dir() . '/sleepordie_sync.signal', (string)now()->timestamp);
+        } catch (\Throwable) {}
+
         $enableDiscord = (bool)($user->enable_discord_detection ?? true);
         $enableCpp = (bool)($user->enable_cpp_detection ?? true);
 
@@ -721,7 +751,12 @@ class SleepController extends Controller
             }
         }
 
-        if (array_key_exists('test_mode', $validated) && $validated['test_mode'] !== null) {
+        // Only update test_mode from client if explicitly instructed (e.g. tray menu toggle),
+        // preventing routine presence telemetry from overwriting web settings.
+        if (
+            (array_key_exists('test_mode', $validated) && $validated['test_mode'] !== null && $request->has('set_test_mode')) ||
+            ($request->input('alert_action') === 'toggle_test_mode')
+        ) {
             $user->update(['test_mode' => (bool)$validated['test_mode']]);
             $user->refresh();
         }

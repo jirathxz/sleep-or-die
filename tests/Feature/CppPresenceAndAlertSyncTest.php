@@ -154,3 +154,65 @@ test('alert sync state machine: alert (60s paused) -> lockdown -> sleep warning 
             ],
         ]);
 });
+
+test('settings sync: saveSettings queues daemon notification and routine presence update does not overwrite web test_mode', function () {
+    $user = User::factory()->create([
+        'test_mode' => true,
+        'sleep_target_time' => '23:00',
+        'wake_up_time' => '07:00',
+    ]);
+
+    // 1. User switches Test Mode to OFF in Web UI and saves
+    $saveRes = $this->actingAs($user)->postJson('/sleep/settings', [
+        'test_mode' => false,
+        'sleep_target_time' => '22:30',
+        'wake_up_time' => '06:30',
+    ]);
+
+    $saveRes->assertOk()
+        ->assertJson([
+            'test_mode' => false,
+            'sleep_target_time' => '22:30',
+            'wake_up_time' => '06:30',
+        ]);
+
+    expect($user->fresh()->test_mode)->toBeFalse();
+
+    // 2. Routine presence ping from C++ with test_mode=true should NOT overwrite DB test_mode
+    $presenceRes = $this->postJson('/api/presence/update', [
+        'user_id' => $user->id,
+        'source' => 'desktop_daemon',
+        'status' => 'online',
+        'idle_seconds' => 5,
+        'test_mode' => true, // Routine ping from C++ with stale local state
+    ]);
+
+    $presenceRes->assertOk();
+    expect($user->fresh()->test_mode)->toBeFalse(); // Still false!
+
+    // The daemon config returned to C++ should have the authoritative test_mode=false
+    $presenceRes->assertJson([
+        'daemon_config' => [
+            'test_mode' => false,
+            'bedtime_hour' => 22,
+            'bedtime_minute' => 30,
+        ],
+        'pending_notification' => [
+            'stage' => 'config_update',
+        ],
+    ]);
+
+    // 3. Explicit toggle from C++ tray menu DOES update test_mode
+    $toggleRes = $this->postJson('/api/presence/update', [
+        'user_id' => $user->id,
+        'source' => 'desktop_daemon',
+        'status' => 'online',
+        'alert_action' => 'toggle_test_mode',
+        'test_mode' => true,
+        'set_test_mode' => true,
+    ]);
+
+    $toggleRes->assertOk();
+    expect($user->fresh()->test_mode)->toBeTrue();
+});
+
