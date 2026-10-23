@@ -13,6 +13,8 @@
 
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #include <windows.h>
 #include <shellapi.h>
 #include <mmsystem.h>
@@ -28,6 +30,7 @@
 #include <thread>
 #include <atomic>
 
+#pragma comment(lib, "ws2_32.lib")
 #pragma comment(lib, "user32.lib")
 #pragma comment(lib, "gdi32.lib")
 #pragma comment(lib, "shell32.lib")
@@ -85,6 +88,8 @@ struct DaemonConfig {
     bool enableDiscordDetection = true;
     bool enableCppDetection = true;
     bool isSystemActive = true;
+    bool isWithinCurfew = false;
+    bool isSleeping = false;
 };
 
 // Global daemon state
@@ -94,6 +99,9 @@ NOTIFYICONDATAW g_nid = {};
 HWND g_hWnd = NULL;
 std::atomic<bool> g_simulationRunning(false);
 std::atomic<bool> g_simulatedSleeping(false);
+std::atomic<bool> g_initialSyncComplete(false);
+std::chrono::steady_clock::time_point g_startupGracePeriodUntil;
+std::time_t g_emergencyCountdownStart = 0;
 
 void SaveConfigJson() {
     std::ofstream file("config.json");
@@ -339,7 +347,11 @@ std::string g_currentAlertPhase = "idle";
 void ShowTrayBalloon(const std::wstring& title, const std::wstring& message, DWORD infoFlags = NIIF_INFO);
 void UpdateTrayTooltip(const std::wstring& tooltip);
 void ExecuteFinalEnforcement();
-void ReportPresence(const std::string& status, int idleSeconds, bool screenLocked, const std::string& alertAction = "");
+void EnterWindowsSleepMode();
+bool RefreshDaemonDataFromServer();
+bool SyncDataFromServerBlocking(int maxRetries = 5, int delayMs = 1000);
+void StartLocalSyncServer(int port = 8008);
+void ReportPresence(const std::string& status, int idleSeconds, bool screenLocked, const std::string& alertAction = "", bool syncTestMode = false);
 
 std::wstring UnescapeJsonToWString(const std::string& str) {
     if (str.empty()) return L"";
@@ -486,6 +498,9 @@ void HandlePendingNotification(const std::string& resp) {
             if (stage == "lockdown" && !config.testMode) {
                 Sleep(500);
                 LockWorkStation();
+            } else if (stage == "sleep_warning" && !config.testMode) {
+                Sleep(500);
+                EnterWindowsSleepMode();
             } else if ((stage == "deadline" || stage == "shutdown") && !config.testMode) {
                 system("shutdown /s /t 30 /c \"[SleepOrDie] ระบบปิดเครื่องเนื่องจากถึงเวลาเข้านอน\"");
             }
@@ -584,9 +599,9 @@ void HandleAlertStateResponse(const std::string& resp) {
                     MB_OK | MB_ICONERROR | MB_SYSTEMMODAL
                 );
             } else {
-                ShowTrayBalloon(L"⚠️ ตรวจพบกลับมาใช้งาน! หัก HP 25 แต้ม", L"ระบบล็อกหน้าจอเพื่อเตือนขั้นเด็ดขาด หากยังฝ่าฝืนจะเข้าสู่ Shutdown จริงทันที", NIIF_ERROR);
+                ShowTrayBalloon(L"⚠️ ตรวจพบกลับมาใช้งาน! หัก HP 25 แต้ม (REAL SLEEP)", L"ระบบสั่งเข้าสู่ Windows Sleep Mode ทันทีตามวินัยการพักผ่อน!", NIIF_ERROR);
                 Sleep(800);
-                LockWorkStation();
+                EnterWindowsSleepMode();
             }
 
             g_alertModalActive.store(false);
@@ -626,21 +641,78 @@ void ParseServerDaemonConfig(const std::string& resp) {
         return defaultVal;
     };
 
+    auto findString = [&](const std::string& key, const std::string& defaultVal) -> std::string {
+        size_t pos = resp.find("\"" + key + "\"");
+        if (pos == std::string::npos) return defaultVal;
+        size_t colon = resp.find(":", pos);
+        if (colon == std::string::npos) return defaultVal;
+        size_t q1 = resp.find("\"", colon);
+        if (q1 == std::string::npos) return defaultVal;
+        size_t q2 = resp.find("\"", q1 + 1);
+        if (q2 == std::string::npos) return defaultVal;
+        return resp.substr(q1 + 1, q2 - q1 - 1);
+    };
+
+    bool oldTestMode = config.testMode;
+
     config.bedtimeHour = findInt("bedtime_hour", config.bedtimeHour);
     config.bedtimeMinute = findInt("bedtime_minute", config.bedtimeMinute);
     config.wakeUpHour = findInt("wake_up_hour", config.wakeUpHour);
     config.wakeUpMinute = findInt("wake_up_minute", config.wakeUpMinute);
+
+    // Also support parsing "sleep_target_time": "HH:MM" if present
+    std::string sleepTargetStr = findString("sleep_target_time", "");
+    if (!sleepTargetStr.empty()) {
+        size_t colon = sleepTargetStr.find(":");
+        if (colon != std::string::npos) {
+            try {
+                config.bedtimeHour = std::stoi(sleepTargetStr.substr(0, colon));
+                config.bedtimeMinute = std::stoi(sleepTargetStr.substr(colon + 1));
+            } catch (...) {}
+        }
+    }
+
+    std::string wakeUpStr = findString("wake_up_time", "");
+    if (!wakeUpStr.empty()) {
+        size_t colon = wakeUpStr.find(":");
+        if (colon != std::string::npos) {
+            try {
+                config.wakeUpHour = std::stoi(wakeUpStr.substr(0, colon));
+                config.wakeUpMinute = std::stoi(wakeUpStr.substr(colon + 1));
+            } catch (...) {}
+        }
+    }
+
     config.emergencyCountdownSeconds = findInt("emergency_countdown_seconds", config.emergencyCountdownSeconds);
     config.currentHp = findInt("current_hp", config.currentHp);
     config.testMode = findBool("test_mode", config.testMode);
     config.enableDiscordDetection = findBool("enable_discord_detection", config.enableDiscordDetection);
     config.enableCppDetection = findBool("enable_cpp_detection", config.enableCppDetection);
     config.isSystemActive = findBool("is_system_active", config.isSystemActive);
+    config.isWithinCurfew = findBool("is_within_curfew", config.isWithinCurfew);
+    config.isSleeping = findBool("is_sleeping", config.isSleeping);
+
+    if (config.currentHp == 100) {
+        g_emergencyCountdownStart = 0;
+    }
 
     SaveConfigJson();
+
+    // Immediately update tray tooltip with new config
+    long secLeft = GetSecondsUntilBedtime(config.bedtimeHour, config.bedtimeMinute);
+    long hours = std::max(0L, secLeft / 3600);
+    long mins = std::max(0L, (secLeft % 3600) / 60);
+    std::wstring modeTag = config.testMode ? L" [Test Mode]" : L" [LIVE]";
+    std::wstring tip = L"SleepOrDie: " + std::to_wstring(hours) + L"h " + std::to_wstring(mins) + L"m to Bedtime | HP: " + std::to_wstring(config.currentHp) + L"%" + modeTag;
+    UpdateTrayTooltip(tip);
+
+    if (oldTestMode != config.testMode) {
+        std::wstring modeStr = config.testMode ? L"โหมดทดสอบ (Test Mode ON)" : L"โหมดวินัยจริง (Live Mode OFF - ล็อก/สลีป/ชัตดาวน์จริง)";
+        ShowTrayBalloon(L"SleepOrDie Guard — ซิงค์โหมดใหม่จากเว็บ", (L"อัปเดตสถานะเป็น: " + modeStr).c_str(), NIIF_INFO);
+    }
 }
 
-void RefreshDaemonDataFromServer() {
+bool RefreshDaemonDataFromServer() {
     LoadConfigJson();
 
     if (config.userId > 0 || !config.userEmail.empty() || !config.authToken.empty()) {
@@ -662,23 +734,44 @@ void RefreshDaemonDataFromServer() {
         std::string resp;
         DWORD code = 0;
         if (SendHttpJson(config.apiHost, config.apiPort, config.apiPath, json, resp, code)) {
-            ParseServerDaemonConfig(resp);
-            HandleAlertStateResponse(resp);
+            if (code == 200 && !resp.empty()) {
+                ParseServerDaemonConfig(resp);
+                HandleAlertStateResponse(resp);
+
+                // Refresh tooltip immediately
+                long secLeft = GetSecondsUntilBedtime(config.bedtimeHour, config.bedtimeMinute);
+                long hours = std::max(0L, secLeft / 3600);
+                long mins = std::max(0L, (secLeft % 3600) / 60);
+                std::wstring modeTag = config.testMode ? L" [Test Mode]" : L" [LIVE]";
+                std::wstring tip = L"SleepOrDie: " + std::to_wstring(hours) + L"h " + std::to_wstring(mins) + L"m to Bedtime | HP: " + std::to_wstring(config.currentHp) + L"%" + modeTag;
+                UpdateTrayTooltip(tip);
+
+                return true;
+            }
         }
     }
-
-    // Refresh tooltip immediately
-    long secLeft = GetSecondsUntilBedtime(config.bedtimeHour, config.bedtimeMinute);
-    long hours = std::max(0L, secLeft / 3600);
-    long mins = std::max(0L, (secLeft % 3600) / 60);
-    std::wstring modeTag = config.testMode ? L" [Test Mode]" : L" [LIVE]";
-    std::wstring tip = L"SleepOrDie: " + std::to_wstring(hours) + L"h " + std::to_wstring(mins) + L"m to Bedtime | HP: " + std::to_wstring(config.currentHp) + L"%" + modeTag;
-    UpdateTrayTooltip(tip);
+    return false;
 }
 
-void ReportPresence(const std::string& status, int idleSeconds, bool screenLocked, const std::string& alertAction) {
+bool SyncDataFromServerBlocking(int maxRetries, int delayMs) {
+    for (int attempt = 1; attempt <= maxRetries; ++attempt) {
+        if (RefreshDaemonDataFromServer()) {
+            g_initialSyncComplete.store(true);
+            return true;
+        }
+        if (attempt < maxRetries) {
+            Sleep(delayMs);
+        }
+    }
+    return false;
+}
+
+void ReportPresence(const std::string& status, int idleSeconds, bool screenLocked, const std::string& alertAction, bool syncTestMode) {
     std::string json = "{\"source\":\"desktop_daemon\",\"status\":\"" + status + "\",\"idle_seconds\":" + std::to_string(idleSeconds) + ",\"screen_locked\":" + (screenLocked ? "true" : "false");
-    json += ",\"test_mode\":" + std::string(config.testMode ? "true" : "false");
+    if (syncTestMode) {
+        json += ",\"test_mode\":" + std::string(config.testMode ? "true" : "false");
+        json += ",\"set_test_mode\":" + std::string(config.testMode ? "true" : "false");
+    }
     if (!config.discordUserId.empty()) {
         json += ",\"discord_user_id\":\"" + config.discordUserId + "\"";
     }
@@ -797,6 +890,89 @@ void ExecuteFinalEnforcement() {
     }
 }
 
+void EnterWindowsSleepMode() {
+    HANDLE hToken = NULL;
+    TOKEN_PRIVILEGES tkp = {};
+    if (OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &hToken)) {
+        LookupPrivilegeValue(NULL, SE_SHUTDOWN_NAME, &tkp.Privileges[0].Luid);
+        tkp.PrivilegeCount = 1;
+        tkp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+        AdjustTokenPrivileges(hToken, FALSE, &tkp, 0, (PTOKEN_PRIVILEGES)NULL, 0);
+        CloseHandle(hToken);
+    }
+
+    LockWorkStation();
+    Sleep(500);
+
+    BOOLEAN res = SetSuspendState(FALSE, FALSE, FALSE);
+    if (!res) {
+        system("powershell.exe -NoProfile -Command \"Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Application]::SetSuspendState([System.Windows.Forms.PowerState]::Suspend, $false, $false)\"");
+    }
+}
+
+void StartLocalSyncServer(int port) {
+    std::thread([port]() {
+        WSADATA wsaData;
+        if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
+            return;
+        }
+
+        SOCKET listenSock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+        if (listenSock == INVALID_SOCKET) {
+            WSACleanup();
+            return;
+        }
+
+        BOOL reuse = TRUE;
+        setsockopt(listenSock, SOL_SOCKET, SO_REUSEADDR, (const char*)&reuse, sizeof(reuse));
+
+        sockaddr_in service = {};
+        service.sin_family = AF_INET;
+        service.sin_addr.s_addr = inet_addr("127.0.0.1");
+        service.sin_port = htons((u_short)port);
+
+        if (bind(listenSock, (SOCKADDR*)&service, sizeof(service)) == SOCKET_ERROR) {
+            closesocket(listenSock);
+            WSACleanup();
+            return;
+        }
+
+        if (listen(listenSock, 5) == SOCKET_ERROR) {
+            closesocket(listenSock);
+            WSACleanup();
+            return;
+        }
+
+        while (true) {
+            SOCKET clientSock = accept(listenSock, NULL, NULL);
+            if (clientSock == INVALID_SOCKET) {
+                break;
+            }
+
+            char recvbuf[1024] = {0};
+            recv(clientSock, recvbuf, sizeof(recvbuf) - 1, 0);
+
+            std::string response =
+                "HTTP/1.1 200 OK\r\n"
+                "Content-Type: application/json; charset=utf-8\r\n"
+                "Access-Control-Allow-Origin: *\r\n"
+                "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n"
+                "Access-Control-Allow-Headers: Content-Type\r\n"
+                "Connection: close\r\n\r\n"
+                "{\"status\":\"synced\",\"ok\":true}";
+
+            send(clientSock, response.c_str(), (int)response.length(), 0);
+            closesocket(clientSock);
+
+            // Trigger immediate refresh from server
+            RefreshDaemonDataFromServer();
+        }
+
+        closesocket(listenSock);
+        WSACleanup();
+    }).detach();
+}
+
 void RunSimulation321() {
     if (g_simulationRunning) return;
     g_simulationRunning = true;
@@ -821,17 +997,23 @@ void RunSimulation321() {
             MB_OK | MB_ICONWARNING | MB_SYSTEMMODAL
         );
 
-        // 3. Windows Sleep Mode (T-2m) Mock MSGBOX
+        // 3. Windows Sleep Mode (T-2m)
         PlaySoundForStage(SleepStage::SleepWarning);
-        MessageBoxW(
-            NULL,
-            L"⚠️ [ขั้นตอน 3/4: จำลอง WINDOWS SLEEP MODE (T-2m)]\n\n"
-            L"หากฝ่าฝืนอีก ระบบจะเข้าสู่ Windows Sleep Mode\n\n"
-            L"[โหมดจำลอง: แสดงแจ้งเตือนโดยไม่สลีปเครื่องจริง]\n"
-            L"กด OK เพื่อดูขั้นตอนนับถอยหลังฉุกเฉินและ Shutdown",
-            L"SleepOrDie Sleep Mode (Mock)",
-            MB_OK | MB_ICONWARNING | MB_SYSTEMMODAL
-        );
+        if (config.testMode) {
+            MessageBoxW(
+                NULL,
+                L"⚠️ [ขั้นตอน 3/4: จำลอง WINDOWS SLEEP MODE (T-2m)]\n\n"
+                L"หากฝ่าฝืนอีก ระบบจะเข้าสู่ Windows Sleep Mode\n\n"
+                L"[โหมดจำลอง: แสดงแจ้งเตือนโดยไม่สลีปเครื่องจริง]\n"
+                L"กด OK เพื่อดูขั้นตอนนับถอยหลังฉุกเฉินและ Shutdown",
+                L"SleepOrDie Sleep Mode (Mock)",
+                MB_OK | MB_ICONWARNING | MB_SYSTEMMODAL
+            );
+        } else {
+            ShowTrayBalloon(L"SleepOrDie จำลอง Sleep (REAL SLEEP)", L"คุณปิด Test Mode ไว้: ระบบสั่ง Windows Sleep Mode จริง!", NIIF_WARNING);
+            Sleep(1000);
+            EnterWindowsSleepMode();
+        }
 
         // 4. Emergency Countdown before Shutdown
         int countdown = 5; // Fast demo countdown 5s
@@ -1138,11 +1320,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
                 } else if (cmd == ID_TRAY_TOGGLE_TEST_MODE) {
                     config.testMode = !config.testMode;
                     SaveConfigJson();
-                    ReportPresence("online", (int)GetUserIdleSeconds(), false);
+                    ReportPresence("online", (int)GetUserIdleSeconds(), false, "toggle_test_mode", true);
                     if (config.testMode) {
                         ShowTrayBalloon(L"SleepOrDie Settings", L"สลับเป็น: โหมดทดสอบ (Test Mode: ON)\nเมื่อถึงช่วง Lockdown หรือ Shutdown จะแสดงเพียง MessageBox", NIIF_INFO);
                     } else {
-                        ShowTrayBalloon(L"SleepOrDie Settings", L"สลับเป็น: โหมดวินัยจริง (Live Mode: OFF)\nเมื่อถึงช่วง Lockdown จะล็อกหน้าจอจริง และ HP 0% จะสั่ง Shutdown ปิดเครื่องจริง!", NIIF_WARNING);
+                        ShowTrayBalloon(L"SleepOrDie Settings", L"สลับเป็น: โหมดวินัยจริง (Live Mode: OFF)\nเมื่อถึงช่วง Lockdown จะล็อกหน้าจอจริง สลีปเครื่อง และ HP 0% จะสั่ง Shutdown ปิดเครื่องจริง!", NIIF_WARNING);
                     }
                 } else if (cmd == ID_TRAY_SIMULATE) {
                     RunSimulation321();
@@ -1152,7 +1334,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
                     DWORD statusCode = 0;
                     SendHttpJson(config.apiHost, config.apiPort, L"/api/sleep/reset-hp", jsonReq, resp, statusCode);
                     config.currentHp = 100;
+                    g_emergencyCountdownStart = 0;
                     currentStage = SleepStage::Normal;
+                    SaveConfigJson();
                     ShowTrayBalloon(L"SleepOrDie Guard", L"❤️ รีเซ็ตพลังชีวิตกลับสู่ 100% เรียบร้อยแล้ว!", NIIF_INFO);
                     std::wstring tip = L"SleepOrDie: รีเซ็ต HP เต็ม 100% เรียบร้อย";
                     UpdateTrayTooltip(tip);
@@ -1185,12 +1369,24 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
 void DaemonLoop() {
     int tickCount = 0;
 
+    // Safety check: Ensure initial sync with web server is completed before doing stage evaluation
+    if (!g_initialSyncComplete.load()) {
+        for (int i = 0; i < 3 && !g_initialSyncComplete.load(); ++i) {
+            if (RefreshDaemonDataFromServer()) {
+                g_initialSyncComplete.store(true);
+                break;
+            }
+            Sleep(1000);
+        }
+    }
+
     while (true) {
         if (g_simulationRunning) {
             Sleep(1000);
             continue;
         }
 
+        // If simulated sleeping is on, stay in mock sleep mode
         if (g_simulatedSleeping.load()) {
             std::wstring tip = L"SleepOrDie: โหมดจำลองว่านอนแล้ว (Test Sleeping) | HP: " + std::to_wstring(config.currentHp) + L"%";
             UpdateTrayTooltip(tip);
@@ -1198,6 +1394,39 @@ void DaemonLoop() {
             continue;
         }
 
+        bool withinCurfew = IsWithinCurfewHours();
+
+        // 1. Outside curfew hours -> NORMAL stage (free time, no penalty, no countdown)
+        if (!withinCurfew) {
+            currentStage = SleepStage::Normal;
+            g_emergencyCountdownStart = 0;
+            long secLeft = GetSecondsUntilBedtime(config.bedtimeHour, config.bedtimeMinute);
+            long hours = std::max(0L, secLeft / 3600);
+            long mins = std::max(0L, (secLeft % 3600) / 60);
+            std::wstring modeTag = config.testMode ? L" [Test Mode]" : L" [LIVE]";
+            std::wstring tip = L"SleepOrDie: " + std::to_wstring(hours) + L"h " + std::to_wstring(mins) + L"m to Bedtime | HP: " + std::to_wstring(config.currentHp) + L"%" + modeTag;
+            UpdateTrayTooltip(tip);
+
+            // Periodic presence sync
+            if (++tickCount % 2 == 0) {
+                DWORD idleSec = GetUserIdleSeconds();
+                ReportPresence((idleSec >= (DWORD)config.idleThresholdSeconds) ? "offline" : "online", (int)idleSec, false);
+            }
+
+            // Check for sync signal file
+            WIN32_FIND_DATAA findData;
+            HANDLE hFind = FindFirstFileA("sync.signal", &findData);
+            if (hFind != INVALID_HANDLE_VALUE) {
+                FindClose(hFind);
+                DeleteFileA("sync.signal");
+                RefreshDaemonDataFromServer();
+            }
+
+            Sleep(config.checkIntervalSeconds * 1000);
+            continue;
+        }
+
+        // 2. Within curfew hours: evaluate stages
         long secondsRemaining = GetSecondsUntilBedtime(config.bedtimeHour, config.bedtimeMinute);
         DWORD idleSeconds = GetUserIdleSeconds();
         SleepStage newStage = SleepStage::Normal;
@@ -1253,20 +1482,28 @@ void DaemonLoop() {
                     LockWorkStation();
                 }
             } else if (currentStage == SleepStage::SleepWarning) {
-                ShowTrayBalloon(L"SleepOrDie สลีปโหมด (T-2m)", L"เหลือเวลา 2 นาที! หากฝ่าฝืนอีกระบบจะสั่ง Windows Sleep Mode", NIIF_WARNING);
-                ReportPresence("offline", 120, true);
+                if (config.testMode) {
+                    ShowTrayBalloon(L"SleepOrDie สลีปโหมด (T-2m) [Test Mode ON]", L"เหลือเวลา 2 นาที! หากฝ่าฝืนอีกระบบจะสั่ง Windows Sleep Mode", NIIF_WARNING);
+                    ReportPresence("offline", 120, true);
 
-                std::thread([]() {
-                    MessageBoxW(
-                        NULL,
-                        L"⚠️ [SleepOrDie: WINDOWS SLEEP WARNING (T-2m)]\n\n"
-                        L"เหลือเวลา 2 นาทีสุดท้ายก่อนเวลานอน!\n"
-                        L"คุณยังคงฝ่าฝืนการใช้งาน ระบบเตรียมเข้าสู่ Windows Sleep Mode\n\n"
-                        L"[โหมดจำลอง: แสดงแจ้งเตือนโดยไม่สลีปเครื่องจริง]",
-                        L"SleepOrDie Sleep Mode (Mock)",
-                        MB_OK | MB_ICONWARNING | MB_SYSTEMMODAL
-                    );
-                }).detach();
+                    std::thread([]() {
+                        MessageBoxW(
+                            NULL,
+                            L"⚠️ [SleepOrDie: WINDOWS SLEEP WARNING (T-2m) — Test Mode ON]\n\n"
+                            L"เหลือเวลา 2 นาทีสุดท้ายก่อนเวลานอน!\n"
+                            L"คุณยังคงฝ่าฝืนการใช้งาน ระบบเตรียมเข้าสู่ Windows Sleep Mode\n\n"
+                            L"⚙️ โหมดจำลอง Test Mode ON: แสดงแจ้งเตือนโดยไม่สลีปเครื่องจริง\n"
+                            L"(หากปิด Test Mode ใน Settings ระบบจะเข้าสู่ Windows Sleep Mode จริงทันที)",
+                            L"SleepOrDie Sleep Mode (Mock)",
+                            MB_OK | MB_ICONWARNING | MB_SYSTEMMODAL
+                        );
+                    }).detach();
+                } else {
+                    ShowTrayBalloon(L"SleepOrDie สลีปโหมด (T-2m) [REAL SLEEP]", L"เหลือเวลา 2 นาทีสุดท้าย! ระบบสั่ง Windows Sleep Mode ทันที", NIIF_WARNING);
+                    ReportPresence("offline", 120, true);
+                    Sleep(800);
+                    EnterWindowsSleepMode();
+                }
             } else if (currentStage == SleepStage::Sleep) {
                 int countdown = config.emergencyCountdownSeconds > 0 ? config.emergencyCountdownSeconds : 60;
                 std::wstring msg = L"ถึงเวลานอนที่ตั้งไว้แล้ว! มีเวลา " + std::to_wstring(countdown) + L" วินาทีฉุกเฉินก่อน HP ลดเหลือ 0%";
@@ -1277,22 +1514,48 @@ void DaemonLoop() {
 
         // Emergency countdown if past deadline
         if (currentStage == SleepStage::Sleep) {
-            long secondsPast = -secondsRemaining;
-            long countdown = config.emergencyCountdownSeconds > 0 ? config.emergencyCountdownSeconds : 60;
-            long emergencySecondsLeft = std::max(0L, countdown - secondsPast);
-            config.currentHp = std::max(0, (int)((emergencySecondsLeft * 100) / countdown));
+            // ANTI-LOOP SHUTDOWN SAFETY CHECK:
+            // 1. Startup grace period (first 60s after opening app) NEVER shuts down
+            // 2. Server alert state authority: if server says idle or acknowledged, do not drain HP or shutdown
+            bool inStartupGrace = (std::chrono::steady_clock::now() < g_startupGracePeriodUntil);
+            bool serverIdle = (g_currentAlertPhase == "idle" || g_currentAlertPhase == "acknowledged" || g_currentAlertPhase == "acknowledged_lockdown");
 
-            PlaySoundForStage(SleepStage::Sleep);
+            if (serverIdle) {
+                g_emergencyCountdownStart = 0;
+            } else {
+                if (g_emergencyCountdownStart == 0) {
+                    g_emergencyCountdownStart = std::time(nullptr);
+                }
+                long secondsElapsed = (long)(std::time(nullptr) - g_emergencyCountdownStart);
+                long countdown = config.emergencyCountdownSeconds > 0 ? config.emergencyCountdownSeconds : 60;
+                long emergencySecondsLeft = std::max(0L, countdown - secondsElapsed);
+                if (config.currentHp > 0 && countdown > 0) {
+                    config.currentHp = std::max(0, (int)((emergencySecondsLeft * 100) / countdown));
+                }
 
-            if (emergencySecondsLeft <= 0 || config.currentHp <= 0) {
-                currentStage = SleepStage::Shutdown;
-                ExecuteFinalEnforcement();
-                break;
+                PlaySoundForStage(SleepStage::Sleep);
+
+                if (!inStartupGrace && (emergencySecondsLeft <= 0 || config.currentHp <= 0)) {
+                    currentStage = SleepStage::Shutdown;
+                    ExecuteFinalEnforcement();
+                    break;
+                }
             }
+        } else {
+            g_emergencyCountdownStart = 0;
         }
 
-        // Periodic presence sync (every 3 seconds, all day long)
-        if (++tickCount % 3 == 0) {
+        // Check for local sync signal file from Web/PHP
+        WIN32_FIND_DATAA findData;
+        HANDLE hFind = FindFirstFileA("sync.signal", &findData);
+        if (hFind != INVALID_HANDLE_VALUE) {
+            FindClose(hFind);
+            DeleteFileA("sync.signal");
+            RefreshDaemonDataFromServer();
+        }
+
+        // Periodic presence sync (every 2 seconds)
+        if (++tickCount % 2 == 0) {
             if (idleSeconds >= (DWORD)config.idleThresholdSeconds) {
                 ReportPresence("offline", (int)idleSeconds, currentStage == SleepStage::Lockdown);
             } else {
@@ -1306,6 +1569,9 @@ void DaemonLoop() {
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
     LoadConfigJson();
+
+    // Start local IPC sync listener server on 127.0.0.1:8008
+    StartLocalSyncServer(8008);
 
     std::string cmd = lpCmdLine ? lpCmdLine : "";
     if (cmd.find("--test") != std::string::npos) {
@@ -1324,6 +1590,17 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             return 0;
         }
     }
+
+    // -------------------------------------------------------------------------
+    // CRITICAL STARTUP SYNC: Fetch complete data from Web API before launching!
+    // Prevents startup shutdown loops by obtaining the authoritative HP, bedtime,
+    // curfew status, test mode, and alert state from the server first.
+    // -------------------------------------------------------------------------
+    bool synced = SyncDataFromServerBlocking(5, 1000);
+    g_initialSyncComplete.store(synced);
+
+    // Safety guard on startup: Give 60 seconds grace period to prevent immediate shutdowns
+    g_startupGracePeriodUntil = std::chrono::steady_clock::now() + std::chrono::seconds(60);
 
     // Register hidden window class for System Tray message loop
     WNDCLASSEXW wcex = {};
@@ -1350,8 +1627,21 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     Shell_NotifyIconW(NIM_ADD, &g_nid);
 
-    // Initial greeting balloon
-    std::wstring greetMsg = L"ระบบเริ่มทำงานเงียบ ๆ บน System Tray (นับถอยหลังฉุกเฉิน " + std::to_wstring(config.emergencyCountdownSeconds) + L"s)";
+    // Refresh tooltip with fresh data right after tray registration
+    long secLeft = GetSecondsUntilBedtime(config.bedtimeHour, config.bedtimeMinute);
+    long hours = std::max(0L, secLeft / 3600);
+    long mins = std::max(0L, (secLeft % 3600) / 60);
+    std::wstring modeTag = config.testMode ? L" [Test Mode]" : L" [LIVE]";
+    std::wstring tip = L"SleepOrDie: " + std::to_wstring(hours) + L"h " + std::to_wstring(mins) + L"m to Bedtime | HP: " + std::to_wstring(config.currentHp) + L"%" + modeTag;
+    UpdateTrayTooltip(tip);
+
+    // Initial greeting balloon confirming sync status
+    std::wstring greetMsg;
+    if (synced) {
+        greetMsg = L"ซิงค์ข้อมูลกับระบบเสร็จสมบูรณ์ (HP: " + std::to_wstring(config.currentHp) + L"% | โหมด: " + (config.testMode ? L"Test Mode" : L"LIVE") + L")";
+    } else {
+        greetMsg = L"เริ่มทำงาน (ระบบอยู่ในช่วงสแตนด์บายรอเชื่อมต่อเว็บ API)";
+    }
     ShowTrayBalloon(L"SleepOrDie Desktop Guard", greetMsg.c_str(), NIIF_INFO);
 
     // Launch daemon evaluation loop on worker thread

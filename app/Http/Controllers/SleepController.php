@@ -535,6 +535,25 @@ class SleepController extends Controller
         $this->sleepEngine->resetHp($user);
         $user->refresh();
 
+        // Send instant sync signal to C++ daemon local server (port 8008)
+        try {
+            $ctx = stream_context_create([
+                'http' => [
+                    'method' => 'GET',
+                    'timeout' => 0.2,
+                    'ignore_errors' => true,
+                ],
+            ]);
+            @file_get_contents('http://127.0.0.1:8008/sync', false, $ctx);
+        } catch (\Throwable) {}
+
+        // Write sync signal file for desktop daemon
+        try {
+            $signalPath = base_path('../desktop-daemon/sync.signal');
+            @file_put_contents($signalPath, (string)now()->timestamp);
+            @file_put_contents(sys_get_temp_dir() . '/sleepordie_sync.signal', (string)now()->timestamp);
+        } catch (\Throwable) {}
+
         return response()->json([
             'success' => true,
             'message' => 'รีเซ็ตพลังชีวิต (HP 100%) และรีเซ็ตสถานะสำเร็จเรียบร้อย',

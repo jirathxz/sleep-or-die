@@ -608,6 +608,7 @@ export const useSleepStore = create<SleepState>((set, get) => ({
 
             return {
                 ...data,
+                current_hp: currentHp,
                 theme_preference: themePref,
                 border_style: borderStyle,
                 inventory,
@@ -1957,9 +1958,9 @@ export const useSleepStore = create<SleepState>((set, get) => ({
                             acknowledged: false,
                         },
                     });
-                    if (get().audioEnabled) {
-                        audioManager.playLevelUpChime();
-                    }
+                    try {
+                        fetch('http://127.0.0.1:8008/sync', { mode: 'no-cors' }).catch(() => {});
+                    } catch {}
                     return true;
                 }
             }
