@@ -132,6 +132,7 @@ export interface SleepState {
     // Modals & Debrief State
     bestStreak: number;
     showHitmanModal: boolean;
+    hitmanDismissed: boolean;
     showDebriefModal: boolean;
     debriefData: DebriefData | null;
     showOverflowModal: boolean;
@@ -477,6 +478,7 @@ export const useSleepStore = create<SleepState>((set, get) => ({
     simulationElapsedPast: 0,
 
     showHitmanModal: false,
+    hitmanDismissed: false,
     showDebriefModal: false,
     debriefData: null,
     showOverflowModal: false,
@@ -539,10 +541,9 @@ export const useSleepStore = create<SleepState>((set, get) => ({
                 }
             }
 
-            // Rule: หากอยู่ในห้องคุยไม่ถือว่านอน, หาก C++ ตรวจพบว่า PC ออนไลน์ไม่ถือว่านอน, หรือหากไม่ได้เปิดใช้งานระบบเลย
-            const lastConfirmed = (!isSystemActive || isInVoice || isPcOnline)
-                ? null
-                : (data.last_sleep_confirmed_at !== undefined ? data.last_sleep_confirmed_at : state.last_sleep_confirmed_at);
+            const lastConfirmed = data.last_sleep_confirmed_at !== undefined
+                ? data.last_sleep_confirmed_at
+                : state.last_sleep_confirmed_at;
 
             // If system inactive, reset audio and maintain normal stage
             if (!isSystemActive) {
@@ -563,7 +564,7 @@ export const useSleepStore = create<SleepState>((set, get) => ({
                     voice_channel: voiceChannel,
                     cpp_presence: cppPresence,
                     alert_state: alertState,
-                    last_sleep_confirmed_at: null,
+                    last_sleep_confirmed_at: lastConfirmed,
                     wake_up_time: wakeUp,
                     sleep_target_time: target,
                     current_hp: 100,
@@ -783,6 +784,7 @@ export const useSleepStore = create<SleepState>((set, get) => ({
             secondsRemaining: timer.seconds,
             isPastDeadline: timer.isPast,
             showHitmanModal: false,
+            hitmanDismissed: false,
             showDebriefModal: false,
             showOverflowModal: false,
         });
@@ -805,6 +807,7 @@ export const useSleepStore = create<SleepState>((set, get) => ({
             secondsRemaining: timer.seconds,
             isPastDeadline: timer.isPast,
             showHitmanModal: false,
+            hitmanDismissed: false,
             showDebriefModal: false,
             showOverflowModal: false,
         });
@@ -815,12 +818,16 @@ export const useSleepStore = create<SleepState>((set, get) => ({
         if (get().audioEnabled) {
             audioManager.playHitmanBgm();
         }
-        set({ showHitmanModal: true });
+        set({
+            showHitmanModal: true,
+            hitmanDismissed: false,
+            secondsRemaining: get().secondsRemaining > 0 ? get().secondsRemaining : 15,
+        });
     },
 
     closeHitmanModal: () => {
         audioManager.stopHitmanBgm();
-        set({ showHitmanModal: false });
+        set({ showHitmanModal: false, hitmanDismissed: true });
     },
 
     closeOverflowModal: () => {
@@ -1152,6 +1159,11 @@ export const useSleepStore = create<SleepState>((set, get) => ({
         let displayMinutes = timer.minutes;
         let displayHours = timer.hours;
 
+        // Re-arm Hitman Codec when prior to bedtime target
+        if (!timer.isPast && get().hitmanDismissed) {
+            set({ hitmanDismissed: false });
+        }
+
         if (timer.isPast && !last_sleep_confirmed_at) {
             // Bedtime breached: dynamic emergency countdown before HP hits 0
             const countdownSec = get().emergency_countdown_seconds || 60;
@@ -1162,9 +1174,14 @@ export const useSleepStore = create<SleepState>((set, get) => ({
             displayMinutes = 0;
             displayHours = 0;
 
-            // Trigger Hitman Codec 140.85 screen when critical <= 15s
-            if (emergencySecondsLeft <= 15 && !get().showHitmanModal) {
+            // Trigger Hitman Codec 140.85 screen when critical <= 15s (and > 0, not already dismissed)
+            if (emergencySecondsLeft <= 15 && emergencySecondsLeft > 0 && !get().showHitmanModal && !get().hitmanDismissed) {
                 get().openHitmanModal();
+            }
+
+            // Auto-close Hitman modal if open and time has completely run out (<= 0)
+            if (emergencySecondsLeft <= 0 && get().showHitmanModal) {
+                get().closeHitmanModal();
             }
 
             // Stealth Camo protection if activeHp reaches 0
@@ -1348,6 +1365,7 @@ export const useSleepStore = create<SleepState>((set, get) => ({
                     debriefData: null,
                     stage: 'sleep',
                     showHitmanModal: false,
+                    hitmanDismissed: true,
                 });
                 return true;
             }
@@ -1370,6 +1388,7 @@ export const useSleepStore = create<SleepState>((set, get) => ({
                         simulationActive: false,
                         simulationPhase: 'idle',
                         showHitmanModal: false,
+                        hitmanDismissed: true,
                         debriefData: null,
                     });
                     return true;
@@ -1396,6 +1415,7 @@ export const useSleepStore = create<SleepState>((set, get) => ({
                 simulationPhase: 'idle',
                 last_sleep_confirmed_at: new Date().toISOString(),
                 showHitmanModal: false,
+                hitmanDismissed: true,
                 debriefData: null,
                 level: currentLvl,
                 exp: newExp,

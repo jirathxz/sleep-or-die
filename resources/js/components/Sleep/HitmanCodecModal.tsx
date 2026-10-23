@@ -28,6 +28,16 @@ export const HitmanCodecModal: React.FC<HitmanCodecModalProps> = ({
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [isOpen, onClose]);
 
+    // Automatically close when countdown has expired (<= 0) after 1 second grace
+    useEffect(() => {
+        if (isOpen && secondsRemaining <= 0) {
+            const timer = setTimeout(() => {
+                onClose();
+            }, 1000);
+            return () => clearTimeout(timer);
+        }
+    }, [isOpen, secondsRemaining, onClose]);
+
     if (!isOpen) return null;
 
     const pad = (n: number) => n.toString().padStart(2, '0');
@@ -95,7 +105,10 @@ export const HitmanCodecModal: React.FC<HitmanCodecModalProps> = ({
                 {/* Actions */}
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
                     <button
-                        onClick={onConfirmSleep}
+                        onClick={async () => {
+                            onClose();
+                            await onConfirmSleep();
+                        }}
                         className="w-full sm:w-auto flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black font-semibold text-xs tracking-wide transition-all shadow-[0_0_20px_rgba(16,185,129,0.4)] cursor-pointer"
                     >
                         <Moon className="size-4" />
