@@ -622,6 +622,7 @@ class SleepController extends Controller
             'simulate_sleep' => ['nullable', 'boolean'],
             'wake_up_simulation' => ['nullable', 'boolean'],
             'alert_action' => ['nullable', 'string'],
+            'test_mode' => ['nullable', 'boolean'],
         ]);
 
         $user = null;
@@ -650,6 +651,11 @@ class SleepController extends Controller
             if (!$isAuthorized) {
                 return response()->json(['message' => 'Unauthorized: Invalid presence webhook or daemon token'], 401);
             }
+        }
+
+        if (array_key_exists('test_mode', $validated) && $validated['test_mode'] !== null) {
+            $user->update(['test_mode' => (bool)$validated['test_mode']]);
+            $user->refresh();
         }
 
         $source = $validated['source'] ?? 'discord';

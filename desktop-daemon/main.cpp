@@ -42,6 +42,7 @@
 #define ID_TRAY_TEST_SLEEP 2005
 #define ID_TRAY_RESET_HP 2006
 #define ID_TRAY_TOGGLE_TEST_MODE 2007
+#define ID_TRAY_REFRESH 2008
 #define ID_TRAY_LOGIN 2003
 #define ID_TRAY_EXIT 2004
 
@@ -279,6 +280,9 @@ bool SendHttpJson(const std::wstring& host, int port, const std::wstring& path, 
     HINTERNET hSession = WinHttpOpen(L"SleepOrDieGuard/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
     if (!hSession) return false;
 
+    // Fast timeouts so UI doesn't freeze on network delays
+    WinHttpSetTimeouts(hSession, 1500, 1500, 2000, 2000);
+
     HINTERNET hConnect = WinHttpConnect(hSession, host.c_str(), (INTERNET_PORT)port, 0);
     if (!hConnect) {
         WinHttpCloseHandle(hSession);
@@ -333,6 +337,7 @@ std::atomic<bool> g_alertModalActive{false};
 std::string g_currentAlertPhase = "idle";
 
 void ShowTrayBalloon(const std::wstring& title, const std::wstring& message, DWORD infoFlags = NIIF_INFO);
+void UpdateTrayTooltip(const std::wstring& tooltip);
 void ExecuteFinalEnforcement();
 void ReportPresence(const std::string& status, int idleSeconds, bool screenLocked, const std::string& alertAction = "");
 
@@ -432,8 +437,87 @@ void HandleAlertStateResponse(const std::string& resp) {
     }
 }
 
+void ParseServerDaemonConfig(const std::string& resp) {
+    if (resp.empty()) return;
+
+    auto findInt = [&](const std::string& key, int defaultVal) -> int {
+        size_t pos = resp.find("\"" + key + "\"");
+        if (pos == std::string::npos) return defaultVal;
+        size_t colon = resp.find(":", pos);
+        if (colon == std::string::npos) return defaultVal;
+        size_t start = resp.find_first_of("0123456789-", colon);
+        if (start == std::string::npos) return defaultVal;
+        try {
+            return std::stoi(resp.substr(start));
+        } catch (...) {
+            return defaultVal;
+        }
+    };
+
+    auto findBool = [&](const std::string& key, bool defaultVal) -> bool {
+        size_t pos = resp.find("\"" + key + "\"");
+        if (pos == std::string::npos) return defaultVal;
+        size_t colon = resp.find(":", pos);
+        if (colon == std::string::npos) return defaultVal;
+        std::string sub = resp.substr(colon, 15);
+        if (sub.find("false") != std::string::npos) return false;
+        if (sub.find("true") != std::string::npos) return true;
+        return defaultVal;
+    };
+
+    config.bedtimeHour = findInt("bedtime_hour", config.bedtimeHour);
+    config.bedtimeMinute = findInt("bedtime_minute", config.bedtimeMinute);
+    config.wakeUpHour = findInt("wake_up_hour", config.wakeUpHour);
+    config.wakeUpMinute = findInt("wake_up_minute", config.wakeUpMinute);
+    config.emergencyCountdownSeconds = findInt("emergency_countdown_seconds", config.emergencyCountdownSeconds);
+    config.currentHp = findInt("current_hp", config.currentHp);
+    config.testMode = findBool("test_mode", config.testMode);
+    config.enableDiscordDetection = findBool("enable_discord_detection", config.enableDiscordDetection);
+    config.enableCppDetection = findBool("enable_cpp_detection", config.enableCppDetection);
+    config.isSystemActive = findBool("is_system_active", config.isSystemActive);
+
+    SaveConfigJson();
+}
+
+void RefreshDaemonDataFromServer() {
+    LoadConfigJson();
+
+    if (config.userId > 0 || !config.userEmail.empty() || !config.authToken.empty()) {
+        std::string json = "{\"source\":\"desktop_daemon\",\"status\":\"online\",\"idle_seconds\":" + std::to_string(GetUserIdleSeconds()) + ",\"screen_locked\":false";
+        if (!config.discordUserId.empty()) {
+            json += ",\"discord_user_id\":\"" + config.discordUserId + "\"";
+        }
+        if (config.userId > 0) {
+            json += ",\"user_id\":" + std::to_string(config.userId);
+        }
+        if (!config.authToken.empty()) {
+            json += ",\"auth_token\":\"" + config.authToken + "\"";
+        }
+        if (!config.userEmail.empty()) {
+            json += ",\"email\":\"" + config.userEmail + "\"";
+        }
+        json += "}";
+
+        std::string resp;
+        DWORD code = 0;
+        if (SendHttpJson(config.apiHost, config.apiPort, config.apiPath, json, resp, code)) {
+            ParseServerDaemonConfig(resp);
+            HandleAlertStateResponse(resp);
+        }
+    }
+
+    // Refresh tooltip immediately
+    long secLeft = GetSecondsUntilBedtime(config.bedtimeHour, config.bedtimeMinute);
+    long hours = std::max(0L, secLeft / 3600);
+    long mins = std::max(0L, (secLeft % 3600) / 60);
+    std::wstring modeTag = config.testMode ? L" [Test Mode]" : L" [LIVE]";
+    std::wstring tip = L"SleepOrDie: " + std::to_wstring(hours) + L"h " + std::to_wstring(mins) + L"m to Bedtime | HP: " + std::to_wstring(config.currentHp) + L"%" + modeTag;
+    UpdateTrayTooltip(tip);
+}
+
 void ReportPresence(const std::string& status, int idleSeconds, bool screenLocked, const std::string& alertAction) {
     std::string json = "{\"source\":\"desktop_daemon\",\"status\":\"" + status + "\",\"idle_seconds\":" + std::to_string(idleSeconds) + ",\"screen_locked\":" + (screenLocked ? "true" : "false");
+    json += ",\"test_mode\":" + std::string(config.testMode ? "true" : "false");
     if (!config.discordUserId.empty()) {
         json += ",\"discord_user_id\":\"" + config.discordUserId + "\"";
     }
@@ -442,6 +526,9 @@ void ReportPresence(const std::string& status, int idleSeconds, bool screenLocke
     }
     if (!config.authToken.empty()) {
         json += ",\"auth_token\":\"" + config.authToken + "\"";
+    }
+    if (!config.userEmail.empty()) {
+        json += ",\"email\":\"" + config.userEmail + "\"";
     }
     if (!alertAction.empty()) {
         json += ",\"alert_action\":\"" + alertAction + "\"";
@@ -452,38 +539,7 @@ void ReportPresence(const std::string& status, int idleSeconds, bool screenLocke
         std::string resp;
         DWORD code = 0;
         if (SendHttpJson(config.apiHost, config.apiPort, config.apiPath, json, resp, code)) {
-            // Check if response contains updated countdown
-            size_t pos = resp.find("\"emergency_countdown_seconds\"");
-            if (pos != std::string::npos) {
-                size_t colon = resp.find(":", pos);
-                if (colon != std::string::npos) {
-                    size_t start = resp.find_first_of("0123456789", colon);
-                    if (start != std::string::npos) {
-                        try {
-                            int sec = std::stoi(resp.substr(start));
-                            if (sec >= 10 && sec <= 300) {
-                                config.emergencyCountdownSeconds = sec;
-                            }
-                        } catch (...) {}
-                    }
-                }
-            }
-
-            // Check if response contains updated test_mode setting
-            size_t tmPos = resp.find("\"test_mode\"");
-            if (tmPos != std::string::npos) {
-                size_t colon = resp.find(":", tmPos);
-                if (colon != std::string::npos) {
-                    std::string valSub = resp.substr(colon, 12);
-                    if (valSub.find("false") != std::string::npos) {
-                        config.testMode = false;
-                    } else if (valSub.find("true") != std::string::npos) {
-                        config.testMode = true;
-                    }
-                }
-            }
-
-            // Sync alert state from server
+            ParseServerDaemonConfig(resp);
             HandleAlertStateResponse(resp);
         }
     }).detach();
@@ -852,6 +908,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
     switch (message) {
         case WM_TRAYICON: {
             if (LOWORD(lParam) == WM_RBUTTONUP || LOWORD(lParam) == WM_LBUTTONDBLCLK) {
+                // 🔄 Refresh latest data from server and local config every time user right-clicks the tray!
+                RefreshDaemonDataFromServer();
+
                 POINT pt;
                 GetCursorPos(&pt);
                 HMENU hMenu = CreatePopupMenu();
@@ -867,6 +926,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
                 AppendMenuW(hMenu, MF_STRING | MF_GRAYED, 0, timeText.c_str());
                 AppendMenuW(hMenu, MF_SEPARATOR, 0, NULL);
                 AppendMenuW(hMenu, MF_STRING, ID_TRAY_STATUS, L"📊 ดูข้อมูลสถานะการนอน");
+                AppendMenuW(hMenu, MF_STRING, ID_TRAY_REFRESH, L"🔄 รีเฟรชข้อมูลล่าสุด (Refresh Data)");
 
                 std::wstring testSleepText = g_simulatedSleeping.load()
                     ? L"☀️ ทดสอบ: ยกเลิกโหมดจำลองนอน (Wake Up)"
@@ -889,6 +949,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
                 DestroyMenu(hMenu);
 
                 if (cmd == ID_TRAY_STATUS) {
+                    RefreshDaemonDataFromServer();
+
                     int wlen = MultiByteToWideChar(CP_UTF8, 0, config.userEmail.c_str(), -1, NULL, 0);
                     std::wstring wEmail = (wlen > 1) ? std::wstring(wlen - 1, 0) : L"(ยังไม่ล็อกอิน)";
                     if (wlen > 1) {
@@ -905,6 +967,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
                                         L"• โหมดทดสอบจำลองนอน: " + (g_simulatedSleeping.load() ? L"เปิดใช้งานอยู่ (Simulated Sleeping)" : L"ไม่ได้เปิด") + L"\n"
                                         L"• สถานะเคอร์ฟิว: " + (IsWithinCurfewHours() ? L"กำลังอยู่ในช่วงเคอร์ฟิวเข้านอน" : L"ช่วงเวลาปกติ");
                     MessageBoxW(hWnd, info.c_str(), L"สถานะระบบ SleepOrDie", MB_OK | MB_ICONINFORMATION);
+                } else if (cmd == ID_TRAY_REFRESH) {
+                    RefreshDaemonDataFromServer();
+                    ShowTrayBalloon(L"SleepOrDie Guard", L"🔄 รีเฟรชข้อมูลสถานะล่าสุดจากระบบเรียบร้อยแล้ว!", NIIF_INFO);
                 } else if (cmd == ID_TRAY_TEST_SLEEP) {
                     bool sleeping = !g_simulatedSleeping.load();
                     g_simulatedSleeping.store(sleeping);
@@ -912,6 +977,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
                 } else if (cmd == ID_TRAY_TOGGLE_TEST_MODE) {
                     config.testMode = !config.testMode;
                     SaveConfigJson();
+                    ReportPresence("online", (int)GetUserIdleSeconds(), false);
                     if (config.testMode) {
                         ShowTrayBalloon(L"SleepOrDie Settings", L"สลับเป็น: โหมดทดสอบ (Test Mode: ON)\nเมื่อถึงช่วง Lockdown หรือ Shutdown จะแสดงเพียง MessageBox", NIIF_INFO);
                     } else {
