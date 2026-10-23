@@ -836,6 +836,8 @@ class SleepController extends Controller
             'enable_cpp_detection' => $enableCpp,
             'test_mode' => (bool)($user->test_mode ?? true),
             'is_system_active' => $enableDiscord || $enableCpp,
+            'is_within_curfew' => $this->sleepEngine->isWithinBedtimeHours($user),
+            'is_sleeping' => (bool)$user->last_sleep_confirmed_at,
         ];
 
         return response()->json($result, 200, [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
@@ -895,6 +897,8 @@ class SleepController extends Controller
             'enable_cpp_detection' => $enableCpp,
             'test_mode' => (bool)($user->test_mode ?? true),
             'is_system_active' => $enableDiscord || $enableCpp,
+            'is_within_curfew' => $this->sleepEngine->isWithinBedtimeHours($user),
+            'is_sleeping' => (bool)$user->last_sleep_confirmed_at,
         ]);
     }
 
