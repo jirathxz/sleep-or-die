@@ -242,6 +242,11 @@ export const CountdownDisplay: React.FC<CountdownDisplayProps> = ({
         dotColor = 'bg-rose-500';
         stageTextColor = 'text-rose-400 font-medium';
         digitsColor = 'text-zinc-500';
+    } else if (isInVoice && enableCpp && isPcOnline) {
+        stageText = `ตรวจพบอยู่ในห้องคุยเสียง Discord ${voiceChannel ? `("${voiceChannel}")` : ''} และ C++ Guard (PC มีการใช้งาน) • ไม่ถือว่านอน`;
+        dotColor = 'bg-rose-500 animate-pulse';
+        stageTextColor = 'text-rose-400 font-medium';
+        digitsColor = 'text-white';
     } else if (isInVoice) {
         stageText = `ตรวจพบอยู่ในห้องคุยเสียง Discord ${voiceChannel ? `("${voiceChannel}")` : ''} • ไม่ถือว่านอน`;
         dotColor = 'bg-rose-500 animate-pulse';
@@ -368,26 +373,29 @@ export const CountdownDisplay: React.FC<CountdownDisplayProps> = ({
 
                 {/* Active Status Alert: Displays only when there is an active event/warning */}
                 {(!isSystemActive || isInVoice || isVerifying || (enableCpp && isPcOnline)) && (
-                    <div className="flex items-center justify-center">
-                        {!isSystemActive ? (
+                    <div className="flex flex-wrap items-center justify-center gap-2">
+                        {!isSystemActive && (
                             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-800/60 border border-white/5 text-[11px] text-zinc-400">
                                 <AlertCircle className="size-3.5 text-zinc-500" />
                                 <span>ปิดการตรวจจับทั้งหมด</span>
                             </div>
-                        ) : isInVoice ? (
+                        )}
+                        {isSystemActive && isInVoice && (
                             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-[11px] text-rose-300">
                                 <Volume2 className="size-3.5 text-rose-400 shrink-0" />
                                 <span>อยู่ในห้องคุยเสียง {voiceChannel ? `"${voiceChannel}"` : ''} • ยังไม่ถือว่านอน</span>
                             </div>
-                        ) : isVerifying ? (
+                        )}
+                        {isSystemActive && (enableCpp && isPcOnline) && (
+                            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300">
+                                <Shield className="size-3.5 text-amber-400 shrink-0" />
+                                <span>C++ Guard ตรวจพบ PC มีการใช้งาน • ยังไม่ถือว่านอน</span>
+                            </div>
+                        )}
+                        {isSystemActive && isVerifying && (
                             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-400">
                                 <Moon className="size-3.5 text-emerald-400 shrink-0" />
                                 <span>บันทึกสถานะนอนแล้ว • ตรวจจับผ่าน Discord & C++</span>
-                            </div>
-                        ) : (
-                            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300">
-                                <span className="size-1.5 rounded-full bg-amber-400 animate-pulse" />
-                                <span>C++ Guard ตรวจพบ PC มีการใช้งาน</span>
                             </div>
                         )}
                     </div>
